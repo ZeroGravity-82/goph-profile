@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 const (
 	// MaxFileNameLength ограничивает исходное имя файла аватарки.
@@ -46,8 +50,8 @@ const (
 
 // Avatar описывает аватарку пользователя и ключи ее файлов.
 type Avatar struct {
-	ID                AvatarID
-	UserID            UserID
+	ID                uuid.UUID
+	UserID            uuid.UUID
 	FileName          string
 	MIMEType          string
 	SizeBytes         int64
@@ -64,19 +68,19 @@ type Avatar struct {
 
 // NewProcessingAvatar создает аватарку после загрузки исходного файла.
 func NewProcessingAvatar(
-	id AvatarID,
-	userID UserID,
+	id uuid.UUID,
+	userID uuid.UUID,
 	fileName string,
 	mimeType string,
 	sizeBytes int64,
 	objectKeyOriginal string,
 	now time.Time,
 ) (Avatar, error) {
-	if err := validateAvatarID(id); err != nil {
-		return Avatar{}, err
+	if id == uuid.Nil {
+		return Avatar{}, ErrInvalidID
 	}
-	if err := validateUserID(userID); err != nil {
-		return Avatar{}, err
+	if userID == uuid.Nil {
+		return Avatar{}, ErrInvalidID
 	}
 	if err := validateAvatarMetadata(fileName, mimeType, sizeBytes, objectKeyOriginal); err != nil {
 		return Avatar{}, err
@@ -95,7 +99,7 @@ func NewProcessingAvatar(
 }
 
 // CanBeCurrent проверяет, можно ли выбрать аватарку текущей.
-func (a Avatar) CanBeCurrent() error {
+func (a *Avatar) CanBeCurrent() error {
 	if a.DeletedAt != nil || a.Status == AvatarStatusDeleting || a.Status == AvatarStatusDeleted {
 		return ErrAvatarDeleted
 	}

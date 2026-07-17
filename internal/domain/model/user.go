@@ -1,31 +1,34 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // User описывает пользователя сервиса.
 type User struct {
-	ID              UserID
+	ID              uuid.UUID
 	Email           Email
-	CurrentAvatarID *AvatarID
+	CurrentAvatarID *uuid.UUID
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
 
-// NewUser создает пользователя с нормализованным email.
-func NewUser(id UserID, email string, now time.Time) (User, error) {
-	if err := validateUserID(id); err != nil {
-		return User{}, err
+// Email содержит нормализованный email пользователя.
+type Email string
+
+// NewUserID создает UUIDv7 для пользователя.
+func NewUserID() (uuid.UUID, error) {
+	return uuid.NewV7()
+}
+
+// NewUser создает пользователя.
+func NewUser(id uuid.UUID, email Email, now time.Time) (User, error) {
+	if id == uuid.Nil {
+		return User{}, ErrInvalidID
 	}
-	normalizedEmail, err := NormalizeEmail(email)
-	if err != nil {
-		return User{}, err
-	}
-	return User{
-		ID:        id,
-		Email:     normalizedEmail,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}, nil
+	return User{ID: id, Email: email, CreatedAt: now, UpdatedAt: now}, nil
 }
 
 // SelectCurrentAvatar выбирает готовую аватарку пользователя как текущую.
@@ -46,7 +49,7 @@ func (u *User) SelectCurrentAvatar(avatar Avatar, now time.Time) error {
 }
 
 // ClearCurrentAvatar сбрасывает текущую аватарку.
-func (u *User) ClearCurrentAvatar(avatarID AvatarID, now time.Time) bool {
+func (u *User) ClearCurrentAvatar(avatarID uuid.UUID, now time.Time) bool {
 	if u.CurrentAvatarID == nil || *u.CurrentAvatarID != avatarID {
 		return false
 	}

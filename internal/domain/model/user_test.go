@@ -14,13 +14,23 @@ func TestNewUser(t *testing.T) {
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 
 	// Act
-	user, err := NewUser("user-id", "User@Example.COM", now)
+	user, err := NewUser(testUserID, "user@example.com", now)
 
 	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, UserID("user-id"), user.ID)
+	assert.Equal(t, testUserID, user.ID)
 	assert.Equal(t, Email("user@example.com"), user.Email)
 	assert.Nil(t, user.CurrentAvatarID)
+}
+
+// TestNewUserID проверяет генерацию UUIDv7 для пользователя.
+func TestNewUserID(t *testing.T) {
+	// Act
+	id, err := NewUserID()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, testUserID.Version(), id.Version())
 }
 
 // TestSelectCurrentAvatar проверяет выбор готовой аватарки как текущей.
@@ -28,11 +38,12 @@ func TestSelectCurrentAvatar(t *testing.T) {
 	// Arrange
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 	updatedAt := now.Add(time.Second)
-	user := mustUser(t, now)
+	user, err := NewUser(testUserID, "user@example.com", now)
+	require.NoError(t, err)
 	avatar := mustReadyAvatar(t, now)
 
 	// Act
-	err := user.SelectCurrentAvatar(avatar, updatedAt)
+	err = user.SelectCurrentAvatar(avatar, updatedAt)
 
 	// Assert
 	require.NoError(t, err)
@@ -52,12 +63,13 @@ func TestSelectCurrentAvatar(t *testing.T) {
 func TestSelectCurrentAvatar_RejectsForeignAvatar(t *testing.T) {
 	// Arrange
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
-	user := mustUser(t, now)
+	user, err := NewUser(testUserID, "user@example.com", now)
+	require.NoError(t, err)
 	avatar := mustReadyAvatar(t, now)
-	avatar.UserID = "another-user-id"
+	avatar.UserID = testOtherUserID
 
 	// Act
-	err := user.SelectCurrentAvatar(avatar, now)
+	err = user.SelectCurrentAvatar(avatar, now)
 
 	// Assert
 	require.ErrorIs(t, err, ErrAvatarForbidden)
@@ -68,7 +80,8 @@ func TestClearCurrentAvatar(t *testing.T) {
 	// Arrange
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 	updatedAt := now.Add(time.Second)
-	user := mustUser(t, now)
+	user, err := NewUser(testUserID, "user@example.com", now)
+	require.NoError(t, err)
 	avatar := mustReadyAvatar(t, now)
 	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
 
@@ -85,15 +98,6 @@ func TestClearCurrentAvatar(t *testing.T) {
 
 	// Assert
 	assert.False(t, cleared)
-}
-
-func mustUser(t *testing.T, now time.Time) User {
-	t.Helper()
-
-	user, err := NewUser("user-id", "user@example.com", now)
-	require.NoError(t, err)
-
-	return user
 }
 
 func mustReadyAvatar(t *testing.T, now time.Time) Avatar {

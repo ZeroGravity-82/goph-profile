@@ -5,10 +5,6 @@ import "errors"
 var (
 	// ErrInvalidID возвращается при пустом доменном идентификаторе.
 	ErrInvalidID = errors.New("invalid id")
-	// ErrInvalidEmail возвращается при пустом или некорректном email.
-	ErrInvalidEmail = errors.New("invalid email")
-	// ErrEmailTooLong возвращается при превышении доменного лимита email.
-	ErrEmailTooLong = errors.New("email too long")
 	// ErrInvalidAvatarMetadata возвращается при некорректных метаданных.
 	ErrInvalidAvatarMetadata = errors.New("invalid avatar metadata")
 	// ErrFileTooLarge возвращается при слишком большом размере файла.
