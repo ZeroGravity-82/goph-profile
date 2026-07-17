@@ -167,11 +167,15 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 	}
 
 	if err = uc.avatarRepo.Create(ctx, avatar); err != nil {
-		deleteErr := wrapCleanupError(
-			"delete uploaded original after create failure",
-			uc.fileStorage.Delete(ctx, objectKeyOriginal),
-		)
-		return UploadAvatarOutput{}, joinUploadError(fmt.Errorf("create avatar: %w", err), deleteErr)
+		deleteErr := uc.fileStorage.Delete(ctx, objectKeyOriginal)
+		if deleteErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to delete uploaded original after create avatar error: %w; delete error: %w",
+				err,
+				deleteErr,
+			)
+		}
+		return UploadAvatarOutput{}, fmt.Errorf("create avatar: %w", err)
 	}
 
 	message := AvatarProcessingMessage{
@@ -180,14 +184,34 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 		ObjectKeyOriginal: avatar.ObjectKeyOriginal,
 	}
 	if err = uc.publisher.PublishAvatarProcessing(ctx, message); err != nil {
-		deleteAvatarErr := wrapCleanupError("delete avatar after publish failure", uc.avatarRepo.Delete(ctx, avatar.ID))
-		deleteObjectErr := wrapCleanupError(
-			"delete uploaded original after publish failure",
-			uc.fileStorage.Delete(ctx, objectKeyOriginal),
-		)
-		publishErr := fmt.Errorf("publish avatar processing message: %w", err)
+		deleteAvatarErr := uc.avatarRepo.Delete(ctx, avatar.ID)
+		deleteObjectErr := uc.fileStorage.Delete(ctx, objectKeyOriginal)
 
-		return UploadAvatarOutput{}, joinUploadError(publishErr, deleteAvatarErr, deleteObjectErr)
+		if deleteAvatarErr != nil && deleteObjectErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to delete avatar and uploaded original after publish avatar processing message error: %w; "+
+					"delete avatar error: %w; delete error: %w",
+				err,
+				deleteAvatarErr,
+				deleteObjectErr,
+			)
+		}
+		if deleteAvatarErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to delete avatar after publish avatar processing message error: %w; delete avatar error: %w",
+				err,
+				deleteAvatarErr,
+			)
+		}
+		if deleteObjectErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to delete uploaded original after publish avatar processing message error: %w; delete error: %w",
+				err,
+				deleteObjectErr,
+			)
+		}
+
+		return UploadAvatarOutput{}, fmt.Errorf("publish avatar processing message: %w", err)
 	}
 
 	return uploadAvatarOutput(avatar), nil
@@ -312,21 +336,4 @@ func avatarObjectKeys(avatar model.Avatar) []string {
 		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb300)
 	}
 	return objectKeys
-}
-
-func wrapCleanupError(message string, err error) error {
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("%s: %w", message, err)
-}
-
-func joinUploadError(err error, cleanupErrs ...error) error {
-	errs := []error{err}
-	for _, cleanupErr := range cleanupErrs {
-		if cleanupErr != nil {
-			errs = append(errs, cleanupErr)
-		}
-	}
-	return errors.Join(errs...)
 }

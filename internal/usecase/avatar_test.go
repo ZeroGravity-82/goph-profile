@@ -226,9 +226,11 @@ func TestAvatarUseCase_UploadAvatar_DeletesAvatarAndOriginalObjectAfterPublishEr
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	publishErr := errors.New("publish error")
+	deleteAvatarErr := errors.New("delete avatar error")
+	deleteObjectErr := errors.New("delete object error")
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
-	avatarRepo := &avatarRepositoryFake{}
-	fileStore := &fileStoreFake{objectKey: testObjectKeyOriginal}
+	avatarRepo := &avatarRepositoryFake{deleteErr: deleteAvatarErr}
+	fileStore := &fileStoreFake{objectKey: testObjectKeyOriginal, deleteErr: deleteObjectErr}
 	messagePublisher := &avatarMessagePublisherFake{err: publishErr}
 	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, fileStore, messagePublisher)
 
@@ -237,6 +239,8 @@ func TestAvatarUseCase_UploadAvatar_DeletesAvatarAndOriginalObjectAfterPublishEr
 
 	// Assert
 	require.ErrorIs(t, err, publishErr)
+	require.ErrorIs(t, err, deleteAvatarErr)
+	require.ErrorIs(t, err, deleteObjectErr)
 	assert.Zero(t, result)
 	require.Len(t, avatarRepo.created, 1)
 	assert.Equal(t, []uuid.UUID{avatarRepo.created[0].ID}, avatarRepo.deletedIDs)
