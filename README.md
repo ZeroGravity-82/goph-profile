@@ -85,11 +85,15 @@ SPA работает так:
 GET /api/v1/avatar?email=user@example.com
 ```
 
-Если пользователь или готовая аватарка не найдены, сервис возвращает стандартную PNG-заглушку. Заглушка хранится как статический ресурс:
+Если пользователь или текущая готовая аватарка не найдены, сервис возвращает стандартную PNG-заглушку. Заглушка хранится как статический ресурс:
 
 ```text
 web/static/default-avatar.png
 ```
+
+Текущая аватарка выбирается явно. Для этого у пользователя хранится ссылка на текущую аватарку. Публичная выдача по email возвращает выбранную текущую аватарку, только если она имеет статус `ready` и не удалена. Если текущая аватарка не выбрана, еще обрабатывается или удалена, сервис возвращает стандартную заглушку.
+
+Первая успешно обработанная аватарка пользователя становится текущей автоматически, если у пользователя еще нет выбранной текущей аватарки. Последующие загрузки не меняют текущую аватарку без явного выбора пользователя.
 
 ### Хранение файлов
 
@@ -136,6 +140,7 @@ type AvatarDeleteEvent struct {
 app_user
 - id UUID PRIMARY KEY
 - email VARCHAR(255) NOT NULL
+- current_avatar_id UUID NULL REFERENCES avatar(id)
 - created_at TIMESTAMPTZ NOT NULL
 - updated_at TIMESTAMPTZ NOT NULL
 - deleted_at TIMESTAMPTZ NULL
@@ -157,7 +162,11 @@ avatar
 - deleted_at TIMESTAMPTZ NULL
 ```
 
-Для активных пользователей нужен уникальный индекс по `lower(email)`, чтобы `User@Example.com` и `user@example.com` считались одним пользователем.
+Из-за взаимной ссылки `app_user.current_avatar_id -> avatar.id` и `avatar.user_id -> app_user.id` миграция может сначала создать `app_user` без `current_avatar_id`, затем создать `avatar`, а после этого добавить `current_avatar_id` через `ALTER TABLE`.
+
+Для активных пользователей нужен уникальный индекс по `lower(email)` в таблице `app_user`, чтобы `User@Example.com` и `user@example.com` считались одним пользователем.
+
+Текущая аватарка должна принадлежать тому же пользователю, быть в статусе `ready` и не иметь `deleted_at`. Этот инвариант проверяется в usecase выбора текущей аватарки; если потребуется жесткая защита на уровне БД, ее можно добавить отдельным ограничением или триггером.
 
 Статус аватарки хранится в PostgreSQL ENUM `avatar_status`:
 
@@ -196,6 +205,7 @@ DELETE /api/v1/avatars/{avatar_id}
 
 GET    /api/v1/users/{user_id}/avatar
 GET    /api/v1/users/{user_id}/avatars
+PUT    /api/v1/users/{user_id}/avatar/current
 DELETE /api/v1/users/{user_id}/avatar
 
 GET    /health
