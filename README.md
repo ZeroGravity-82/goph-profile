@@ -63,7 +63,7 @@ GophProfile - микросервис для управления аватарк�
 Внутри сервиса пользователь имеет стабильный UUID:
 
 ```text
-users.id -> avatars.user_id
+app_user.id -> avatar.user_id
 ```
 
 Email используется как публичный атрибут для поиска аватарки внешними сервисами. Такой подход позволяет нормализовать email, искать его без учета регистра и не использовать изменяемый пользовательский атрибут как внутренний ключ владения.
@@ -133,16 +133,16 @@ type AvatarDeleteEvent struct {
 Предварительная схема для MVP:
 
 ```text
-users
+app_user
 - id UUID PRIMARY KEY
 - email VARCHAR(255) NOT NULL
 - created_at TIMESTAMPTZ NOT NULL
 - updated_at TIMESTAMPTZ NOT NULL
 - deleted_at TIMESTAMPTZ NULL
 
-avatars
+avatar
 - id UUID PRIMARY KEY
-- user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT
+- user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE RESTRICT
 - file_name VARCHAR(255) NOT NULL
 - mime_type VARCHAR(255) NOT NULL
 - size_bytes BIGINT NOT NULL
