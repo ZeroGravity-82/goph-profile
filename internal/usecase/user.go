@@ -34,11 +34,11 @@ type UserUseCase struct {
 }
 
 // NewUserUseCase создает UserUseCase.
-func NewUserUseCase(users userRepository) (*UserUseCase, error) {
-	if users == nil {
+func NewUserUseCase(userRepo userRepository) (*UserUseCase, error) {
+	if userRepo == nil {
 		return nil, errors.New("user repository is not provided")
 	}
-	return &UserUseCase{userRepo: users}, nil
+	return &UserUseCase{userRepo: userRepo}, nil
 }
 
 // ResolveUserByEmail возвращает пользователя по email или создает его.

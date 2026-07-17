@@ -1,0 +1,87 @@
+package usecase
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+)
+
+type avatarUserRepositoryFake struct {
+	user model.User
+	err  error
+	ids  []uuid.UUID
+}
+
+func (r *avatarUserRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.User, error) {
+	r.ids = append(r.ids, id)
+	return r.user, r.err
+}
+
+type avatarRepositoryFake struct {
+	createErr  error
+	deleteErr  error
+	created    []model.Avatar
+	deletedIDs []uuid.UUID
+}
+
+func (r *avatarRepositoryFake) Create(_ context.Context, avatar model.Avatar) error {
+	r.created = append(r.created, avatar)
+	return r.createErr
+}
+
+func (r *avatarRepositoryFake) Delete(_ context.Context, id uuid.UUID) error {
+	r.deletedIDs = append(r.deletedIDs, id)
+	return r.deleteErr
+}
+
+type putObjectCall struct {
+	objectKey string
+	content   []byte
+}
+
+type objectKeyCall struct {
+	userID   uuid.UUID
+	avatarID uuid.UUID
+}
+
+type fileStoreFake struct {
+	objectKey      string
+	putErr         error
+	deleteErr      error
+	objectKeyCalls []objectKeyCall
+	puts           []putObjectCall
+	deletes        []string
+}
+
+func (s *fileStoreFake) ObjectKey(userID uuid.UUID, avatarID uuid.UUID) string {
+	s.objectKeyCalls = append(s.objectKeyCalls, objectKeyCall{userID: userID, avatarID: avatarID})
+	if s.objectKey != "" {
+		return s.objectKey
+	}
+	return testObjectKeyOriginal
+}
+
+func (s *fileStoreFake) Put(_ context.Context, objectKey string, content []byte) error {
+	s.puts = append(s.puts, putObjectCall{objectKey: objectKey, content: content})
+	return s.putErr
+}
+
+func (s *fileStoreFake) Delete(_ context.Context, objectKey string) error {
+	s.deletes = append(s.deletes, objectKey)
+	return s.deleteErr
+}
+
+type avatarMessagePublisherFake struct {
+	err      error
+	messages []AvatarProcessingMessage
+}
+
+func (p *avatarMessagePublisherFake) PublishAvatarProcessing(
+	_ context.Context,
+	message AvatarProcessingMessage,
+) error {
+	p.messages = append(p.messages, message)
+	return p.err
+}
