@@ -9,9 +9,11 @@ import (
 )
 
 type avatarUserRepositoryFake struct {
-	user model.User
-	err  error
-	ids  []uuid.UUID
+	user      model.User
+	err       error
+	updateErr error
+	ids       []uuid.UUID
+	updated   []model.User
 }
 
 func (r *avatarUserRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.User, error) {
@@ -19,11 +21,24 @@ func (r *avatarUserRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (mod
 	return r.user, r.err
 }
 
+func (r *avatarUserRepositoryFake) Update(_ context.Context, user model.User) error {
+	r.updated = append(r.updated, user)
+	return r.updateErr
+}
+
 type avatarRepositoryFake struct {
+	avatar     model.Avatar
+	getErr     error
 	createErr  error
 	deleteErr  error
+	ids        []uuid.UUID
 	created    []model.Avatar
 	deletedIDs []uuid.UUID
+}
+
+func (r *avatarRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.Avatar, error) {
+	r.ids = append(r.ids, id)
+	return r.avatar, r.getErr
 }
 
 func (r *avatarRepositoryFake) Create(_ context.Context, avatar model.Avatar) error {

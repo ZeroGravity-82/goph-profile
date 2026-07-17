@@ -31,13 +31,28 @@ type UploadAvatarOutput struct {
 	UpdatedAt time.Time
 }
 
+// SelectCurrentAvatarInput описывает входные данные сценария выбора текущей аватарки.
+type SelectCurrentAvatarInput struct {
+	UserID   uuid.UUID
+	AvatarID uuid.UUID
+}
+
+// SelectCurrentAvatarOutput описывает результат сценария выбора текущей аватарки.
+type SelectCurrentAvatarOutput struct {
+	UserID          uuid.UUID
+	CurrentAvatarID uuid.UUID
+	UpdatedAt       time.Time
+}
+
 // avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
 type avatarUserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
+	Update(ctx context.Context, user model.User) error
 }
 
 // avatarRepository описывает нужные операции с аватарками.
 type avatarRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (model.Avatar, error)
 	Create(ctx context.Context, avatar model.Avatar) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -165,6 +180,43 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 	return uploadAvatarOutput(avatar), nil
 }
 
+// SelectCurrentAvatar выбирает готовую аватарку пользователя как текущую.
+func (uc *AvatarUseCase) SelectCurrentAvatar(
+	ctx context.Context,
+	in SelectCurrentAvatarInput,
+) (SelectCurrentAvatarOutput, error) {
+	if uc == nil || uc.userRepo == nil {
+		return SelectCurrentAvatarOutput{}, errors.New("user repository is not provided")
+	}
+	if uc.avatarRepo == nil {
+		return SelectCurrentAvatarOutput{}, errors.New("avatar repository is not provided")
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, in.UserID)
+	if err != nil {
+		return SelectCurrentAvatarOutput{}, fmt.Errorf("get user by id: %w", err)
+	}
+
+	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
+	if err != nil {
+		return SelectCurrentAvatarOutput{}, fmt.Errorf("get avatar by id: %w", err)
+	}
+
+	if err = user.SelectCurrentAvatar(avatar, time.Now().UTC()); err != nil {
+		return SelectCurrentAvatarOutput{}, err
+	}
+	alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
+	if alreadyCurrent {
+		return selectCurrentAvatarOutput(user), nil
+	}
+
+	if err = uc.userRepo.Update(ctx, user); err != nil {
+		return SelectCurrentAvatarOutput{}, fmt.Errorf("update current avatar: %w", err)
+	}
+
+	return selectCurrentAvatarOutput(user), nil
+}
+
 func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
 	return UploadAvatarOutput{
 		ID:        avatar.ID,
@@ -175,6 +227,14 @@ func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
 		Status:    avatar.Status,
 		CreatedAt: avatar.CreatedAt,
 		UpdatedAt: avatar.UpdatedAt,
+	}
+}
+
+func selectCurrentAvatarOutput(user model.User) SelectCurrentAvatarOutput {
+	return SelectCurrentAvatarOutput{
+		UserID:          user.ID,
+		CurrentAvatarID: *user.CurrentAvatarID,
+		UpdatedAt:       user.UpdatedAt,
 	}
 }
 
