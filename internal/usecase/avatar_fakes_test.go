@@ -30,9 +30,11 @@ type avatarRepositoryFake struct {
 	avatar     model.Avatar
 	getErr     error
 	createErr  error
+	updateErr  error
 	deleteErr  error
 	ids        []uuid.UUID
 	created    []model.Avatar
+	updated    []model.Avatar
 	deletedIDs []uuid.UUID
 }
 
@@ -44,6 +46,11 @@ func (r *avatarRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.A
 func (r *avatarRepositoryFake) Create(_ context.Context, avatar model.Avatar) error {
 	r.created = append(r.created, avatar)
 	return r.createErr
+}
+
+func (r *avatarRepositoryFake) Update(_ context.Context, avatar model.Avatar) error {
+	r.updated = append(r.updated, avatar)
+	return r.updateErr
 }
 
 func (r *avatarRepositoryFake) Delete(_ context.Context, id uuid.UUID) error {
@@ -89,8 +96,10 @@ func (s *fileStoreFake) Delete(_ context.Context, objectKey string) error {
 }
 
 type avatarMessagePublisherFake struct {
-	err      error
-	messages []AvatarProcessingMessage
+	err              error
+	deleteErr        error
+	messages         []AvatarProcessingMessage
+	deletionMessages []AvatarDeletionMessage
 }
 
 func (p *avatarMessagePublisherFake) PublishAvatarProcessing(
@@ -99,4 +108,12 @@ func (p *avatarMessagePublisherFake) PublishAvatarProcessing(
 ) error {
 	p.messages = append(p.messages, message)
 	return p.err
+}
+
+func (p *avatarMessagePublisherFake) PublishAvatarDeletion(
+	_ context.Context,
+	message AvatarDeletionMessage,
+) error {
+	p.deletionMessages = append(p.deletionMessages, message)
+	return p.deleteErr
 }

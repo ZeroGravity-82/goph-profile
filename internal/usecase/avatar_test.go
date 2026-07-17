@@ -121,7 +121,7 @@ func TestAvatarUseCase_UploadAvatar(t *testing.T) {
 	assert.Empty(t, fileStore.deletes)
 }
 
-// TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata проверяет ошибку при невалидных метаданных аватарки.
+// TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata проверяет ошибку невалидных метаданных при загрузке аватарки.
 func TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -145,7 +145,7 @@ func TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata(t *testing.T) {
 	assert.Empty(t, messagePublisher.messages)
 }
 
-// TestAvatarUseCase_UploadAvatar_ReturnsUserNotFound проверяет ошибку отсутствия пользователя.
+// TestAvatarUseCase_UploadAvatar_ReturnsUserNotFound проверяет ошибку отсутствия пользователя при загрузке аватарки.
 func TestAvatarUseCase_UploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -167,7 +167,8 @@ func TestAvatarUseCase_UploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	assert.Empty(t, messagePublisher.messages)
 }
 
-// TestAvatarUseCase_UploadAvatar_ReturnsPutOriginalObjectError проверяет ошибку сохранения исходного файла.
+// TestAvatarUseCase_UploadAvatar_ReturnsPutOriginalObjectError проверяет ошибку сохранения исходного файла при загрузке
+// аватарки.
 func TestAvatarUseCase_UploadAvatar_ReturnsPutOriginalObjectError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -193,8 +194,8 @@ func TestAvatarUseCase_UploadAvatar_ReturnsPutOriginalObjectError(t *testing.T) 
 	assert.Empty(t, fileStore.deletes)
 }
 
-// TestAvatarUseCase_UploadAvatar_DeletesOriginalObjectAfterCreateError проверяет удаление исходного файла
-// из хранилища после ошибки создания записи аватарки в БД.
+// TestAvatarUseCase_UploadAvatar_DeletesOriginalObjectAfterCreateError проверяет удаление исходного файла из
+// хранилища после ошибки создания записи в БД при загрузке аватарки.
 func TestAvatarUseCase_UploadAvatar_DeletesOriginalObjectAfterCreateError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -218,8 +219,8 @@ func TestAvatarUseCase_UploadAvatar_DeletesOriginalObjectAfterCreateError(t *tes
 	assert.Empty(t, messagePublisher.messages)
 }
 
-// TestAvatarUseCase_UploadAvatar_DeletesAvatarAndOriginalObjectAfterPublishError проверяет удаление записи
-// аватарки в БД и исходного файла после ошибки публикации сообщения.
+// TestAvatarUseCase_UploadAvatar_DeletesAvatarAndOriginalObjectAfterPublishError проверяет удаление записи в БД и
+// исходного файла после ошибки публикации сообщения о загрузке аватарки.
 func TestAvatarUseCase_UploadAvatar_DeletesAvatarAndOriginalObjectAfterPublishError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -291,7 +292,8 @@ func TestAvatarUseCase_SelectCurrentAvatar_IsIdempotent(t *testing.T) {
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound проверяет ошибку отсутствия пользователя.
+// TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound проверяет ошибку отсутствия пользователя при выборе
+// текущей аватарки.
 func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -311,7 +313,8 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки.
+// TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки при выборе
+// текущей аватарки.
 func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -332,7 +335,8 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarForbidden проверяет ошибку выбора чужой аватарки.
+// TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarForbidden проверяет ошибку выбора чужой аватарки в качестве
+// текущей.
 func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -353,7 +357,8 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) 
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotReady проверяет ошибку выбора неготовой аватарки.
+// TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotReady проверяет ошибку выбора неготовой аватарки в качестве
+// текущей.
 func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotReady(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -372,7 +377,8 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotReady(t *testing.T) {
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_SelectCurrentAvatar_ReturnsUpdateUserError проверяет ошибку сохранения пользователя.
+// TestAvatarUseCase_SelectCurrentAvatar_ReturnsUpdateUserError проверяет ошибку сохранения пользователя при выборе
+// текущей аватарки.
 func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUpdateUserError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -392,6 +398,202 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUpdateUserError(t *testing.T) 
 	require.Len(t, userRepo.updated, 1)
 	require.NotNil(t, userRepo.updated[0].CurrentAvatarID)
 	assert.Equal(t, testAvatarID, *userRepo.updated[0].CurrentAvatarID)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar проверяет удаление текущей аватарки.
+func TestAvatarUseCase_DeleteCurrentAvatar(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	avatar := mustReadyUseCaseAvatar(t, now)
+	user := mustUseCaseUser(t, now)
+	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
+	userRepo := &avatarUserRepositoryFake{user: user}
+	avatarRepo := &avatarRepositoryFake{avatar: avatar}
+	messagePublisher := &avatarMessagePublisherFake{}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	require.Len(t, avatarRepo.updated, 1)
+	assert.Equal(t, model.AvatarStatusDeleting, avatarRepo.updated[0].Status)
+	require.NotNil(t, avatarRepo.updated[0].DeletedAt)
+	require.Len(t, userRepo.updated, 1)
+	assert.Nil(t, userRepo.updated[0].CurrentAvatarID)
+	assert.Equal(t, []AvatarDeletionMessage{
+		{
+			AvatarID: testAvatarID,
+			ObjectKeys: []string{
+				testObjectKeyOriginal,
+				"thumbs/avatar-id/100.png",
+				"thumbs/avatar-id/300.png",
+			},
+		},
+	}, messagePublisher.deletionMessages)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_IsIdempotent проверяет удаление при отсутствии текущей аватарки.
+func TestAvatarUseCase_DeleteCurrentAvatar_IsIdempotent(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
+	avatarRepo := &avatarRepositoryFake{}
+	messagePublisher := &avatarMessagePublisherFake{}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Empty(t, avatarRepo.ids)
+	assert.Empty(t, avatarRepo.updated)
+	assert.Empty(t, userRepo.updated)
+	assert.Empty(t, messagePublisher.deletionMessages)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_ReturnsUserNotFound проверяет ошибку отсутствия пользователя при удалении
+// аватарки.
+func TestAvatarUseCase_DeleteCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
+	avatarRepo := &avatarRepositoryFake{}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.ErrorIs(t, err, ErrUserNotFound)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Empty(t, avatarRepo.ids)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствия текущей аватарки при
+// удалении.
+func TestAvatarUseCase_DeleteCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	avatar := mustReadyUseCaseAvatar(t, now)
+	user := mustUseCaseUser(t, now)
+	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
+	userRepo := &avatarUserRepositoryFake{user: user}
+	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.ErrorIs(t, err, ErrAvatarNotFound)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Empty(t, avatarRepo.updated)
+	assert.Empty(t, userRepo.updated)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_ReturnsAvatarForbidden проверяет ошибку удаления чужой аватарки.
+func TestAvatarUseCase_DeleteCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	avatar := mustReadyUseCaseAvatar(t, now)
+	user := mustUseCaseUser(t, now)
+	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
+	avatar.UserID = testOtherUserID
+	userRepo := &avatarUserRepositoryFake{user: user}
+	avatarRepo := &avatarRepositoryFake{avatar: avatar}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.ErrorIs(t, err, model.ErrAvatarForbidden)
+	assert.Empty(t, avatarRepo.updated)
+	assert.Empty(t, userRepo.updated)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_ReturnsUpdateAvatarError проверяет ошибку сохранения аватарки при удалении.
+func TestAvatarUseCase_DeleteCurrentAvatar_ReturnsUpdateAvatarError(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	updateErr := errors.New("update avatar error")
+	avatar := mustReadyUseCaseAvatar(t, now)
+	user := mustUseCaseUser(t, now)
+	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
+	userRepo := &avatarUserRepositoryFake{user: user}
+	avatarRepo := &avatarRepositoryFake{avatar: avatar, updateErr: updateErr}
+	messagePublisher := &avatarMessagePublisherFake{}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.ErrorIs(t, err, updateErr)
+	require.Len(t, avatarRepo.updated, 1)
+	assert.Empty(t, userRepo.updated)
+	assert.Empty(t, messagePublisher.deletionMessages)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_ReturnsUpdateUserError проверяет ошибку сохранения пользователя при удалении
+// аватарки.
+func TestAvatarUseCase_DeleteCurrentAvatar_ReturnsUpdateUserError(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	updateErr := errors.New("update user error")
+	avatar := mustReadyUseCaseAvatar(t, now)
+	user := mustUseCaseUser(t, now)
+	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
+	userRepo := &avatarUserRepositoryFake{user: user, updateErr: updateErr}
+	avatarRepo := &avatarRepositoryFake{avatar: avatar}
+	messagePublisher := &avatarMessagePublisherFake{}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.ErrorIs(t, err, updateErr)
+	require.Len(t, avatarRepo.updated, 1)
+	require.Len(t, userRepo.updated, 1)
+	assert.Empty(t, messagePublisher.deletionMessages)
+}
+
+// TestAvatarUseCase_DeleteCurrentAvatar_ReturnsPublishDeletionError проверяет ошибку публикации сообщения об удалении
+// аватарки.
+func TestAvatarUseCase_DeleteCurrentAvatar_ReturnsPublishDeletionError(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	publishErr := errors.New("publish deletion error")
+	avatar := mustReadyUseCaseAvatar(t, now)
+	user := mustUseCaseUser(t, now)
+	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
+	userRepo := &avatarUserRepositoryFake{user: user}
+	avatarRepo := &avatarRepositoryFake{avatar: avatar}
+	messagePublisher := &avatarMessagePublisherFake{deleteErr: publishErr}
+	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+
+	// Act
+	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
+
+	// Assert
+	require.ErrorIs(t, err, publishErr)
+	require.Len(t, avatarRepo.updated, 1)
+	require.Len(t, userRepo.updated, 1)
+	require.Len(t, messagePublisher.deletionMessages, 1)
 }
 
 func validUploadAvatarInput() UploadAvatarInput {

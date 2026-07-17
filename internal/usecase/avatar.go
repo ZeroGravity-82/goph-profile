@@ -44,6 +44,11 @@ type SelectCurrentAvatarOutput struct {
 	UpdatedAt       time.Time
 }
 
+// DeleteCurrentAvatarInput описывает входные данные сценария удаления текущей аватарки.
+type DeleteCurrentAvatarInput struct {
+	UserID uuid.UUID
+}
+
 // avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
 type avatarUserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
@@ -54,6 +59,7 @@ type avatarUserRepository interface {
 type avatarRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.Avatar, error)
 	Create(ctx context.Context, avatar model.Avatar) error
+	Update(ctx context.Context, avatar model.Avatar) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -71,9 +77,16 @@ type AvatarProcessingMessage struct {
 	ObjectKeyOriginal string
 }
 
-// avatarMessagePublisher описывает публикацию сообщений обработки.
+// AvatarDeletionMessage описывает сообщение удаления файлов аватарки.
+type AvatarDeletionMessage struct {
+	AvatarID   uuid.UUID
+	ObjectKeys []string
+}
+
+// avatarMessagePublisher описывает публикацию сообщений по аватаркам.
 type avatarMessagePublisher interface {
 	PublishAvatarProcessing(ctx context.Context, message AvatarProcessingMessage) error
+	PublishAvatarDeletion(ctx context.Context, message AvatarDeletionMessage) error
 }
 
 // AvatarUseCase реализует сценарии работы с аватарками.
@@ -202,10 +215,10 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 		return SelectCurrentAvatarOutput{}, fmt.Errorf("get avatar by id: %w", err)
 	}
 
+	alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
 	if err = user.SelectCurrentAvatar(avatar, time.Now().UTC()); err != nil {
 		return SelectCurrentAvatarOutput{}, err
 	}
-	alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
 	if alreadyCurrent {
 		return selectCurrentAvatarOutput(user), nil
 	}
@@ -215,6 +228,58 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 	}
 
 	return selectCurrentAvatarOutput(user), nil
+}
+
+// DeleteCurrentAvatar удаляет текущую аватарку пользователя.
+func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurrentAvatarInput) error {
+	if uc == nil || uc.userRepo == nil {
+		return errors.New("user repository is not provided")
+	}
+	if uc.avatarRepo == nil {
+		return errors.New("avatar repository is not provided")
+	}
+	if uc.publisher == nil {
+		return errors.New("avatar message publisher is not provided")
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, in.UserID)
+	if err != nil {
+		return fmt.Errorf("get user by id: %w", err)
+	}
+	if user.CurrentAvatarID == nil {
+		return nil
+	}
+
+	avatar, err := uc.avatarRepo.GetByID(ctx, *user.CurrentAvatarID)
+	if err != nil {
+		return fmt.Errorf("get current avatar by id: %w", err)
+	}
+	if avatar.UserID != user.ID {
+		return model.ErrAvatarForbidden
+	}
+
+	now := time.Now().UTC()
+	if err = avatar.MarkDeleting(now); err != nil {
+		return err
+	}
+	user.ClearCurrentAvatar(avatar.ID, now)
+
+	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
+		return fmt.Errorf("update deleting avatar: %w", err)
+	}
+	if err = uc.userRepo.Update(ctx, user); err != nil {
+		return fmt.Errorf("clear current avatar: %w", err)
+	}
+
+	message := AvatarDeletionMessage{
+		AvatarID:   avatar.ID,
+		ObjectKeys: avatarObjectKeys(avatar),
+	}
+	if err = uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
+		return fmt.Errorf("publish avatar deletion message: %w", err)
+	}
+
+	return nil
 }
 
 func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
@@ -236,6 +301,17 @@ func selectCurrentAvatarOutput(user model.User) SelectCurrentAvatarOutput {
 		CurrentAvatarID: *user.CurrentAvatarID,
 		UpdatedAt:       user.UpdatedAt,
 	}
+}
+
+func avatarObjectKeys(avatar model.Avatar) []string {
+	objectKeys := []string{avatar.ObjectKeyOriginal}
+	if avatar.ObjectKeyThumb100 != nil {
+		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb100)
+	}
+	if avatar.ObjectKeyThumb300 != nil {
+		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb300)
+	}
+	return objectKeys
 }
 
 func wrapCleanupError(message string, err error) error {
