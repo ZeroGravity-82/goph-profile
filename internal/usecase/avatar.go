@@ -83,6 +83,29 @@ type MarkAvatarFailedOutput struct {
 	UpdatedAt time.Time
 }
 
+// GetAvatarMetadataInput описывает входные данные сценария получения метаданных аватарки.
+type GetAvatarMetadataInput struct {
+	AvatarID uuid.UUID
+}
+
+// GetAvatarMetadataOutput описывает результат сценария получения метаданных аватарки.
+type GetAvatarMetadataOutput struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	FileName          string
+	MIMEType          string
+	SizeBytes         int64
+	Width             *int
+	Height            *int
+	ObjectKeyOriginal string
+	ObjectKeyThumb100 *string
+	ObjectKeyThumb300 *string
+	Status            model.AvatarStatus
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	DeletedAt         *time.Time
+}
+
 // avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
 type avatarUserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
@@ -416,6 +439,23 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 	return markAvatarFailedOutput(avatar), nil
 }
 
+// GetAvatarMetadata возвращает метаданные аватарки.
+func (uc *AvatarUseCase) GetAvatarMetadata(
+	ctx context.Context,
+	in GetAvatarMetadataInput,
+) (GetAvatarMetadataOutput, error) {
+	if uc == nil || uc.avatarRepo == nil {
+		return GetAvatarMetadataOutput{}, errors.New("avatar repository is not provided")
+	}
+
+	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
+	if err != nil {
+		return GetAvatarMetadataOutput{}, fmt.Errorf("get avatar by id: %w", err)
+	}
+
+	return getAvatarMetadataOutput(avatar), nil
+}
+
 func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
 	return UploadAvatarOutput{
 		ID:        avatar.ID,
@@ -426,6 +466,25 @@ func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
 		Status:    avatar.Status,
 		CreatedAt: avatar.CreatedAt,
 		UpdatedAt: avatar.UpdatedAt,
+	}
+}
+
+func getAvatarMetadataOutput(avatar model.Avatar) GetAvatarMetadataOutput {
+	return GetAvatarMetadataOutput{
+		ID:                avatar.ID,
+		UserID:            avatar.UserID,
+		FileName:          avatar.FileName,
+		MIMEType:          avatar.MIMEType,
+		SizeBytes:         avatar.SizeBytes,
+		Width:             avatar.Width,
+		Height:            avatar.Height,
+		ObjectKeyOriginal: avatar.ObjectKeyOriginal,
+		ObjectKeyThumb100: avatar.ObjectKeyThumb100,
+		ObjectKeyThumb300: avatar.ObjectKeyThumb300,
+		Status:            avatar.Status,
+		CreatedAt:         avatar.CreatedAt,
+		UpdatedAt:         avatar.UpdatedAt,
+		DeletedAt:         avatar.DeletedAt,
 	}
 }
 

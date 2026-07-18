@@ -19,7 +19,13 @@ func TestAvatarUseCase_MarkAvatarFailed(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, &avatarUserRepositoryFake{}, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarUseCase(
+		t,
+		&avatarUserRepositoryFake{},
+		avatarRepo,
+		&fileStoreFake{},
+		&avatarMessagePublisherFake{},
+	)
 	input := MarkAvatarFailedInput{AvatarID: testAvatarID}
 
 	// Act
@@ -40,7 +46,13 @@ func TestAvatarUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
-	useCase := mustAvatarUseCase(t, &avatarUserRepositoryFake{}, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarUseCase(
+		t,
+		&avatarUserRepositoryFake{},
+		avatarRepo,
+		&fileStoreFake{},
+		&avatarMessagePublisherFake{},
+	)
 
 	// Act
 	result, err := useCase.MarkAvatarFailed(ctx, MarkAvatarFailedInput{AvatarID: testAvatarID})
@@ -58,7 +70,13 @@ func TestAvatarUseCase_MarkAvatarFailed_ReturnsInvalidTransition(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	avatarRepo := &avatarRepositoryFake{avatar: mustReadyUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, &avatarUserRepositoryFake{}, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarUseCase(
+		t,
+		&avatarUserRepositoryFake{},
+		avatarRepo,
+		&fileStoreFake{},
+		&avatarMessagePublisherFake{},
+	)
 
 	// Act
 	result, err := useCase.MarkAvatarFailed(ctx, MarkAvatarFailedInput{AvatarID: testAvatarID})
@@ -77,7 +95,13 @@ func TestAvatarUseCase_MarkAvatarFailed_ReturnsUpdateAvatarError(t *testing.T) {
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	updateErr := errors.New("update avatar error")
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now), updateErr: updateErr}
-	useCase := mustAvatarUseCase(t, &avatarUserRepositoryFake{}, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarUseCase(
+		t,
+		&avatarUserRepositoryFake{},
+		avatarRepo,
+		&fileStoreFake{},
+		&avatarMessagePublisherFake{},
+	)
 
 	// Act
 	result, err := useCase.MarkAvatarFailed(ctx, MarkAvatarFailedInput{AvatarID: testAvatarID})
