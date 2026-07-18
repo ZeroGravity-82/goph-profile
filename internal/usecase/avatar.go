@@ -70,6 +70,19 @@ type MarkAvatarReadyOutput struct {
 	UpdatedAt         time.Time
 }
 
+// MarkAvatarFailedInput описывает входные данные сценария ошибки обработки аватарки.
+type MarkAvatarFailedInput struct {
+	AvatarID uuid.UUID
+}
+
+// MarkAvatarFailedOutput описывает результат сценария ошибки обработки аватарки.
+type MarkAvatarFailedOutput struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Status    model.AvatarStatus
+	UpdatedAt time.Time
+}
+
 // avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
 type avatarUserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
@@ -378,6 +391,31 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 	return markAvatarReadyOutput(avatar), nil
 }
 
+// MarkAvatarFailed завершает обработку аватарки ошибкой.
+func (uc *AvatarUseCase) MarkAvatarFailed(
+	ctx context.Context,
+	in MarkAvatarFailedInput,
+) (MarkAvatarFailedOutput, error) {
+	if uc == nil || uc.avatarRepo == nil {
+		return MarkAvatarFailedOutput{}, errors.New("avatar repository is not provided")
+	}
+
+	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
+	if err != nil {
+		return MarkAvatarFailedOutput{}, fmt.Errorf("get avatar by id: %w", err)
+	}
+
+	if err = avatar.MarkFailed(time.Now().UTC()); err != nil {
+		return MarkAvatarFailedOutput{}, err
+	}
+
+	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
+		return MarkAvatarFailedOutput{}, fmt.Errorf("update failed avatar: %w", err)
+	}
+
+	return markAvatarFailedOutput(avatar), nil
+}
+
 func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
 	return UploadAvatarOutput{
 		ID:        avatar.ID,
@@ -401,6 +439,15 @@ func markAvatarReadyOutput(avatar model.Avatar) MarkAvatarReadyOutput {
 		ObjectKeyThumb300: *avatar.ObjectKeyThumb300,
 		Status:            avatar.Status,
 		UpdatedAt:         avatar.UpdatedAt,
+	}
+}
+
+func markAvatarFailedOutput(avatar model.Avatar) MarkAvatarFailedOutput {
+	return MarkAvatarFailedOutput{
+		ID:        avatar.ID,
+		UserID:    avatar.UserID,
+		Status:    avatar.Status,
+		UpdatedAt: avatar.UpdatedAt,
 	}
 }
 
