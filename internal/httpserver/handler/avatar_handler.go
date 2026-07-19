@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/google/uuid"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
@@ -32,40 +34,46 @@ type AvatarUploader interface {
 // AvatarHandler обрабатывает HTTP-запросы для аватарок.
 type AvatarHandler struct {
 	uploader AvatarUploader
+	logger   *slog.Logger
 }
 
 // NewAvatarHandler создает AvatarHandler.
-func NewAvatarHandler(uploader AvatarUploader) *AvatarHandler {
-	return &AvatarHandler{uploader: uploader}
+func NewAvatarHandler(uploader AvatarUploader, logger *slog.Logger) *AvatarHandler {
+	if logger == nil {
+		logger = logging.NopLogger()
+	}
+
+	return &AvatarHandler{uploader: uploader, logger: logger}
 }
 
 // uploadAvatar парсит multipart-запрос, проверяет X-User-ID  и передает файл в сценарий загрузки аватарки.
 func (h *AvatarHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 	userID, err := parseUserIDHeader(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid X-User-ID header", "")
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid X-User-ID header", "")
 		return
 	}
 
 	input, err := parseAvatarUploadRequest(w, r, userID)
 	if err != nil {
-		writeAvatarUploadError(w, err)
+		h.writeAvatarUploadError(w, r, err)
 		return
 	}
 
 	output, err := h.uploader.UploadAvatar(r.Context(), input)
 	if err != nil {
-		writeUploadUseCaseError(w, err)
+		h.writeUploadUseCaseError(w, r, err)
 		return
 	}
 
 	avatarURL, err := url.JoinPath(avatarRoutePath, output.ID.String())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Internal server error", "")
+		h.logInternalServerError(r, "failed to build avatar URL", err)
+		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, uploadAvatarResponse{
+	writeJSON(h.logger, w, r, http.StatusCreated, uploadAvatarResponse{
 		ID:        output.ID.String(),
 		UserID:    output.UserID.String(),
 		URL:       avatarURL,
@@ -185,47 +193,86 @@ func isWebP(content []byte) bool {
 
 // writeAvatarUploadError переводит ошибки файла аватарки в HTTP-ответы: превышение лимита в 413, невалидные
 // метаданные в 400, остальные ошибки в 500.
-func writeAvatarUploadError(w http.ResponseWriter, err error) {
+func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, errAvatarFileTooLarge) || errors.Is(err, model.ErrFileTooLarge) {
-		writeErrorWithMaxSize(w, http.StatusRequestEntityTooLarge, "File too large")
+		writeErrorWithMaxSize(h.logger, w, r, http.StatusRequestEntityTooLarge, "File too large")
 		return
 	}
 	if errors.Is(err, model.ErrInvalidAvatarMetadata) {
 		writeError(
+			h.logger,
 			w,
+			r,
 			http.StatusBadRequest,
 			"Invalid file format",
 			"Supported formats: jpeg, png, webp",
 		)
 		return
 	}
-	writeError(w, http.StatusInternalServerError, "Internal server error", "")
+	h.logInternalServerError(r, "failed to upload avatar file", err)
+	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 }
 
-func writeUploadUseCaseError(w http.ResponseWriter, err error) {
+func (h *AvatarHandler) writeUploadUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, usecase.ErrUserNotFound) {
-		writeError(w, http.StatusNotFound, "User not found", "")
+		writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 		return
 	}
-	writeAvatarUploadError(w, err)
+	h.writeAvatarUploadError(w, r, err)
 }
 
-func writeError(w http.ResponseWriter, statusCode int, message string, details string) {
-	writeJSON(w, statusCode, errorResponse{
+func (h *AvatarHandler) logInternalServerError(r *http.Request, message string, err error) {
+	h.logger.ErrorContext(
+		r.Context(),
+		message,
+		slog.Any("error", err),
+		slog.String("method", r.Method),
+		slog.String("uri", r.RequestURI),
+	)
+}
+
+func writeError(
+	logger *slog.Logger,
+	w http.ResponseWriter,
+	r *http.Request,
+	statusCode int,
+	message string,
+	details string,
+) {
+	writeJSON(logger, w, r, statusCode, errorResponse{
 		Error:   message,
 		Details: details,
 	})
 }
 
-func writeErrorWithMaxSize(w http.ResponseWriter, statusCode int, message string) {
-	writeJSON(w, statusCode, errorResponse{
+func writeErrorWithMaxSize(
+	logger *slog.Logger,
+	w http.ResponseWriter,
+	r *http.Request,
+	statusCode int,
+	message string,
+) {
+	writeJSON(logger, w, r, statusCode, errorResponse{
 		Error:   message,
 		MaxSize: model.MaxAvatarFileSizeBytes,
 	})
 }
 
-func writeJSON(w http.ResponseWriter, statusCode int, response any) {
+func writeJSON(logger *slog.Logger, w http.ResponseWriter, r *http.Request, statusCode int, response any) {
+	if logger == nil {
+		logger = logging.NopLogger()
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.ErrorContext(
+			r.Context(),
+			"failed to write HTTP response",
+			slog.Any("error", err),
+			slog.String("method", r.Method),
+			slog.String("uri", r.RequestURI),
+			slog.Int("status", statusCode),
+		)
+	}
 }

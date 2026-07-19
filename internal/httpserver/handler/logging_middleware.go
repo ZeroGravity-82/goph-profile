@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func withLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 	if logger == nil {
-		logger = slog.Default()
+		logger = logging.NopLogger()
 	}
 
 	return middleware.RequestLogger(slogLogFormatter{logger: logger})

@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func withGzip(logger *slog.Logger) func(http.Handler) http.Handler {
 	if logger == nil {
-		logger = slog.Default()
+		logger = logging.NopLogger()
 	}
 
 	compressResponse := middleware.Compress(gzip.DefaultCompression, "application/json")
@@ -26,7 +27,7 @@ func withGzip(logger *slog.Logger) func(http.Handler) http.Handler {
 			gzipReader, err := gzip.NewReader(r.Body)
 			if err != nil {
 				logger.WarnContext(r.Context(), "failed to create gzip request reader", slog.Any("error", err))
-				writeError(w, http.StatusBadRequest, "Invalid gzip request body", "")
+				writeError(logger, w, r, http.StatusBadRequest, "Invalid gzip request body", "")
 				return
 			}
 			defer func() {

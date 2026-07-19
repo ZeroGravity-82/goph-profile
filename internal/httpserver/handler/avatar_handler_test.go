@@ -37,7 +37,7 @@ func TestAvatarHandler_uploadAvatar(t *testing.T) {
 			CreatedAt: createdAt,
 		},
 	}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -66,7 +66,7 @@ func TestAvatarHandler_uploadAvatar(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsInvalidUserID(t *testing.T) {
 	// Arrange
 	uploader := &avatarUploaderFake{}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, discardLogger())
 	request := newUploadAvatarRequest(t, "not-a-uuid", "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -83,7 +83,7 @@ func TestAvatarHandler_uploadAvatar_RejectsInvalidUserID(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsMissingFile(t *testing.T) {
 	// Arrange
 	uploader := &avatarUploaderFake{}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, discardLogger())
 	request := newUploadAvatarRequestWithoutFile(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -100,7 +100,7 @@ func TestAvatarHandler_uploadAvatar_RejectsMissingFile(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsUnsupportedFormat(t *testing.T) {
 	// Arrange
 	uploader := &avatarUploaderFake{}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.txt", []byte("not an image"))
 	response := httptest.NewRecorder()
 
@@ -117,7 +117,7 @@ func TestAvatarHandler_uploadAvatar_RejectsUnsupportedFormat(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 	// Arrange
 	uploader := &avatarUploaderFake{}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, discardLogger())
 	content := bytes.Repeat([]byte{0x89}, int(model.MaxAvatarFileSizeBytes)+1)
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", content)
 	response := httptest.NewRecorder()
@@ -139,7 +139,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	uploader := &avatarUploaderFake{err: usecase.ErrUserNotFound}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -155,8 +155,9 @@ func TestAvatarHandler_uploadAvatar_ReturnsUserNotFound(t *testing.T) {
 // TestAvatarHandler_uploadAvatar_ReturnsInternalServerError проверяет внутреннюю ошибку загрузки аватарки.
 func TestAvatarHandler_uploadAvatar_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
+	logBuffer := &bytes.Buffer{}
 	uploader := &avatarUploaderFake{err: errors.New("database error")}
-	handler := NewAvatarHandler(uploader)
+	handler := NewAvatarHandler(uploader, newTextLogger(logBuffer))
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -167,6 +168,27 @@ func TestAvatarHandler_uploadAvatar_ReturnsInternalServerError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, response.Code)
 	require.Len(t, uploader.inputs, 1)
 	assertErrorResponse(t, response, "Internal server error")
+	assert.Contains(t, logBuffer.String(), "database error")
+}
+
+// TestWriteJSON_LogsWriteError проверяет логирование ошибки записи JSON-ответа.
+func TestWriteJSON_LogsWriteError(t *testing.T) {
+	// Arrange
+	logBuffer := &bytes.Buffer{}
+	logger := newTextLogger(logBuffer)
+	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, nil)
+	response := &errorResponseWriter{header: http.Header{}}
+
+	// Act
+	writeJSON(logger, response, request, http.StatusCreated, uploadAvatarResponse{ID: testAvatarID.String()})
+
+	// Assert
+	assert.Equal(t, "application/json", response.header.Get("Content-Type"))
+	assert.Equal(t, http.StatusCreated, response.statusCode)
+	logOutput := logBuffer.String()
+	assert.Contains(t, logOutput, "failed to write HTTP response")
+	assert.Contains(t, logOutput, "write error")
+	assert.Contains(t, logOutput, "status=201")
 }
 
 type avatarUploaderFake struct {
@@ -257,4 +279,21 @@ func mustAvatarURL(t *testing.T, avatarID string) string {
 	require.NoError(t, err)
 
 	return avatarURL
+}
+
+type errorResponseWriter struct {
+	header     http.Header
+	statusCode int
+}
+
+func (w *errorResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *errorResponseWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write error")
+}
+
+func (w *errorResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
 }

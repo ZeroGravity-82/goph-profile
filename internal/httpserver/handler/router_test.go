@@ -171,7 +171,11 @@ func TestNewRouter_UploadAvatarRoute_WritesGzipResponse(t *testing.T) {
 }
 
 func discardLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	return newTextLogger(&bytes.Buffer{})
+}
+
+func newTextLogger(buffer *bytes.Buffer) *slog.Logger {
+	return slog.New(slog.NewTextHandler(buffer, nil))
 }
 
 func gzipRequestBody(t *testing.T, request *http.Request) {

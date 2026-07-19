@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/handler"
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 )
 
 const (
@@ -28,7 +29,7 @@ type HTTPServer struct {
 // NewHTTPServer создает HTTPServer.
 func NewHTTPServer(addr string, uploader handler.AvatarUploader, logger *slog.Logger) *HTTPServer {
 	if logger == nil {
-		logger = slog.Default()
+		logger = logging.NopLogger()
 	}
 	return &HTTPServer{
 		addr:     addr,
