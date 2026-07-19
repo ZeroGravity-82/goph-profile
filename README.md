@@ -46,6 +46,7 @@ GophProfile - микросервис для управления аватарк�
 Возможные улучшения после MVP:
 - транзакционный outbox для надежной публикации сообщений после коммита в PostgreSQL;
 - полноценная аутентификация и авторизация пользователей;
+- Swagger/OpenAPI-документация REST API;
 - CORS-настройки, если web-интерфейс или внешние клиенты будут обращаться к API с другого origin;
 - rate limiting для API;
 - `ETag` и условные HTTP-запросы `If-None-Match` для кеширования аватарок.
@@ -277,6 +278,7 @@ file: binary image
 
 - `400 Bad Request` - некорректный `X-User-ID`, отсутствующий файл или неподдерживаемый формат;
 - `413 Payload Too Large` - файл больше 10 МиБ;
+- `415 Unsupported Media Type` - `Content-Type` не `multipart/form-data`;
 - `500 Internal Server Error` - внутренняя ошибка без раскрытия деталей инфраструктуры.
 
 ### Получение аватарки
@@ -583,7 +585,7 @@ internal/logging/            # настройка логирования
 internal/queue/rabbitmq/     # публикация и получение сообщений RabbitMQ
 internal/storage/minio/      # S3-совместимое хранилище файлов аватарок
 internal/storage/postgres/   # реализация хранения данных в PostgreSQL
-internal/transport/http/     # REST-хендлеры, валидация, маппинг ошибок
+internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
 internal/usecase/            # сценарии использования приложения и минимальные интерфейсы их зависимостей
 migrations/                  # SQL-миграции базы данных
 web/static/                  # SPA-ресурсы и default-avatar.png
