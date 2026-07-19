@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -62,7 +61,7 @@ func TestNewUserUseCase_RejectsNilRepository(t *testing.T) {
 	assert.Nil(t, service)
 }
 
-// TestUserUseCase_ResolveUserByEmail проверяет нормализацию email.
+// TestUserUseCase_ResolveUserByEmail проверяет получение пользователя по email.
 func TestUserUseCase_ResolveUserByEmail(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -74,7 +73,7 @@ func TestUserUseCase_ResolveUserByEmail(t *testing.T) {
 	require.NoError(t, err)
 
 	// Act
-	result, err := service.ResolveUserByEmail(ctx, "  User@Example.COM  ")
+	result, err := service.ResolveUserByEmail(ctx, "user@example.com")
 
 	// Assert
 	require.NoError(t, err)
@@ -140,38 +139,22 @@ func TestUserUseCase_ResolveUserByEmail_ReadsAfterConflict(t *testing.T) {
 	assert.Equal(t, []model.Email{"user@example.com"}, repository.createEmails)
 }
 
-// TestUserUseCase_ResolveUserByEmail_RejectsInvalidEmail проверяет невалидный email.
+// TestUserUseCase_ResolveUserByEmail_RejectsInvalidEmail проверяет доменную валидацию email перед репозиторием.
 func TestUserUseCase_ResolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
-	tests := []struct {
-		name string
-		raw  string
-	}{
-		{name: "empty", raw: " "},
-		{name: "without at", raw: "user.example.com"},
-		{name: "empty local", raw: "@example.com"},
-		{name: "empty domain", raw: "user@"},
-		{name: "spaces", raw: "user name@example.com"},
-		{name: "too long", raw: strings.Repeat("a", MaxEmailLength-10) + "@example.com"},
-	}
+	// Arrange
+	ctx := context.Background()
+	repository := &userRepositoryFake{}
+	service, err := NewUserUseCase(repository)
+	require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
-			ctx := context.Background()
-			repository := &userRepositoryFake{}
-			service, err := NewUserUseCase(repository)
-			require.NoError(t, err)
+	// Act
+	result, err := service.ResolveUserByEmail(ctx, "not-an-email")
 
-			// Act
-			result, err := service.ResolveUserByEmail(ctx, tt.raw)
-
-			// Assert
-			require.ErrorIs(t, err, ErrInvalidEmail)
-			assert.Zero(t, result)
-			assert.Empty(t, repository.getEmails)
-			assert.Empty(t, repository.createEmails)
-		})
-	}
+	// Assert
+	require.ErrorIs(t, err, model.ErrInvalidEmail)
+	assert.Zero(t, result)
+	assert.Empty(t, repository.getEmails)
+	assert.Empty(t, repository.createEmails)
 }
 
 // TestUserUseCase_ResolveUserByEmail_ReturnsGetError проверяет ошибку чтения.

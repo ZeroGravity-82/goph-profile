@@ -4,16 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
-)
-
-const (
-	// MaxEmailLength ограничивает нормализованный email пользователя.
-	MaxEmailLength = 255
 )
 
 // ResolveUserByEmailOutput описывает результат сценария ResolveUserByEmail.
@@ -47,14 +41,12 @@ func NewUserUseCase(userRepo userRepository) (*UserUseCase, error) {
 // если Create возвращает ErrEmailAlreadyTaken, сценарий повторно читает пользователя.
 func (uc *UserUseCase) ResolveUserByEmail(
 	ctx context.Context,
-	rawEmail string,
+	email model.Email,
 ) (ResolveUserByEmailOutput, error) {
-	if uc == nil || uc.userRepo == nil {
+	if uc.userRepo == nil {
 		return ResolveUserByEmailOutput{}, errors.New("user repository is not provided")
 	}
-
-	email, err := normalizeEmail(rawEmail)
-	if err != nil {
+	if err := email.Validate(); err != nil {
 		return ResolveUserByEmailOutput{}, err
 	}
 
@@ -80,24 +72,6 @@ func (uc *UserUseCase) ResolveUserByEmail(
 	}
 
 	return resolveUserByEmailOutput(user), nil
-}
-
-func normalizeEmail(raw string) (model.Email, error) {
-	normalized := strings.ToLower(strings.TrimSpace(raw))
-	if normalized == "" {
-		return "", ErrInvalidEmail
-	}
-	if len(normalized) > MaxEmailLength {
-		return "", ErrInvalidEmail
-	}
-	if strings.Count(normalized, "@") != 1 {
-		return "", ErrInvalidEmail
-	}
-	local, domain, ok := strings.Cut(normalized, "@")
-	if !ok || local == "" || domain == "" || strings.ContainsAny(normalized, " \t\r\n") {
-		return "", ErrInvalidEmail
-	}
-	return model.Email(normalized), nil
 }
 
 func resolveUserByEmailOutput(user model.User) ResolveUserByEmailOutput {

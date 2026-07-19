@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -8,7 +9,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNewUser проверяет создание пользователя с нормализованным email.
+// TestNewEmail проверяет нормализацию email.
+func TestNewEmail(t *testing.T) {
+	// Act
+	email, err := NewEmail("  User@Example.COM  ")
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, Email("user@example.com"), email)
+}
+
+// TestNewEmail_RejectsInvalidEmail проверяет доменные ограничения email.
+func TestNewEmail_RejectsInvalidEmail(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{name: "empty", raw: " "},
+		{name: "without at", raw: "user.example.com"},
+		{name: "empty local", raw: "@example.com"},
+		{name: "empty domain", raw: "user@"},
+		{name: "spaces", raw: "user name@example.com"},
+		{name: "too long", raw: strings.Repeat("a", MaxEmailSizeBytes-10) + "@example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Act
+			email, err := NewEmail(tt.raw)
+
+			// Assert
+			require.ErrorIs(t, err, ErrInvalidEmail)
+			assert.Empty(t, email)
+		})
+	}
+}
+
+// TestNewUser проверяет создание пользователя с валидным email.
 func TestNewUser(t *testing.T) {
 	// Arrange
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
@@ -21,6 +58,19 @@ func TestNewUser(t *testing.T) {
 	assert.Equal(t, testUserID, user.ID)
 	assert.Equal(t, Email("user@example.com"), user.Email)
 	assert.Nil(t, user.CurrentAvatarID)
+}
+
+// TestNewUser_RejectsInvalidEmail проверяет запрет создания пользователя с некорректным email.
+func TestNewUser_RejectsInvalidEmail(t *testing.T) {
+	// Arrange
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+
+	// Act
+	user, err := NewUser(testUserID, "not-an-email", now)
+
+	// Assert
+	require.ErrorIs(t, err, ErrInvalidEmail)
+	assert.Zero(t, user)
 }
 
 // TestNewUserID проверяет генерацию UUIDv7 для пользователя.

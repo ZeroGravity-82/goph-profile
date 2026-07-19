@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
@@ -14,7 +15,7 @@ import (
 
 // userUseCase описывает сценарии работы с пользователями: определение пользователя по email.
 type userUseCase interface {
-	ResolveUserByEmail(ctx context.Context, rawEmail string) (usecase.ResolveUserByEmailOutput, error)
+	ResolveUserByEmail(ctx context.Context, email model.Email) (usecase.ResolveUserByEmailOutput, error)
 }
 
 // UserHandler обрабатывает HTTP-запросы для пользователей.
@@ -40,15 +41,20 @@ func NewUserHandler(
 
 // resolveUserByEmail парсит JSON-запрос и передает email в сценарий определения пользователя.
 func (h *UserHandler) resolveUserByEmail(w http.ResponseWriter, r *http.Request) {
-	request, err := parseResolveUserRequest(r)
+	request, err := resolveUserRequestFromRequest(r)
 	if err != nil {
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid request body", "")
 		return
 	}
-
-	output, err := h.userUseCase.ResolveUserByEmail(r.Context(), request.Email)
+	email, err := model.NewEmail(request.Email)
 	if err != nil {
-		if errors.Is(err, usecase.ErrInvalidEmail) {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
+		return
+	}
+
+	output, err := h.userUseCase.ResolveUserByEmail(r.Context(), email)
+	if err != nil {
+		if errors.Is(err, model.ErrInvalidEmail) {
 			writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
 			return
 		}
@@ -63,7 +69,7 @@ func (h *UserHandler) resolveUserByEmail(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func parseResolveUserRequest(r *http.Request) (dto.ResolveUserRequest, error) {
+func resolveUserRequestFromRequest(r *http.Request) (dto.ResolveUserRequest, error) {
 	var request dto.ResolveUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return dto.ResolveUserRequest{}, err

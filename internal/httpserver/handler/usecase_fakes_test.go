@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -34,13 +35,13 @@ func (uc *avatarUseCaseFake) GetAvatarMetadata(
 type userUseCaseFake struct {
 	resolveOutput usecase.ResolveUserByEmailOutput
 	resolveErr    error
-	resolveInputs []string
+	resolveInputs []model.Email
 }
 
 func (uc *userUseCaseFake) ResolveUserByEmail(
 	_ context.Context,
-	rawEmail string,
+	email model.Email,
 ) (usecase.ResolveUserByEmailOutput, error) {
-	uc.resolveInputs = append(uc.resolveInputs, rawEmail)
+	uc.resolveInputs = append(uc.resolveInputs, email)
 	return uc.resolveOutput, uc.resolveErr
 }

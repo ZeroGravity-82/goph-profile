@@ -1,9 +1,15 @@
 package model
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+const (
+	// MaxEmailSizeBytes ограничивает нормализованный email пользователя.
+	MaxEmailSizeBytes = 255
 )
 
 // User описывает пользователя сервиса.
@@ -16,7 +22,40 @@ type User struct {
 }
 
 // Email содержит нормализованный email пользователя.
+//
+// Новый email нужно создавать через NewEmail, только так он буден валидным и нормализованным.
 type Email string
+
+// NewEmail нормализует email и проверяет доменные ограничения.
+func NewEmail(raw string) (Email, error) {
+	email := Email(strings.ToLower(strings.TrimSpace(raw)))
+	if err := email.Validate(); err != nil {
+		return "", err
+	}
+	return email, nil
+}
+
+// Validate проверяет доменные ограничения нормализованного email.
+func (e Email) Validate() error {
+	email := string(e)
+	if email == "" {
+		return ErrInvalidEmail
+	}
+	if len(email) > MaxEmailSizeBytes {
+		return ErrInvalidEmail
+	}
+	if strings.Count(email, "@") != 1 {
+		return ErrInvalidEmail
+	}
+	local, domain, ok := strings.Cut(email, "@")
+	if !ok || local == "" || domain == "" || strings.ContainsAny(email, " \t\r\n") {
+		return ErrInvalidEmail
+	}
+	if email != strings.ToLower(strings.TrimSpace(email)) {
+		return ErrInvalidEmail
+	}
+	return nil
+}
 
 // NewUserID создает UUIDv7 для пользователя.
 func NewUserID() (uuid.UUID, error) {
@@ -27,6 +66,9 @@ func NewUserID() (uuid.UUID, error) {
 func NewUser(id uuid.UUID, email Email, now time.Time) (User, error) {
 	if id == uuid.Nil {
 		return User{}, ErrInvalidID
+	}
+	if err := email.Validate(); err != nil {
+		return User{}, err
 	}
 	return User{ID: id, Email: email, CreatedAt: now, UpdatedAt: now}, nil
 }

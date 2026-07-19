@@ -151,7 +151,7 @@ func TestNewRouter_UserResolveRoute(t *testing.T) {
 
 	// Assert
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, []string{"user@example.com"}, userUseCase.resolveInputs)
+	assert.Equal(t, []model.Email{"user@example.com"}, userUseCase.resolveInputs)
 }
 
 // TestNewRouter_UserResolveRoute_ReturnsUnsupportedMediaType проверяет ошибку неподдерживаемого content-type.

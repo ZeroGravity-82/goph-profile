@@ -5,6 +5,8 @@ import "errors"
 var (
 	// ErrInvalidID возвращается при пустом доменном идентификаторе.
 	ErrInvalidID = errors.New("invalid id")
+	// ErrInvalidEmail возвращается при некорректном email.
+	ErrInvalidEmail = errors.New("invalid email")
 	// ErrInvalidAvatarMetadata возвращается при некорректных метаданных.
 	ErrInvalidAvatarMetadata = errors.New("invalid avatar metadata")
 	// ErrImageTooLarge возвращается при слишком большом изображении.

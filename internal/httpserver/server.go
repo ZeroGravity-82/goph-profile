@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/handler"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
@@ -27,7 +28,7 @@ type avatarUseCase interface {
 }
 
 type userUseCase interface {
-	ResolveUserByEmail(ctx context.Context, rawEmail string) (usecase.ResolveUserByEmailOutput, error)
+	ResolveUserByEmail(ctx context.Context, email model.Email) (usecase.ResolveUserByEmailOutput, error)
 }
 
 // HTTPServer запускает основной REST API.

@@ -184,7 +184,7 @@ func NewAvatarUseCase(
 
 // UploadAvatar загружает аватарку.
 func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput) (UploadAvatarOutput, error) {
-	if uc == nil || uc.userRepo == nil {
+	if uc.userRepo == nil {
 		return UploadAvatarOutput{}, errors.New("user repository is not provided")
 	}
 	if uc.avatarRepo == nil {
@@ -288,7 +288,7 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 	ctx context.Context,
 	in SelectCurrentAvatarInput,
 ) (SelectCurrentAvatarOutput, error) {
-	if uc == nil || uc.userRepo == nil {
+	if uc.userRepo == nil {
 		return SelectCurrentAvatarOutput{}, errors.New("user repository is not provided")
 	}
 	if uc.avatarRepo == nil {
@@ -330,7 +330,7 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 
 // DeleteCurrentAvatar удаляет текущую аватарку пользователя.
 func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurrentAvatarInput) error {
-	if uc == nil || uc.userRepo == nil {
+	if uc.userRepo == nil {
 		return errors.New("user repository is not provided")
 	}
 	if uc.avatarRepo == nil {
@@ -396,7 +396,7 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 	ctx context.Context,
 	in MarkAvatarReadyInput,
 ) (MarkAvatarReadyOutput, error) {
-	if uc == nil || uc.userRepo == nil {
+	if uc.userRepo == nil {
 		return MarkAvatarReadyOutput{}, errors.New("user repository is not provided")
 	}
 	if uc.avatarRepo == nil {
@@ -456,7 +456,7 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 	ctx context.Context,
 	in MarkAvatarFailedInput,
 ) (MarkAvatarFailedOutput, error) {
-	if uc == nil || uc.avatarRepo == nil {
+	if uc.avatarRepo == nil {
 		return MarkAvatarFailedOutput{}, errors.New("avatar repository is not provided")
 	}
 
@@ -486,7 +486,7 @@ func (uc *AvatarUseCase) GetAvatarMetadata(
 	ctx context.Context,
 	in GetAvatarMetadataInput,
 ) (GetAvatarMetadataOutput, error) {
-	if uc == nil || uc.avatarRepo == nil {
+	if uc.avatarRepo == nil {
 		return GetAvatarMetadataOutput{}, errors.New("avatar repository is not provided")
 	}
 

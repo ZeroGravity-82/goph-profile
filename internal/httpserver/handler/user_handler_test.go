@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func TestUserHandler_resolveUserByEmail(t *testing.T) {
 	// Assert
 	require.Equal(t, http.StatusOK, response.Code)
 	assert.Equal(t, "application/json", response.Header().Get("Content-Type"))
-	assert.Equal(t, []string{"  User@Example.COM  "}, userUseCase.resolveInputs)
+	assert.Equal(t, []model.Email{"user@example.com"}, userUseCase.resolveInputs)
 
 	var body dto.ResolveUserResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
@@ -62,19 +63,35 @@ func TestUserHandler_resolveUserByEmail_RejectsInvalidJSON(t *testing.T) {
 
 // TestUserHandler_resolveUserByEmail_RejectsInvalidEmail проверяет ошибку невалидного email.
 func TestUserHandler_resolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
-	// Arrange
-	userUseCase := &userUseCaseFake{resolveErr: usecase.ErrInvalidEmail}
-	handler := NewUserHandler(userUseCase, discardLogger())
-	request := newResolveUserRequest(t, "not-an-email")
-	response := httptest.NewRecorder()
+	tests := []struct {
+		name  string
+		email string
+	}{
+		{name: "empty", email: " "},
+		{name: "without at", email: "user.example.com"},
+		{name: "empty local", email: "@example.com"},
+		{name: "empty domain", email: "user@"},
+		{name: "spaces", email: "user name@example.com"},
+		{name: "too long", email: strings.Repeat("a", model.MaxEmailSizeBytes-10) + "@example.com"},
+	}
 
-	// Act
-	handler.resolveUserByEmail(response, request)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			userUseCase := &userUseCaseFake{}
+			handler := NewUserHandler(userUseCase, discardLogger())
+			request := newResolveUserRequest(t, tt.email)
+			response := httptest.NewRecorder()
 
-	// Assert
-	assert.Equal(t, http.StatusBadRequest, response.Code)
-	assert.Equal(t, []string{"not-an-email"}, userUseCase.resolveInputs)
-	assertErrorResponse(t, response, "Invalid email")
+			// Act
+			handler.resolveUserByEmail(response, request)
+
+			// Assert
+			assert.Equal(t, http.StatusBadRequest, response.Code)
+			assert.Empty(t, userUseCase.resolveInputs)
+			assertErrorResponse(t, response, "Invalid email")
+		})
+	}
 }
 
 // TestUserHandler_resolveUserByEmail_ReturnsInternalServerError проверяет внутреннюю ошибку определения пользователя.
@@ -91,7 +108,7 @@ func TestUserHandler_resolveUserByEmail_ReturnsInternalServerError(t *testing.T)
 
 	// Assert
 	assert.Equal(t, http.StatusInternalServerError, response.Code)
-	assert.Equal(t, []string{"user@example.com"}, userUseCase.resolveInputs)
+	assert.Equal(t, []model.Email{"user@example.com"}, userUseCase.resolveInputs)
 	assertErrorResponse(t, response, "Internal server error")
 	assert.Contains(t, logBuffer.String(), "database error")
 }
