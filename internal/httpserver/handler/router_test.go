@@ -8,13 +8,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
 // TestNewRouter_UploadAvatarRoute проверяет регистрацию маршрута загрузки аватарки.
 func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, discardLogger())
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -30,7 +33,7 @@ func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, nil)
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, nil)
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -47,7 +50,7 @@ func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, discardLogger())
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequestToPath(
 		t,
 		avatarRoutePath+"/",
@@ -68,7 +71,7 @@ func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 // TestNewRouter_ReturnsMethodNotAllowed проверяет ошибку неподдержанного HTTP-метода.
 func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 	// Arrange
-	router := NewRouter(&avatarUseCaseFake{}, discardLogger())
+	router := NewRouter(&avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
 	response := httptest.NewRecorder()
 
@@ -82,7 +85,7 @@ func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 // TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType проверяет ошибку неподдерживаемого content-type.
 func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 	// Arrange
-	router := NewRouter(&avatarUseCaseFake{}, discardLogger())
+	router := NewRouter(&avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, bytes.NewBufferString("{}"))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-User-ID", testUserID.String())
@@ -100,7 +103,7 @@ func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, discardLogger())
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	gzipRequestBody(t, request)
 	response := httptest.NewRecorder()
@@ -117,7 +120,7 @@ func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, discardLogger())
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustAvatarMetadataURL(t, testAvatarID.String()), nil)
 	response := httptest.NewRecorder()
 
@@ -128,4 +131,42 @@ func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 	require.Len(t, avatarUseCase.metadataInputs, 1)
 	assert.Equal(t, testAvatarID, avatarUseCase.metadataInputs[0].AvatarID)
+}
+
+// TestNewRouter_UserResolveRoute проверяет регистрацию маршрута определения пользователя по email.
+func TestNewRouter_UserResolveRoute(t *testing.T) {
+	// Arrange
+	userUseCase := &userUseCaseFake{
+		resolveOutput: usecase.ResolveUserByEmailOutput{
+			ID:    testUserID,
+			Email: model.Email("user@example.com"),
+		},
+	}
+	router := NewRouter(&avatarUseCaseFake{}, userUseCase, discardLogger())
+	request := newResolveUserRequest(t, "user@example.com")
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, []string{"user@example.com"}, userUseCase.resolveInputs)
+}
+
+// TestNewRouter_UserResolveRoute_ReturnsUnsupportedMediaType проверяет ошибку неподдерживаемого content-type.
+func TestNewRouter_UserResolveRoute_ReturnsUnsupportedMediaType(t *testing.T) {
+	// Arrange
+	userUseCase := &userUseCaseFake{}
+	router := NewRouter(&avatarUseCaseFake{}, userUseCase, discardLogger())
+	request := httptest.NewRequest(http.MethodPost, userResolveRoutePath, bytes.NewBufferString("email=user@example.com"))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusUnsupportedMediaType, response.Code)
+	assert.Empty(t, userUseCase.resolveInputs)
 }

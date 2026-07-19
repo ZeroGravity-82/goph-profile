@@ -26,12 +26,17 @@ type avatarUseCase interface {
 	) (usecase.GetAvatarMetadataOutput, error)
 }
 
+type userUseCase interface {
+	ResolveUserByEmail(ctx context.Context, rawEmail string) (usecase.ResolveUserByEmailOutput, error)
+}
+
 // HTTPServer запускает основной REST API.
 //
 // Он запускает роутер, собранный handler.NewRouter, на указанном адресе.
 type HTTPServer struct {
 	addr          string
 	avatarUseCase avatarUseCase
+	userUseCase   userUseCase
 	logger        *slog.Logger
 }
 
@@ -39,6 +44,7 @@ type HTTPServer struct {
 func NewHTTPServer(
 	addr string,
 	avatarUseCase avatarUseCase,
+	userUseCase userUseCase,
 	logger *slog.Logger,
 ) (*HTTPServer, error) {
 	if addr == "" {
@@ -51,13 +57,14 @@ func NewHTTPServer(
 	return &HTTPServer{
 		addr:          addr,
 		avatarUseCase: avatarUseCase,
+		userUseCase:   userUseCase,
 		logger:        logger,
 	}, nil
 }
 
 // Run запускает HTTP-сервер и блокируется, пока не отменен контекст или сервер не остановится с ошибкой.
 func (s *HTTPServer) Run(ctx context.Context) error {
-	router := handler.NewRouter(s.avatarUseCase, s.logger)
+	router := handler.NewRouter(s.avatarUseCase, s.userUseCase, s.logger)
 	srv := &http.Server{
 		Addr:              s.addr,
 		Handler:           router,

@@ -55,3 +55,17 @@ func writeJSON(logger *slog.Logger, w http.ResponseWriter, r *http.Request, stat
 		)
 	}
 }
+
+func logError(logger *slog.Logger, r *http.Request, message string, err error) {
+	if logger == nil {
+		logger = logging.NopLogger()
+	}
+
+	logger.ErrorContext(
+		r.Context(),
+		message,
+		slog.Any("error", err),
+		slog.String("method", r.Method),
+		slog.String("uri", r.RequestURI),
+	)
+}

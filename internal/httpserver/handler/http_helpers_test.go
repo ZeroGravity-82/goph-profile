@@ -45,6 +45,24 @@ func gunzipResponseBody(t *testing.T, response *httptest.ResponseRecorder) strin
 	return string(body)
 }
 
+func newResolveUserRequest(t *testing.T, email string) *http.Request {
+	t.Helper()
+
+	return newResolveUserRequestToPath(t, userResolveRoutePath, email)
+}
+
+func newResolveUserRequestToPath(t *testing.T, path string, email string) *http.Request {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	require.NoError(t, json.NewEncoder(body).Encode(dto.ResolveUserRequest{Email: email}))
+
+	request := httptest.NewRequest(http.MethodPost, path, body)
+	request.Header.Set("Content-Type", "application/json")
+
+	return request
+}
+
 func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, wantError string) {
 	t.Helper()
 

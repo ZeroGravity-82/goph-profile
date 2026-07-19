@@ -27,7 +27,7 @@ const (
 
 var errAvatarFileTooLarge = errors.New("avatar file is too large")
 
-// avatarUseCase описывает сценарии сервиса аватарок: загрузка аватарки и получение метаданных аватарки.
+// avatarUseCase описывает сценарии работы с аватарками: загрузка аватарки и получение метаданных аватарки.
 type avatarUseCase interface {
 	UploadAvatar(ctx context.Context, in usecase.UploadAvatarInput) (usecase.UploadAvatarOutput, error)
 	GetAvatarMetadata(
@@ -42,7 +42,7 @@ type AvatarHandler struct {
 	logger        *slog.Logger
 }
 
-// NewAvatarHandler создает AvatarHandler.
+// NewAvatarHandler создает новый AvatarHandler.
 func NewAvatarHandler(
 	avatarUseCase avatarUseCase,
 	logger *slog.Logger,
@@ -83,7 +83,7 @@ func (h *AvatarHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 
 	avatarURL, err := avatarURLForID(output.ID)
 	if err != nil {
-		h.logError(r, "failed to build avatar URL", err)
+		logError(h.logger, r, "failed to build avatar URL", err)
 		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 		return
 	}
@@ -215,7 +215,7 @@ func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Re
 		)
 		return
 	}
-	h.logError(r, "failed to upload avatar file", err)
+	logError(h.logger, r, "failed to upload avatar file", err)
 	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 }
 
@@ -239,14 +239,14 @@ func (h *AvatarHandler) getAvatarMetadata(w http.ResponseWriter, r *http.Request
 			writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
 			return
 		}
-		h.logError(r, "failed to get avatar metadata", err)
+		logError(h.logger, r, "failed to get avatar metadata", err)
 		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 		return
 	}
 
 	response, err := newAvatarMetadataResponse(output)
 	if err != nil {
-		h.logError(r, "failed to build avatar metadata response", err)
+		logError(h.logger, r, "failed to build avatar metadata response", err)
 		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 		return
 	}
@@ -317,14 +317,4 @@ func avatarThumbnailResponseForSize(avatarID uuid.UUID, size string) (dto.Avatar
 		Size: size,
 		URL:  thumbnailURL + "?" + values.Encode(),
 	}, nil
-}
-
-func (h *AvatarHandler) logError(r *http.Request, message string, err error) {
-	h.logger.ErrorContext(
-		r.Context(),
-		message,
-		slog.Any("error", err),
-		slog.String("method", r.Method),
-		slog.String("uri", r.RequestURI),
-	)
 }

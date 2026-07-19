@@ -22,36 +22,6 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
-var (
-	testUserID   = uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001")
-	testAvatarID = uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003")
-)
-
-type avatarUseCaseFake struct {
-	uploadOutput   usecase.UploadAvatarOutput
-	uploadErr      error
-	uploadInputs   []usecase.UploadAvatarInput
-	metadataOutput usecase.GetAvatarMetadataOutput
-	metadataErr    error
-	metadataInputs []usecase.GetAvatarMetadataInput
-}
-
-func (uc *avatarUseCaseFake) UploadAvatar(
-	_ context.Context,
-	input usecase.UploadAvatarInput,
-) (usecase.UploadAvatarOutput, error) {
-	uc.uploadInputs = append(uc.uploadInputs, input)
-	return uc.uploadOutput, uc.uploadErr
-}
-
-func (uc *avatarUseCaseFake) GetAvatarMetadata(
-	_ context.Context,
-	input usecase.GetAvatarMetadataInput,
-) (usecase.GetAvatarMetadataOutput, error) {
-	uc.metadataInputs = append(uc.metadataInputs, input)
-	return uc.metadataOutput, uc.metadataErr
-}
-
 // TestAvatarHandler_uploadAvatar проверяет успешную загрузку аватарки.
 func TestAvatarHandler_uploadAvatar(t *testing.T) {
 	// Arrange

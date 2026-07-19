@@ -85,7 +85,7 @@ func TestWriteJSON_LogsWriteError(t *testing.T) {
 	response := &errorResponseWriter{header: http.Header{}}
 
 	// Act
-	writeJSON(logger, response, request, http.StatusCreated, dto.UploadAvatarResponse{ID: testAvatarID.String()})
+	writeJSON(logger, response, request, http.StatusCreated, dto.UploadAvatarResponse{ID: "avatar-id"})
 
 	// Assert
 	assert.Equal(t, "application/json", response.header.Get("Content-Type"))

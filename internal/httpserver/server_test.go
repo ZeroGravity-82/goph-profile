@@ -19,7 +19,7 @@ func TestHTTPServer_Run_ReturnsListenError(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
-	server, err := NewHTTPServer(listener.Addr().String(), nil, discardLogger())
+	server, err := NewHTTPServer(listener.Addr().String(), nil, nil, discardLogger())
 	require.NoError(t, err)
 
 	// Act
@@ -36,7 +36,7 @@ func TestHTTPServer_Run_ShutsDownOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server, err := NewHTTPServer("127.0.0.1:0", nil, discardLogger())
+	server, err := NewHTTPServer("127.0.0.1:0", nil, nil, discardLogger())
 	require.NoError(t, err)
 
 	// Act
