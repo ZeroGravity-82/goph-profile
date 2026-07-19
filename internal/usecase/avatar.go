@@ -271,7 +271,16 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 		return UploadAvatarOutput{}, fmt.Errorf("publish avatar processing message: %w", err)
 	}
 
-	return uploadAvatarOutput(avatar), nil
+	return UploadAvatarOutput{
+		ID:        avatar.ID,
+		UserID:    avatar.UserID,
+		FileName:  avatar.FileName,
+		MIMEType:  avatar.MIMEType,
+		SizeBytes: avatar.SizeBytes,
+		Status:    avatar.Status,
+		CreatedAt: avatar.CreatedAt,
+		UpdatedAt: avatar.UpdatedAt,
+	}, nil
 }
 
 // SelectCurrentAvatar выбирает готовую аватарку пользователя как текущую.
@@ -301,14 +310,22 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 		return SelectCurrentAvatarOutput{}, err
 	}
 	if alreadyCurrent {
-		return selectCurrentAvatarOutput(user), nil
+		return SelectCurrentAvatarOutput{
+			UserID:          user.ID,
+			CurrentAvatarID: *user.CurrentAvatarID,
+			UpdatedAt:       user.UpdatedAt,
+		}, nil
 	}
 
 	if err = uc.userRepo.Update(ctx, user); err != nil {
 		return SelectCurrentAvatarOutput{}, fmt.Errorf("update current avatar: %w", err)
 	}
 
-	return selectCurrentAvatarOutput(user), nil
+	return SelectCurrentAvatarOutput{
+		UserID:          user.ID,
+		CurrentAvatarID: *user.CurrentAvatarID,
+		UpdatedAt:       user.UpdatedAt,
+	}, nil
 }
 
 // DeleteCurrentAvatar удаляет текущую аватарку пользователя.
@@ -363,6 +380,17 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 	return nil
 }
 
+func avatarObjectKeys(avatar model.Avatar) []string {
+	objectKeys := []string{avatar.ObjectKeyOriginal}
+	if avatar.ObjectKeyThumb100 != nil {
+		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb100)
+	}
+	if avatar.ObjectKeyThumb300 != nil {
+		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb300)
+	}
+	return objectKeys
+}
+
 // MarkAvatarReady завершает успешную обработку аватарки.
 func (uc *AvatarUseCase) MarkAvatarReady(
 	ctx context.Context,
@@ -411,7 +439,16 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 		}
 	}
 
-	return markAvatarReadyOutput(avatar), nil
+	return MarkAvatarReadyOutput{
+		ID:                avatar.ID,
+		UserID:            avatar.UserID,
+		Width:             *avatar.Width,
+		Height:            *avatar.Height,
+		ObjectKeyThumb100: *avatar.ObjectKeyThumb100,
+		ObjectKeyThumb300: *avatar.ObjectKeyThumb300,
+		Status:            avatar.Status,
+		UpdatedAt:         avatar.UpdatedAt,
+	}, nil
 }
 
 // MarkAvatarFailed завершает обработку аватарки ошибкой.
@@ -436,7 +473,12 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 		return MarkAvatarFailedOutput{}, fmt.Errorf("update failed avatar: %w", err)
 	}
 
-	return markAvatarFailedOutput(avatar), nil
+	return MarkAvatarFailedOutput{
+		ID:        avatar.ID,
+		UserID:    avatar.UserID,
+		Status:    avatar.Status,
+		UpdatedAt: avatar.UpdatedAt,
+	}, nil
 }
 
 // GetAvatarMetadata возвращает метаданные аватарки.
@@ -456,19 +498,6 @@ func (uc *AvatarUseCase) GetAvatarMetadata(
 	return getAvatarMetadataOutput(avatar), nil
 }
 
-func uploadAvatarOutput(avatar model.Avatar) UploadAvatarOutput {
-	return UploadAvatarOutput{
-		ID:        avatar.ID,
-		UserID:    avatar.UserID,
-		FileName:  avatar.FileName,
-		MIMEType:  avatar.MIMEType,
-		SizeBytes: avatar.SizeBytes,
-		Status:    avatar.Status,
-		CreatedAt: avatar.CreatedAt,
-		UpdatedAt: avatar.UpdatedAt,
-	}
-}
-
 func getAvatarMetadataOutput(avatar model.Avatar) GetAvatarMetadataOutput {
 	return GetAvatarMetadataOutput{
 		ID:                avatar.ID,
@@ -486,45 +515,4 @@ func getAvatarMetadataOutput(avatar model.Avatar) GetAvatarMetadataOutput {
 		UpdatedAt:         avatar.UpdatedAt,
 		DeletedAt:         avatar.DeletedAt,
 	}
-}
-
-func markAvatarReadyOutput(avatar model.Avatar) MarkAvatarReadyOutput {
-	return MarkAvatarReadyOutput{
-		ID:                avatar.ID,
-		UserID:            avatar.UserID,
-		Width:             *avatar.Width,
-		Height:            *avatar.Height,
-		ObjectKeyThumb100: *avatar.ObjectKeyThumb100,
-		ObjectKeyThumb300: *avatar.ObjectKeyThumb300,
-		Status:            avatar.Status,
-		UpdatedAt:         avatar.UpdatedAt,
-	}
-}
-
-func markAvatarFailedOutput(avatar model.Avatar) MarkAvatarFailedOutput {
-	return MarkAvatarFailedOutput{
-		ID:        avatar.ID,
-		UserID:    avatar.UserID,
-		Status:    avatar.Status,
-		UpdatedAt: avatar.UpdatedAt,
-	}
-}
-
-func selectCurrentAvatarOutput(user model.User) SelectCurrentAvatarOutput {
-	return SelectCurrentAvatarOutput{
-		UserID:          user.ID,
-		CurrentAvatarID: *user.CurrentAvatarID,
-		UpdatedAt:       user.UpdatedAt,
-	}
-}
-
-func avatarObjectKeys(avatar model.Avatar) []string {
-	objectKeys := []string{avatar.ObjectKeyOriginal}
-	if avatar.ObjectKeyThumb100 != nil {
-		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb100)
-	}
-	if avatar.ObjectKeyThumb300 != nil {
-		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb300)
-	}
-	return objectKeys
 }

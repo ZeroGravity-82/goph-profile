@@ -9,6 +9,15 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+type slogLogFormatter struct {
+	logger *slog.Logger
+}
+
+type slogLogEntry struct {
+	logger  *slog.Logger
+	request *http.Request
+}
+
 func withLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 	if logger == nil {
 		logger = logging.NopLogger()
@@ -17,20 +26,11 @@ func withLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 	return middleware.RequestLogger(slogLogFormatter{logger: logger})
 }
 
-type slogLogFormatter struct {
-	logger *slog.Logger
-}
-
 func (f slogLogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry {
 	return slogLogEntry{
 		logger:  f.logger,
 		request: r,
 	}
-}
-
-type slogLogEntry struct {
-	logger  *slog.Logger
-	request *http.Request
 }
 
 func (e slogLogEntry) Write(

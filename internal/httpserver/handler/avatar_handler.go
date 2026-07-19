@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -97,37 +96,6 @@ func (h *AvatarHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getAvatarMetadata парсит avatar_id из пути и возвращает публичные метаданные аватарки в JSON-ответе.
-func (h *AvatarHandler) getAvatarMetadata(w http.ResponseWriter, r *http.Request) {
-	avatarID, err := parseAvatarIDPathParam(r)
-	if err != nil {
-		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid avatar_id", "")
-		return
-	}
-
-	output, err := h.avatarUseCase.GetAvatarMetadata(r.Context(), usecase.GetAvatarMetadataInput{
-		AvatarID: avatarID,
-	})
-	if err != nil {
-		if errors.Is(err, usecase.ErrAvatarNotFound) {
-			writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
-			return
-		}
-		h.logError(r, "failed to get avatar metadata", err)
-		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
-		return
-	}
-
-	response, err := newAvatarMetadataResponse(output)
-	if err != nil {
-		h.logError(r, "failed to build avatar metadata response", err)
-		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
-		return
-	}
-
-	writeJSON(h.logger, w, r, http.StatusOK, response)
-}
-
 func parseUserIDHeader(r *http.Request) (uuid.UUID, error) {
 	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
 	if err != nil {
@@ -137,17 +105,6 @@ func parseUserIDHeader(r *http.Request) (uuid.UUID, error) {
 		return uuid.Nil, errors.New("invalid X-User-ID header")
 	}
 	return userID, nil
-}
-
-func parseAvatarIDPathParam(r *http.Request) (uuid.UUID, error) {
-	avatarID, err := uuid.Parse(chi.URLParam(r, avatarIDRouteParam))
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to parse avatar_id path param: %w", err)
-	}
-	if avatarID == uuid.Nil {
-		return uuid.Nil, errors.New("invalid avatar_id path param")
-	}
-	return avatarID, nil
 }
 
 // parseAvatarUploadRequest парсит HTTP-запрос загрузки аватарки:
@@ -254,60 +211,50 @@ func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Re
 	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 }
 
-func (h *AvatarHandler) logError(r *http.Request, message string, err error) {
-	h.logger.ErrorContext(
-		r.Context(),
-		message,
-		slog.Any("error", err),
-		slog.String("method", r.Method),
-		slog.String("uri", r.RequestURI),
-	)
+func avatarURLForID(avatarID uuid.UUID) (string, error) {
+	return url.JoinPath(avatarRoutePath, avatarID.String())
 }
 
-func writeError(
-	logger *slog.Logger,
-	w http.ResponseWriter,
-	r *http.Request,
-	statusCode int,
-	message string,
-	details string,
-) {
-	writeJSON(logger, w, r, statusCode, dto.ErrorResponse{
-		Error:   message,
-		Details: details,
-	})
-}
-
-func writeErrorWithMaxSize(
-	logger *slog.Logger,
-	w http.ResponseWriter,
-	r *http.Request,
-	statusCode int,
-	message string,
-) {
-	writeJSON(logger, w, r, statusCode, dto.ErrorResponse{
-		Error:   message,
-		MaxSize: model.MaxAvatarFileSizeBytes,
-	})
-}
-
-func writeJSON(logger *slog.Logger, w http.ResponseWriter, r *http.Request, statusCode int, response any) {
-	if logger == nil {
-		logger = logging.NopLogger()
+// getAvatarMetadata парсит avatar_id из пути и возвращает публичные метаданные аватарки в JSON-ответе.
+func (h *AvatarHandler) getAvatarMetadata(w http.ResponseWriter, r *http.Request) {
+	avatarID, err := parseAvatarIDPathParam(r)
+	if err != nil {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid avatar_id", "")
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.ErrorContext(
-			r.Context(),
-			"failed to write HTTP response",
-			slog.Any("error", err),
-			slog.String("method", r.Method),
-			slog.String("uri", r.RequestURI),
-			slog.Int("status", statusCode),
-		)
+	output, err := h.avatarUseCase.GetAvatarMetadata(r.Context(), usecase.GetAvatarMetadataInput{
+		AvatarID: avatarID,
+	})
+	if err != nil {
+		if errors.Is(err, usecase.ErrAvatarNotFound) {
+			writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
+			return
+		}
+		h.logError(r, "failed to get avatar metadata", err)
+		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+		return
 	}
+
+	response, err := newAvatarMetadataResponse(output)
+	if err != nil {
+		h.logError(r, "failed to build avatar metadata response", err)
+		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+		return
+	}
+
+	writeJSON(h.logger, w, r, http.StatusOK, response)
+}
+
+func parseAvatarIDPathParam(r *http.Request) (uuid.UUID, error) {
+	avatarID, err := uuid.Parse(chi.URLParam(r, avatarIDRouteParam))
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to parse avatar_id path param: %w", err)
+	}
+	if avatarID == uuid.Nil {
+		return uuid.Nil, errors.New("invalid avatar_id path param")
+	}
+	return avatarID, nil
 }
 
 func newAvatarMetadataResponse(output usecase.GetAvatarMetadataOutput) (dto.AvatarMetadataResponse, error) {
@@ -364,6 +311,12 @@ func avatarThumbnailResponseForSize(avatarID uuid.UUID, size string) (dto.Avatar
 	}, nil
 }
 
-func avatarURLForID(avatarID uuid.UUID) (string, error) {
-	return url.JoinPath(avatarRoutePath, avatarID.String())
+func (h *AvatarHandler) logError(r *http.Request, message string, err error) {
+	h.logger.ErrorContext(
+		r.Context(),
+		message,
+		slog.Any("error", err),
+		slog.String("method", r.Method),
+		slog.String("uri", r.RequestURI),
+	)
 }

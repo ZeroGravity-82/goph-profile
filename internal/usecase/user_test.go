@@ -16,6 +16,42 @@ import (
 
 var testUserID = uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001")
 
+type userRepositoryFake struct {
+	getUser      model.User
+	getUsers     []model.User
+	getErr       error
+	getErrs      []error
+	createUser   model.User
+	createErr    error
+	getEmails    []model.Email
+	createEmails []model.Email
+}
+
+func (r *userRepositoryFake) GetByEmail(_ context.Context, email model.Email) (model.User, error) {
+	r.getEmails = append(r.getEmails, email)
+	if len(r.getUsers) > 0 {
+		user := r.getUsers[0]
+		r.getUsers = r.getUsers[1:]
+		err := r.nextGetErr()
+		return user, err
+	}
+	return r.getUser, r.getErr
+}
+
+func (r *userRepositoryFake) Create(_ context.Context, email model.Email) (model.User, error) {
+	r.createEmails = append(r.createEmails, email)
+	return r.createUser, r.createErr
+}
+
+func (r *userRepositoryFake) nextGetErr() error {
+	if len(r.getErrs) == 0 {
+		return r.getErr
+	}
+	err := r.getErrs[0]
+	r.getErrs = r.getErrs[1:]
+	return err
+}
+
 // TestNewUserUseCase_RejectsNilRepository проверяет обязательность репозитория.
 func TestNewUserUseCase_RejectsNilRepository(t *testing.T) {
 	// Act
@@ -177,40 +213,4 @@ func TestUserUseCase_ResolveUserByEmail_ReturnsCreateError(t *testing.T) {
 	assert.Zero(t, result)
 	assert.Equal(t, []model.Email{"user@example.com"}, repository.getEmails)
 	assert.Equal(t, []model.Email{"user@example.com"}, repository.createEmails)
-}
-
-type userRepositoryFake struct {
-	getUser      model.User
-	getUsers     []model.User
-	getErr       error
-	getErrs      []error
-	createUser   model.User
-	createErr    error
-	getEmails    []model.Email
-	createEmails []model.Email
-}
-
-func (r *userRepositoryFake) GetByEmail(_ context.Context, email model.Email) (model.User, error) {
-	r.getEmails = append(r.getEmails, email)
-	if len(r.getUsers) > 0 {
-		user := r.getUsers[0]
-		r.getUsers = r.getUsers[1:]
-		err := r.nextGetErr()
-		return user, err
-	}
-	return r.getUser, r.getErr
-}
-
-func (r *userRepositoryFake) Create(_ context.Context, email model.Email) (model.User, error) {
-	r.createEmails = append(r.createEmails, email)
-	return r.createUser, r.createErr
-}
-
-func (r *userRepositoryFake) nextGetErr() error {
-	if len(r.getErrs) == 0 {
-		return r.getErr
-	}
-	err := r.getErrs[0]
-	r.getErrs = r.getErrs[1:]
-	return err
 }

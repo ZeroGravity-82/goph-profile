@@ -27,6 +27,48 @@ var (
 	testAvatarID = uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003")
 )
 
+type avatarUseCaseFake struct {
+	uploadOutput   usecase.UploadAvatarOutput
+	uploadErr      error
+	uploadInputs   []usecase.UploadAvatarInput
+	metadataOutput usecase.GetAvatarMetadataOutput
+	metadataErr    error
+	metadataInputs []usecase.GetAvatarMetadataInput
+}
+
+func (uc *avatarUseCaseFake) UploadAvatar(
+	_ context.Context,
+	input usecase.UploadAvatarInput,
+) (usecase.UploadAvatarOutput, error) {
+	uc.uploadInputs = append(uc.uploadInputs, input)
+	return uc.uploadOutput, uc.uploadErr
+}
+
+func (uc *avatarUseCaseFake) GetAvatarMetadata(
+	_ context.Context,
+	input usecase.GetAvatarMetadataInput,
+) (usecase.GetAvatarMetadataOutput, error) {
+	uc.metadataInputs = append(uc.metadataInputs, input)
+	return uc.metadataOutput, uc.metadataErr
+}
+
+type errorResponseWriter struct {
+	header     http.Header
+	statusCode int
+}
+
+func (w *errorResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *errorResponseWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write error")
+}
+
+func (w *errorResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+}
+
 // TestAvatarHandler_uploadAvatar проверяет успешную загрузку аватарки.
 func TestAvatarHandler_uploadAvatar(t *testing.T) {
 	// Arrange
@@ -304,31 +346,6 @@ func TestAvatarHandler_getAvatarMetadata_ReturnsInternalServerError(t *testing.T
 	assert.Contains(t, logBuffer.String(), "database error")
 }
 
-type avatarUseCaseFake struct {
-	uploadOutput   usecase.UploadAvatarOutput
-	uploadErr      error
-	uploadInputs   []usecase.UploadAvatarInput
-	metadataOutput usecase.GetAvatarMetadataOutput
-	metadataErr    error
-	metadataInputs []usecase.GetAvatarMetadataInput
-}
-
-func (uc *avatarUseCaseFake) UploadAvatar(
-	_ context.Context,
-	input usecase.UploadAvatarInput,
-) (usecase.UploadAvatarOutput, error) {
-	uc.uploadInputs = append(uc.uploadInputs, input)
-	return uc.uploadOutput, uc.uploadErr
-}
-
-func (uc *avatarUseCaseFake) GetAvatarMetadata(
-	_ context.Context,
-	input usecase.GetAvatarMetadataInput,
-) (usecase.GetAvatarMetadataOutput, error) {
-	uc.metadataInputs = append(uc.metadataInputs, input)
-	return uc.metadataOutput, uc.metadataErr
-}
-
 func newUploadAvatarRequest(
 	t *testing.T,
 	userID string,
@@ -424,21 +441,4 @@ func mustAvatarThumbnailURL(t *testing.T, avatarID uuid.UUID, size string) strin
 	values.Set("size", size)
 
 	return thumbnailURL + "?" + values.Encode()
-}
-
-type errorResponseWriter struct {
-	header     http.Header
-	statusCode int
-}
-
-func (w *errorResponseWriter) Header() http.Header {
-	return w.header
-}
-
-func (w *errorResponseWriter) Write(_ []byte) (int, error) {
-	return 0, errors.New("write error")
-}
-
-func (w *errorResponseWriter) WriteHeader(statusCode int) {
-	w.statusCode = statusCode
 }
