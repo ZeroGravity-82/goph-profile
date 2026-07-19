@@ -7,8 +7,6 @@ var (
 	ErrInvalidID = errors.New("invalid id")
 	// ErrInvalidAvatarMetadata возвращается при некорректных метаданных.
 	ErrInvalidAvatarMetadata = errors.New("invalid avatar metadata")
-	// ErrFileTooLarge возвращается при слишком большом размере файла.
-	ErrFileTooLarge = errors.New("avatar file too large")
 	// ErrImageTooLarge возвращается при слишком большом изображении.
 	ErrImageTooLarge = errors.New("avatar image too large")
 	// ErrInvalidAvatarTransition возвращается при запрещенном переходе статуса.

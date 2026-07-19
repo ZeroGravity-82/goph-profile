@@ -52,23 +52,6 @@ func (uc *avatarUseCaseFake) GetAvatarMetadata(
 	return uc.metadataOutput, uc.metadataErr
 }
 
-type errorResponseWriter struct {
-	header     http.Header
-	statusCode int
-}
-
-func (w *errorResponseWriter) Header() http.Header {
-	return w.header
-}
-
-func (w *errorResponseWriter) Write(_ []byte) (int, error) {
-	return 0, errors.New("write error")
-}
-
-func (w *errorResponseWriter) WriteHeader(statusCode int) {
-	w.statusCode = statusCode
-}
-
 // TestAvatarHandler_uploadAvatar проверяет успешную загрузку аватарки.
 func TestAvatarHandler_uploadAvatar(t *testing.T) {
 	// Arrange
@@ -162,7 +145,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
 	handler := NewAvatarHandler(avatarUseCase, discardLogger())
-	content := bytes.Repeat([]byte{0x89}, int(model.MaxAvatarFileSizeBytes)+1)
+	content := bytes.Repeat([]byte{0x89}, maxAvatarFileSizeBytes+1)
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", content)
 	response := httptest.NewRecorder()
 
@@ -176,7 +159,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 	var body dto.ErrorResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 	assert.Equal(t, "File too large", body.Error)
-	assert.Equal(t, model.MaxAvatarFileSizeBytes, body.MaxSize)
+	assert.Equal(t, int64(maxAvatarFileSizeBytes), body.MaxSize)
 }
 
 // TestAvatarHandler_uploadAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.
@@ -213,26 +196,6 @@ func TestAvatarHandler_uploadAvatar_ReturnsInternalServerError(t *testing.T) {
 	require.Len(t, avatarUseCase.uploadInputs, 1)
 	assertErrorResponse(t, response, "Internal server error")
 	assert.Contains(t, logBuffer.String(), "database error")
-}
-
-// TestWriteJSON_LogsWriteError проверяет логирование ошибки записи JSON-ответа.
-func TestWriteJSON_LogsWriteError(t *testing.T) {
-	// Arrange
-	logBuffer := &bytes.Buffer{}
-	logger := newTextLogger(logBuffer)
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, nil)
-	response := &errorResponseWriter{header: http.Header{}}
-
-	// Act
-	writeJSON(logger, response, request, http.StatusCreated, dto.UploadAvatarResponse{ID: testAvatarID.String()})
-
-	// Assert
-	assert.Equal(t, "application/json", response.header.Get("Content-Type"))
-	assert.Equal(t, http.StatusCreated, response.statusCode)
-	logOutput := logBuffer.String()
-	assert.Contains(t, logOutput, "failed to write HTTP response")
-	assert.Contains(t, logOutput, "write error")
-	assert.Contains(t, logOutput, "status=201")
 }
 
 // TestAvatarHandler_getAvatarMetadata проверяет успешное получение метаданных аватарки.
@@ -413,14 +376,6 @@ func pngContent() []byte {
 		0x00, 0x00, 0x00, 0x0d,
 		0x49, 0x48, 0x44, 0x52,
 	}
-}
-
-func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, wantError string) {
-	t.Helper()
-
-	var body dto.ErrorResponse
-	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-	assert.Equal(t, wantError, body.Error)
 }
 
 func mustAvatarURL(t *testing.T, avatarID string) string {

@@ -13,8 +13,6 @@ const (
 	MaxMIMETypeLength = 255
 	// MaxObjectKeyLength ограничивает ключ файла аватарки.
 	MaxObjectKeyLength = 512
-	// MaxAvatarFileSizeBytes ограничивает размер исходного файла 10 МиБ.
-	MaxAvatarFileSizeBytes int64 = 10 * 1024 * 1024
 	// MaxImageWidth ограничивает ширину изображения в пикселях.
 	MaxImageWidth = 4096
 	// MaxImageHeight ограничивает высоту изображения в пикселях.
@@ -193,9 +191,6 @@ func validateAvatarMetadata(fileName string, mimeType string, sizeBytes int64, o
 	}
 	if sizeBytes <= 0 {
 		return ErrInvalidAvatarMetadata
-	}
-	if sizeBytes > MaxAvatarFileSizeBytes {
-		return ErrFileTooLarge
 	}
 	if !validLength(objectKeyOriginal, MaxObjectKeyLength) {
 		return ErrInvalidAvatarMetadata

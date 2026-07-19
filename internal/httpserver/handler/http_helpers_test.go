@@ -3,13 +3,17 @@ package handler
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 )
 
 func gzipRequestBody(t *testing.T, request *http.Request) {
@@ -39,6 +43,14 @@ func gunzipResponseBody(t *testing.T, response *httptest.ResponseRecorder) strin
 	require.NoError(t, err)
 
 	return string(body)
+}
+
+func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, wantError string) {
+	t.Helper()
+
+	var body dto.ErrorResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.Equal(t, wantError, body.Error)
 }
 
 func mustAvatarMetadataURL(t *testing.T, avatarID string) string {

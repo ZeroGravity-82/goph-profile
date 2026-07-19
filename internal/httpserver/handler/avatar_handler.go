@@ -21,6 +21,7 @@ import (
 
 const (
 	formFileField                     = "file"
+	maxAvatarFileSizeBytes            = 10 * 1024 * 1024
 	maxFormMultipartOverheadSizeBytes = 1024 * 1024
 )
 
@@ -121,7 +122,7 @@ func parseAvatarUploadRequest(
 	r.Body = http.MaxBytesReader(
 		w,
 		r.Body,
-		model.MaxAvatarFileSizeBytes+maxFormMultipartOverheadSizeBytes,
+		maxAvatarFileSizeBytes+maxFormMultipartOverheadSizeBytes,
 	)
 
 	if err := r.ParseMultipartForm(maxFormMultipartOverheadSizeBytes); err != nil {
@@ -160,11 +161,11 @@ func parseAvatarUploadRequest(
 
 // readAvatarFile читает максимум 10 МиБ + 1 байт: если прочитан лишний байт, значит файл больше разрешенного лимита.
 func readAvatarFile(file multipart.File) ([]byte, error) {
-	content, err := io.ReadAll(io.LimitReader(file, model.MaxAvatarFileSizeBytes+1))
+	content, err := io.ReadAll(io.LimitReader(file, maxAvatarFileSizeBytes+1))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(content)) > model.MaxAvatarFileSizeBytes {
+	if int64(len(content)) > maxAvatarFileSizeBytes {
 		return nil, errAvatarFileTooLarge
 	}
 	return content, nil
@@ -192,8 +193,15 @@ func isWebP(content []byte) bool {
 // writeAvatarUploadError переводит ошибки файла аватарки в HTTP-ответы: превышение лимита в 413, невалидные
 // метаданные в 400, остальные ошибки в 500.
 func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, errAvatarFileTooLarge) || errors.Is(err, model.ErrFileTooLarge) {
-		writeErrorWithMaxSize(h.logger, w, r, http.StatusRequestEntityTooLarge, "File too large")
+	if errors.Is(err, errAvatarFileTooLarge) {
+		writeErrorWithMaxSize(
+			h.logger,
+			w,
+			r,
+			http.StatusRequestEntityTooLarge,
+			"File too large",
+			maxAvatarFileSizeBytes,
+		)
 		return
 	}
 	if errors.Is(err, model.ErrInvalidAvatarMetadata) {

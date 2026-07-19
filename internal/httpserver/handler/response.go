@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 )
@@ -30,10 +29,11 @@ func writeErrorWithMaxSize(
 	r *http.Request,
 	statusCode int,
 	message string,
+	maxSize int64,
 ) {
 	writeJSON(logger, w, r, statusCode, dto.ErrorResponse{
 		Error:   message,
-		MaxSize: model.MaxAvatarFileSizeBytes,
+		MaxSize: maxSize,
 	})
 }
 

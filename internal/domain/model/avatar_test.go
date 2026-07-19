@@ -48,26 +48,6 @@ func TestNewProcessingAvatar(t *testing.T) {
 	assert.Equal(t, now, avatar.UpdatedAt)
 }
 
-// TestNewProcessingAvatar_RejectsTooLargeFile проверяет лимит файла.
-func TestNewProcessingAvatar_RejectsTooLargeFile(t *testing.T) {
-	// Arrange
-	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
-
-	// Act
-	_, err := NewProcessingAvatar(
-		testAvatarID,
-		testUserID,
-		"avatar.jpg",
-		MIMEJPEG,
-		MaxAvatarFileSizeBytes+1,
-		"users/user-id/avatars/avatar-id/original",
-		now,
-	)
-
-	// Assert
-	require.ErrorIs(t, err, ErrFileTooLarge)
-}
-
 // TestMarkReady проверяет перевод обработанной аватарки в статус ready.
 func TestMarkReady(t *testing.T) {
 	// Arrange
