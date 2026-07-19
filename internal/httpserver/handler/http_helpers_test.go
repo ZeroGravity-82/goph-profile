@@ -4,21 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func discardLogger() *slog.Logger {
-	return newTextLogger(&bytes.Buffer{})
-}
-
-func newTextLogger(buffer *bytes.Buffer) *slog.Logger {
-	return slog.New(slog.NewTextHandler(buffer, nil))
-}
 
 func gzipRequestBody(t *testing.T, request *http.Request) {
 	t.Helper()
@@ -47,4 +39,13 @@ func gunzipResponseBody(t *testing.T, response *httptest.ResponseRecorder) strin
 	require.NoError(t, err)
 
 	return string(body)
+}
+
+func mustAvatarMetadataURL(t *testing.T, avatarID string) string {
+	t.Helper()
+
+	metadataURL, err := url.JoinPath(avatarRoutePath, avatarID, "metadata")
+	require.NoError(t, err)
+
+	return metadataURL
 }

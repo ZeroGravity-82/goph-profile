@@ -10,13 +10,15 @@ import (
 )
 
 const avatarRoutePath = "/api/v1/avatars"
+const avatarIDRouteParam = "avatar_id"
 
 // NewRouter собирает и возвращает HTTP-роутер REST API.
 //
 // Доступные ручки:
 //
 //	POST /api/v1/avatars
-func NewRouter(uploader AvatarUploader, logger *slog.Logger) http.Handler {
+//	GET /api/v1/avatars/{avatar_id}/metadata
+func NewRouter(avatarUseCase avatarUseCase, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -28,9 +30,10 @@ func NewRouter(uploader AvatarUploader, logger *slog.Logger) http.Handler {
 		withLogging(logger),
 		withGzip(logger),
 	)
-	avatarHandler := NewAvatarHandler(uploader, logger)
+	avatarHandler := NewAvatarHandler(avatarUseCase, logger)
 
 	r.With(middleware.AllowContentType("multipart/form-data")).Post(avatarRoutePath, avatarHandler.uploadAvatar)
+	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}/metadata", avatarHandler.getAvatarMetadata)
 
 	return r
 }

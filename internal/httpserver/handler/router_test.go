@@ -13,8 +13,8 @@ import (
 // TestNewRouter_UploadAvatarRoute проверяет регистрацию маршрута загрузки аватарки.
 func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 	// Arrange
-	uploader := &avatarUploaderFake{}
-	router := NewRouter(uploader, discardLogger())
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -23,14 +23,14 @@ func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 
 	// Assert
 	require.Equal(t, http.StatusCreated, response.Code)
-	require.Len(t, uploader.inputs, 1)
+	require.Len(t, avatarUseCase.uploadInputs, 1)
 }
 
 // TestNewRouter_UploadAvatarRoute_WithNilLogger проверяет работу роутера без переданного логгера.
 func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 	// Arrange
-	uploader := &avatarUploaderFake{}
-	router := NewRouter(uploader, nil)
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, nil)
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -39,15 +39,15 @@ func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 
 	// Assert
 	require.Equal(t, http.StatusCreated, response.Code)
-	require.Len(t, uploader.inputs, 1)
+	require.Len(t, avatarUseCase.uploadInputs, 1)
 }
 
 // TestNewRouter_UploadAvatarRoute_StripsTrailingSlash проверяет нормализацию завершающего слеша в маршруте загрузки
 // аватарки.
 func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 	// Arrange
-	uploader := &avatarUploaderFake{}
-	router := NewRouter(uploader, discardLogger())
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, discardLogger())
 	request := newUploadAvatarRequestToPath(
 		t,
 		avatarRoutePath+"/",
@@ -62,13 +62,13 @@ func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 
 	// Assert
 	require.Equal(t, http.StatusCreated, response.Code)
-	require.Len(t, uploader.inputs, 1)
+	require.Len(t, avatarUseCase.uploadInputs, 1)
 }
 
 // TestNewRouter_ReturnsMethodNotAllowed проверяет ошибку неподдержанного HTTP-метода.
 func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 	// Arrange
-	router := NewRouter(&avatarUploaderFake{}, discardLogger())
+	router := NewRouter(&avatarUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
 	response := httptest.NewRecorder()
 
@@ -82,7 +82,7 @@ func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 // TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType проверяет ошибку неподдерживаемого content-type.
 func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 	// Arrange
-	router := NewRouter(&avatarUploaderFake{}, discardLogger())
+	router := NewRouter(&avatarUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, bytes.NewBufferString("{}"))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-User-ID", testUserID.String())
@@ -99,8 +99,8 @@ func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 // до вызова обработчика загрузки аватарки.
 func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 	// Arrange
-	uploader := &avatarUploaderFake{}
-	router := NewRouter(uploader, discardLogger())
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	gzipRequestBody(t, request)
 	response := httptest.NewRecorder()
@@ -110,5 +110,22 @@ func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 
 	// Assert
 	require.Equal(t, http.StatusCreated, response.Code)
-	require.Len(t, uploader.inputs, 1)
+	require.Len(t, avatarUseCase.uploadInputs, 1)
+}
+
+// TestNewRouter_AvatarMetadataRoute проверяет регистрацию маршрута получения метаданных аватарки.
+func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, discardLogger())
+	request := httptest.NewRequest(http.MethodGet, mustAvatarMetadataURL(t, testAvatarID.String()), nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Len(t, avatarUseCase.metadataInputs, 1)
+	assert.Equal(t, testAvatarID, avatarUseCase.metadataInputs[0].AvatarID)
 }

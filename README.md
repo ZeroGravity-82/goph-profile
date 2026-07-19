@@ -338,6 +338,12 @@ GET /api/v1/avatars/{avatar_id}/metadata
 }
 ```
 
+Ошибки:
+
+- `400 Bad Request` - некорректный `avatar_id`;
+- `404 Not Found` - аватарка не найдена;
+- `500 Internal Server Error` - внутренняя ошибка без раскрытия деталей инфраструктуры.
+
 ### Выбор текущей аватарки
 
 ```http
