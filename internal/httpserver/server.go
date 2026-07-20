@@ -35,6 +35,10 @@ type avatarUseCase interface {
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,
 	) (usecase.GetCurrentAvatarByEmailOutput, error)
+	GetCurrentAvatarByUserID(
+		ctx context.Context,
+		in usecase.GetCurrentAvatarByUserIDInput,
+	) (usecase.GetCurrentAvatarByUserIDOutput, error)
 	GetAvatar(ctx context.Context, in usecase.GetAvatarInput) (usecase.GetAvatarOutput, error)
 	GetAvatarMetadata(
 		ctx context.Context,

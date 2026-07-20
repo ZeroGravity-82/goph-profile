@@ -144,13 +144,26 @@ func mustAvatarMetadataURL(t *testing.T, avatarID string) string {
 	return metadataURL
 }
 
-func mustPublicAvatarURL(t *testing.T, email string) string {
+func mustCurrentAvatarByEmailURL(t *testing.T, email string) string {
 	t.Helper()
 
 	values := url.Values{}
 	values.Set("email", email)
 
 	return "/api/v1/avatar?" + values.Encode()
+}
+
+func newCurrentAvatarByUserIDRequest(t *testing.T, userID string) *http.Request {
+	t.Helper()
+
+	currentAvatarURL, err := url.JoinPath("/api/v1/users", userID, "avatar")
+	require.NoError(t, err)
+
+	request := httptest.NewRequest(http.MethodGet, currentAvatarURL, nil)
+	routeContext := chi.NewRouteContext()
+	routeContext.URLParams.Add("user_id", userID)
+
+	return request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
 }
 
 func newUploadAvatarRequest(

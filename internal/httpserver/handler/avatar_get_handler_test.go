@@ -32,7 +32,7 @@ func TestAvatarHandler_getAvatar(t *testing.T) {
 	// Assert
 	require.Equal(t, http.StatusOK, response.Code)
 	assert.Equal(t, model.MIMEPNG, response.Header().Get("Content-Type"))
-	assert.Equal(t, publicAvatarCacheControl, response.Header().Get("Cache-Control"))
+	assert.Equal(t, avatarCacheControl, response.Header().Get("Cache-Control"))
 	assert.Equal(t, pngContent(), response.Body.Bytes())
 	require.Len(t, avatarUseCase.getAvatarInputs, 1)
 	assert.Equal(t, testAvatarID, avatarUseCase.getAvatarInputs[0].AvatarID)

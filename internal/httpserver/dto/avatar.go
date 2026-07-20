@@ -16,13 +16,13 @@ type SelectCurrentAvatarRequest struct {
 	AvatarID string `json:"avatar_id"`
 }
 
-// AvatarThumbnailResponse описывает доступную миниатюру аватарки в JSON-ответе с публичными метаданными аватарки.
+// AvatarThumbnailResponse описывает доступную миниатюру аватарки в JSON-ответе с метаданными аватарки.
 type AvatarThumbnailResponse struct {
 	Size string `json:"size"`
 	URL  string `json:"url"`
 }
 
-// AvatarMetadataResponse описывает JSON-ответ с публичными метаданными аватарки.
+// AvatarMetadataResponse описывает JSON-ответ с метаданными аватарки.
 type AvatarMetadataResponse struct {
 	ID         string                    `json:"id"`
 	UserID     string                    `json:"user_id"`

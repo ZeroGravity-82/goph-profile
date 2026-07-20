@@ -23,6 +23,9 @@ type avatarUseCaseFake struct {
 	currentByEmailOutput usecase.GetCurrentAvatarByEmailOutput
 	currentByEmailErr    error
 	currentByEmailInputs []usecase.GetCurrentAvatarByEmailInput
+	currentByUserOutput  usecase.GetCurrentAvatarByUserIDOutput
+	currentByUserErr     error
+	currentByUserInputs  []usecase.GetCurrentAvatarByUserIDInput
 	getAvatarOutput      usecase.GetAvatarOutput
 	getAvatarErr         error
 	getAvatarInputs      []usecase.GetAvatarInput
@@ -77,6 +80,14 @@ func (uc *avatarUseCaseFake) GetCurrentAvatarByEmail(
 ) (usecase.GetCurrentAvatarByEmailOutput, error) {
 	uc.currentByEmailInputs = append(uc.currentByEmailInputs, input)
 	return uc.currentByEmailOutput, uc.currentByEmailErr
+}
+
+func (uc *avatarUseCaseFake) GetCurrentAvatarByUserID(
+	_ context.Context,
+	input usecase.GetCurrentAvatarByUserIDInput,
+) (usecase.GetCurrentAvatarByUserIDOutput, error) {
+	uc.currentByUserInputs = append(uc.currentByUserInputs, input)
+	return uc.currentByUserOutput, uc.currentByUserErr
 }
 
 func (uc *avatarUseCaseFake) GetAvatar(

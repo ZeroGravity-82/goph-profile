@@ -24,8 +24,8 @@ import (
 const (
 	formFileField = "file"
 
-	// publicAvatarCacheControl разрешает клиентам кешировать публичную выдачу аватарки на сутки.
-	publicAvatarCacheControl = "max-age=86400"
+	// avatarCacheControl разрешает клиентам кешировать выдачу аватарки на сутки.
+	avatarCacheControl = "max-age=86400"
 
 	maxAvatarFileNameLengthBytes      = 255
 	maxAvatarFileSizeBytes            = 10 * 1024 * 1024
@@ -44,8 +44,8 @@ var (
 
 var defaultAvatarPNG = web.DefaultAvatarPNG
 
-// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор, удаление, получение списка, публичная выдача
-// аватарки по email и получение метаданных.
+// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор, удаление, получение списка, выдача аватарки
+// по email/ID пользователя и получение метаданных.
 type avatarUseCase interface {
 	UploadAvatar(ctx context.Context, in usecase.UploadAvatarInput) (usecase.UploadAvatarOutput, error)
 	SelectCurrentAvatar(
@@ -62,6 +62,10 @@ type avatarUseCase interface {
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,
 	) (usecase.GetCurrentAvatarByEmailOutput, error)
+	GetCurrentAvatarByUserID(
+		ctx context.Context,
+		in usecase.GetCurrentAvatarByUserIDInput,
+	) (usecase.GetCurrentAvatarByUserIDOutput, error)
 	GetAvatar(ctx context.Context, in usecase.GetAvatarInput) (usecase.GetAvatarOutput, error)
 	GetAvatarMetadata(
 		ctx context.Context,
@@ -270,7 +274,7 @@ func avatarURLForID(avatarID uuid.UUID) (string, error) {
 	return url.JoinPath(apiPathPrefix, "avatars", avatarID.String())
 }
 
-// selectCurrentAvatar парсит X-User-ID и avatar_id из JSON-тела, затем передает их в сценарий выбора текущей аватарки.
+// selectCurrentAvatar парсит X-User-ID и avatar_id из JSON-тела, затем передает их в сценарий выбора аватарки.
 func (h *AvatarHandler) selectCurrentAvatar(w http.ResponseWriter, r *http.Request) {
 	input, err := parseSelectCurrentAvatarRequest(r)
 	if err != nil {
@@ -556,8 +560,8 @@ func newListUserAvatarsItemResponse(
 	}, nil
 }
 
-// getPublicAvatarByEmail парсит email из query-параметра и возвращает текущую аватарку или PNG-заглушку.
-func (h *AvatarHandler) getPublicAvatarByEmail(w http.ResponseWriter, r *http.Request) {
+// getCurrentAvatarByEmail парсит email из query-параметра и возвращает текущую аватарку или PNG-заглушку.
+func (h *AvatarHandler) getCurrentAvatarByEmail(w http.ResponseWriter, r *http.Request) {
 	email, err := emailFromAvatarRequest(r)
 	if err != nil {
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
@@ -572,7 +576,7 @@ func (h *AvatarHandler) getPublicAvatarByEmail(w http.ResponseWriter, r *http.Re
 			writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
 			return
 		}
-		logError(h.logger, r, "failed to get public avatar by email", err)
+		logError(h.logger, r, "failed to get current avatar by email", err)
 		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 		return
 	}
@@ -588,6 +592,30 @@ func emailFromAvatarRequest(r *http.Request) (model.Email, error) {
 	return model.NewEmail(r.URL.Query().Get("email"))
 }
 
+// getCurrentAvatarByUserID парсит user_id из пути и возвращает текущую аватарку или PNG-заглушку.
+func (h *AvatarHandler) getCurrentAvatarByUserID(w http.ResponseWriter, r *http.Request) {
+	userID, err := parseUserIDPathParam(r)
+	if err != nil {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid user_id", "")
+		return
+	}
+
+	output, err := h.avatarUseCase.GetCurrentAvatarByUserID(r.Context(), usecase.GetCurrentAvatarByUserIDInput{
+		UserID: userID,
+	})
+	if err != nil {
+		logError(h.logger, r, "failed to get current avatar by user id", err)
+		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+		return
+	}
+
+	if output.UseDefaultAvatar {
+		writeAvatarContent(h.logger, w, r, model.MIMEPNG, defaultAvatarPNG)
+		return
+	}
+	writeAvatarContent(h.logger, w, r, output.MIMEType, output.Content)
+}
+
 // writeAvatarContent выставляет одинаковые заголовки кеширования для пользовательской аватарки и PNG-заглушки.
 func writeAvatarContent(logger *slog.Logger, w http.ResponseWriter, r *http.Request, mimeType string, content []byte) {
 	if logger == nil {
@@ -595,7 +623,7 @@ func writeAvatarContent(logger *slog.Logger, w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("Cache-Control", publicAvatarCacheControl)
+	w.Header().Set("Cache-Control", avatarCacheControl)
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(content); err != nil {
 		logger.ErrorContext(
@@ -707,7 +735,7 @@ func (h *AvatarHandler) writeGetAvatarError(w http.ResponseWriter, r *http.Reque
 	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 }
 
-// getAvatarMetadata парсит avatar_id из пути и возвращает публичные метаданные аватарки в JSON-ответе.
+// getAvatarMetadata парсит avatar_id из пути и возвращает метаданные аватарки в JSON-ответе.
 func (h *AvatarHandler) getAvatarMetadata(w http.ResponseWriter, r *http.Request) {
 	avatarID, err := parseAvatarIDPathParam(r)
 	if err != nil {

@@ -46,7 +46,7 @@ func TestAvatarUseCase_DeleteAvatar(t *testing.T) {
 	}, messagePublisher.deletionMessages)
 }
 
-// TestAvatarUseCase_DeleteAvatar_ClearsCurrentAvatar проверяет сброс текущей аватарки при удалении выбранной.
+// TestAvatarUseCase_DeleteAvatar_ClearsCurrentAvatar проверяет сброс текущей аватарки пользователя при ее удалении.
 func TestAvatarUseCase_DeleteAvatar_ClearsCurrentAvatar(t *testing.T) {
 	// Arrange
 	ctx := context.Background()

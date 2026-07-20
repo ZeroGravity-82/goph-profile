@@ -210,8 +210,8 @@ func TestNewRouter_GetAvatarRoute(t *testing.T) {
 	assert.Equal(t, testAvatarID, avatarUseCase.getAvatarInputs[0].AvatarID)
 }
 
-// TestNewRouter_PublicAvatarRoute проверяет регистрацию ручки публичного получения аватарки по email.
-func TestNewRouter_PublicAvatarRoute(t *testing.T) {
+// TestNewRouter_CurrentAvatarByEmailRoute проверяет регистрацию ручки получения аватарки по email.
+func TestNewRouter_CurrentAvatarByEmailRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{
 		currentByEmailOutput: usecase.GetCurrentAvatarByEmailOutput{
@@ -220,7 +220,7 @@ func TestNewRouter_PublicAvatarRoute(t *testing.T) {
 		},
 	}
 	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
-	request := httptest.NewRequest(http.MethodGet, mustPublicAvatarURL(t, "user@example.com"), nil)
+	request := httptest.NewRequest(http.MethodGet, mustCurrentAvatarByEmailURL(t, "user@example.com"), nil)
 	response := httptest.NewRecorder()
 
 	// Act
@@ -230,6 +230,30 @@ func TestNewRouter_PublicAvatarRoute(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 	require.Len(t, avatarUseCase.currentByEmailInputs, 1)
 	assert.Equal(t, model.Email("user@example.com"), avatarUseCase.currentByEmailInputs[0].Email)
+}
+
+// TestNewRouter_CurrentAvatarByUserIDRoute проверяет регистрацию ручки получения аватарки по ID пользователя.
+func TestNewRouter_CurrentAvatarByUserIDRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{
+		currentByUserOutput: usecase.GetCurrentAvatarByUserIDOutput{
+			Content:  pngContent(),
+			MIMEType: model.MIMEPNG,
+		},
+	}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	currentAvatarURL, err := url.JoinPath("/api/v1/users", testUserID.String(), "avatar")
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodGet, currentAvatarURL, nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Len(t, avatarUseCase.currentByUserInputs, 1)
+	assert.Equal(t, testUserID, avatarUseCase.currentByUserInputs[0].UserID)
 }
 
 // TestNewRouter_ListUserAvatarsRoute проверяет регистрацию ручки получения списка аватарок пользователя.

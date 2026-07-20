@@ -167,6 +167,24 @@ type GetCurrentAvatarByEmailOutput struct {
 	UseDefaultAvatar bool
 }
 
+// GetCurrentAvatarByUserIDInput описывает входные данные сценария получения текущей аватарки по ID пользователя.
+type GetCurrentAvatarByUserIDInput struct {
+	UserID uuid.UUID
+}
+
+// GetCurrentAvatarByUserIDOutput описывает результат сценария получения текущей аватарки по ID пользователя.
+type GetCurrentAvatarByUserIDOutput struct {
+	Content          []byte
+	MIMEType         string
+	UseDefaultAvatar bool
+}
+
+type currentAvatarOutput struct {
+	Content          []byte
+	MIMEType         string
+	UseDefaultAvatar bool
+}
+
 // avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
 type avatarUserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
@@ -768,26 +786,80 @@ func (uc *AvatarUseCase) GetCurrentAvatarByEmail(
 		return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
 	}
 
+	output, err := uc.getCurrentAvatar(ctx, user)
+	if err != nil {
+		return GetCurrentAvatarByEmailOutput{}, err
+	}
+
+	return GetCurrentAvatarByEmailOutput{
+		Content:          output.Content,
+		MIMEType:         output.MIMEType,
+		UseDefaultAvatar: output.UseDefaultAvatar,
+	}, nil
+}
+
+// GetCurrentAvatarByUserID возвращает текущую готовую аватарку пользователя или признак выдачи заглушки.
+func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
+	ctx context.Context,
+	in GetCurrentAvatarByUserIDInput,
+) (GetCurrentAvatarByUserIDOutput, error) {
+	if uc.userRepo == nil {
+		return GetCurrentAvatarByUserIDOutput{}, errors.New("user repository is not provided")
+	}
+	if uc.avatarRepo == nil {
+		return GetCurrentAvatarByUserIDOutput{}, errors.New("avatar repository is not provided")
+	}
+	if uc.fileStorage == nil {
+		return GetCurrentAvatarByUserIDOutput{}, errors.New("file storage is not provided")
+	}
+	if in.UserID == uuid.Nil {
+		return GetCurrentAvatarByUserIDOutput{}, model.ErrInvalidID
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, in.UserID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
+		}
+		return GetCurrentAvatarByUserIDOutput{}, fmt.Errorf("get user by id: %w", err)
+	}
+	if user.CurrentAvatarID == nil {
+		return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
+	}
+
+	output, err := uc.getCurrentAvatar(ctx, user)
+	if err != nil {
+		return GetCurrentAvatarByUserIDOutput{}, err
+	}
+
+	return GetCurrentAvatarByUserIDOutput{
+		Content:          output.Content,
+		MIMEType:         output.MIMEType,
+		UseDefaultAvatar: output.UseDefaultAvatar,
+	}, nil
+}
+
+func (uc *AvatarUseCase) getCurrentAvatar(ctx context.Context, user model.User) (currentAvatarOutput, error) {
 	avatar, err := uc.avatarRepo.GetByID(ctx, *user.CurrentAvatarID)
 	if err != nil {
 		if errors.Is(err, ErrAvatarNotFound) {
-			return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
+			return currentAvatarOutput{UseDefaultAvatar: true}, nil
 		}
-		return GetCurrentAvatarByEmailOutput{}, fmt.Errorf("get current avatar by id: %w", err)
+		return currentAvatarOutput{}, fmt.Errorf("get current avatar by id: %w", err)
 	}
 	if avatar.UserID != user.ID {
-		return GetCurrentAvatarByEmailOutput{}, model.ErrAvatarForbidden
+		return currentAvatarOutput{}, model.ErrAvatarForbidden
 	}
 	if err = avatar.CanBeCurrent(); err != nil {
-		return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
+		return currentAvatarOutput{UseDefaultAvatar: true}, nil
 	}
 
 	content, err := uc.fileStorage.Get(ctx, avatar.ObjectKeyOriginal)
 	if err != nil {
-		return GetCurrentAvatarByEmailOutput{}, fmt.Errorf("get original avatar object: %w", err)
+		return currentAvatarOutput{}, fmt.Errorf("get original avatar object: %w", err)
 	}
 
-	return GetCurrentAvatarByEmailOutput{
+	return currentAvatarOutput{
 		Content:  content,
 		MIMEType: avatar.MIMEType,
 	}, nil

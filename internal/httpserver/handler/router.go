@@ -17,6 +17,7 @@ const apiPathPrefix = "/api/v1"
 //
 //	POST /api/v1/avatars
 //	GET /api/v1/avatar?email={email}
+//	GET /api/v1/users/{user_id}/avatar
 //	GET /api/v1/avatars/{avatar_id}
 //	GET /api/v1/avatars/{avatar_id}/metadata
 //	DELETE /api/v1/avatars/{avatar_id}
@@ -41,7 +42,8 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 
 	r.Route(apiPathPrefix, func(r chi.Router) {
 		r.With(middleware.AllowContentType("multipart/form-data")).Post("/avatars", avatarHandler.uploadAvatar)
-		r.Get("/avatar", avatarHandler.getPublicAvatarByEmail)
+		r.Get("/avatar", avatarHandler.getCurrentAvatarByEmail)
+		r.Get("/users/{user_id}/avatar", avatarHandler.getCurrentAvatarByUserID)
 		r.Get("/avatars/{avatar_id}", avatarHandler.getAvatar)
 		r.Get("/avatars/{avatar_id}/metadata", avatarHandler.getAvatarMetadata)
 		r.Delete("/avatars/{avatar_id}", avatarHandler.deleteAvatar)
