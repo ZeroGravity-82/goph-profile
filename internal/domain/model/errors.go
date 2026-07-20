@@ -9,8 +9,6 @@ var (
 	ErrInvalidEmail = errors.New("invalid email")
 	// ErrInvalidAvatarMetadata возвращается при некорректных метаданных.
 	ErrInvalidAvatarMetadata = errors.New("invalid avatar metadata")
-	// ErrImageTooLarge возвращается при слишком большом изображении.
-	ErrImageTooLarge = errors.New("avatar image too large")
 	// ErrInvalidAvatarTransition возвращается при запрещенном переходе статуса.
 	ErrInvalidAvatarTransition = errors.New("invalid avatar transition")
 	// ErrAvatarForbidden возвращается при операции над чужой аватаркой.

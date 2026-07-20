@@ -7,19 +7,6 @@ import (
 )
 
 const (
-	// MaxFileNameLength ограничивает исходное имя файла аватарки.
-	MaxFileNameLength = 255
-	// MaxObjectKeyLength ограничивает ключ файла аватарки.
-	MaxObjectKeyLength = 512
-	// MaxImageWidth ограничивает ширину изображения в пикселях.
-	MaxImageWidth = 4096
-	// MaxImageHeight ограничивает высоту изображения в пикселях.
-	MaxImageHeight = 4096
-	// MaxImagePixels ограничивает число пикселей изображения.
-	MaxImagePixels = 16_777_216
-)
-
-const (
 	// MIMEJPEG содержит MIME-тип JPEG.
 	MIMEJPEG = "image/jpeg"
 	// MIMEPNG содержит MIME-тип PNG.
@@ -119,8 +106,7 @@ func (a *Avatar) MarkReady(
 	if err := ValidateImageDimensions(width, height); err != nil {
 		return err
 	}
-	if !validLength(objectKeyThumb100, MaxObjectKeyLength) ||
-		!validLength(objectKeyThumb300, MaxObjectKeyLength) {
+	if objectKeyThumb100 == "" || objectKeyThumb300 == "" {
 		return ErrInvalidAvatarMetadata
 	}
 	a.Width = intPtr(width)
@@ -166,22 +152,16 @@ func (a *Avatar) MarkDeleted(now time.Time) error {
 	return nil
 }
 
-// ValidateImageDimensions проверяет лимиты изображения в пикселях.
+// ValidateImageDimensions проверяет, что размеры изображения имеют положительное значение.
 func ValidateImageDimensions(width int, height int) error {
 	if width <= 0 || height <= 0 {
 		return ErrInvalidAvatarMetadata
-	}
-	if width > MaxImageWidth || height > MaxImageHeight {
-		return ErrImageTooLarge
-	}
-	if width*height > MaxImagePixels {
-		return ErrImageTooLarge
 	}
 	return nil
 }
 
 func validateAvatarMetadata(fileName string, mimeType string, sizeBytes int64, objectKeyOriginal string) error {
-	if !validLength(fileName, MaxFileNameLength) {
+	if fileName == "" {
 		return ErrInvalidAvatarMetadata
 	}
 	if !supportedMIMEType(mimeType) {
@@ -190,7 +170,7 @@ func validateAvatarMetadata(fileName string, mimeType string, sizeBytes int64, o
 	if sizeBytes <= 0 {
 		return ErrInvalidAvatarMetadata
 	}
-	if !validLength(objectKeyOriginal, MaxObjectKeyLength) {
+	if objectKeyOriginal == "" {
 		return ErrInvalidAvatarMetadata
 	}
 	return nil
@@ -203,10 +183,6 @@ func supportedMIMEType(mimeType string) bool {
 	default:
 		return false
 	}
-}
-
-func validLength(value string, maxLength int) bool {
-	return value != "" && len(value) <= maxLength
 }
 
 func intPtr(value int) *int {

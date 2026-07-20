@@ -69,6 +69,27 @@ func TestNewProcessingAvatar_RejectsUnsupportedMIMEType(t *testing.T) {
 	assert.Zero(t, avatar)
 }
 
+// TestNewProcessingAvatar_RejectsEmptyFileName проверяет запрет пустого имени файла.
+func TestNewProcessingAvatar_RejectsEmptyFileName(t *testing.T) {
+	// Arrange
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+
+	// Act
+	avatar, err := NewProcessingAvatar(
+		testAvatarID,
+		testUserID,
+		"",
+		MIMEPNG,
+		1024,
+		"users/user-id/avatars/avatar-id/original",
+		now,
+	)
+
+	// Assert
+	require.ErrorIs(t, err, ErrInvalidAvatarMetadata)
+	assert.Zero(t, avatar)
+}
+
 // TestMarkReady проверяет перевод обработанной аватарки в статус ready.
 func TestMarkReady(t *testing.T) {
 	// Arrange
@@ -97,15 +118,15 @@ func TestMarkReady(t *testing.T) {
 	assert.Equal(t, readyAt, avatar.UpdatedAt)
 }
 
-// TestMarkReady_RejectsTooLargeDimensions проверяет лимит пикселей.
-func TestMarkReady_RejectsTooLargeDimensions(t *testing.T) {
+// TestMarkReady_RejectsInvalidDimensions проверяет запрет неположительных размеров.
+func TestMarkReady_RejectsInvalidDimensions(t *testing.T) {
 	// Arrange
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 	avatar := mustProcessingAvatar(t, now)
 
 	// Act
 	err := avatar.MarkReady(
-		MaxImageWidth+1,
+		0,
 		100,
 		"thumbs/avatar-id/100.png",
 		"thumbs/avatar-id/300.png",
@@ -113,7 +134,26 @@ func TestMarkReady_RejectsTooLargeDimensions(t *testing.T) {
 	)
 
 	// Assert
-	require.ErrorIs(t, err, ErrImageTooLarge)
+	require.ErrorIs(t, err, ErrInvalidAvatarMetadata)
+}
+
+// TestMarkReady_RejectsEmptyThumbnailObjectKey проверяет запрет пустого ключа миниатюры.
+func TestMarkReady_RejectsEmptyThumbnailObjectKey(t *testing.T) {
+	// Arrange
+	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
+	avatar := mustProcessingAvatar(t, now)
+
+	// Act
+	err := avatar.MarkReady(
+		100,
+		100,
+		"",
+		"thumbs/avatar-id/300.png",
+		now,
+	)
+
+	// Assert
+	require.ErrorIs(t, err, ErrInvalidAvatarMetadata)
 }
 
 // TestCanBeCurrent проверяет правила выбора текущей аватарки.
