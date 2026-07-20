@@ -26,14 +26,16 @@ const (
 	formFileField          = "file"
 	// publicAvatarCacheControl разрешает клиентам кешировать публичную выдачу аватарки на сутки.
 	publicAvatarCacheControl          = "max-age=86400"
+	maxAvatarFileNameLengthBytes      = 255
 	maxAvatarFileSizeBytes            = 10 * 1024 * 1024
 	maxFormMultipartOverheadSizeBytes = 1024 * 1024
 )
 
 var (
-	errAvatarFileTooLarge  = errors.New("avatar file is too large")
-	errInvalidAvatarSize   = errors.New("invalid avatar size")
-	errInvalidAvatarFormat = errors.New("invalid avatar format")
+	errAvatarFileTooLarge    = errors.New("avatar file is too large")
+	errAvatarFileNameInvalid = errors.New("avatar file name is invalid")
+	errInvalidAvatarSize     = errors.New("invalid avatar size")
+	errInvalidAvatarFormat   = errors.New("invalid avatar format")
 )
 
 var defaultAvatarPNG = web.DefaultAvatarPNG
@@ -156,6 +158,9 @@ func parseAvatarUploadRequest(
 	defer func() {
 		_ = file.Close()
 	}()
+	if err = validateAvatarFileName(fileHeader.Filename); err != nil {
+		return usecase.UploadAvatarInput{}, err
+	}
 
 	content, err := readAvatarFile(file)
 	if err != nil {
@@ -173,6 +178,13 @@ func parseAvatarUploadRequest(
 		MIMEType: mimeType,
 		Content:  content,
 	}, nil
+}
+
+func validateAvatarFileName(fileName string) error {
+	if fileName == "" || len(fileName) > maxAvatarFileNameLengthBytes {
+		return errAvatarFileNameInvalid
+	}
+	return nil
 }
 
 // readAvatarFile читает максимум 10 МиБ + 1 байт: если прочитан лишний байт, значит файл больше разрешенного лимита.
@@ -218,6 +230,10 @@ func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Re
 			"File too large",
 			maxAvatarFileSizeBytes,
 		)
+		return
+	}
+	if errors.Is(err, errAvatarFileNameInvalid) {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid file name", "")
 		return
 	}
 	if errors.Is(err, model.ErrInvalidAvatarMetadata) {

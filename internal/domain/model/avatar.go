@@ -9,8 +9,6 @@ import (
 const (
 	// MaxFileNameLength ограничивает исходное имя файла аватарки.
 	MaxFileNameLength = 255
-	// MaxMIMETypeLength ограничивает MIME-тип исходного файла.
-	MaxMIMETypeLength = 255
 	// MaxObjectKeyLength ограничивает ключ файла аватарки.
 	MaxObjectKeyLength = 512
 	// MaxImageWidth ограничивает ширину изображения в пикселях.
@@ -186,7 +184,7 @@ func validateAvatarMetadata(fileName string, mimeType string, sizeBytes int64, o
 	if !validLength(fileName, MaxFileNameLength) {
 		return ErrInvalidAvatarMetadata
 	}
-	if !supportedMIMEType(mimeType) || !validLength(mimeType, MaxMIMETypeLength) {
+	if !supportedMIMEType(mimeType) {
 		return ErrInvalidAvatarMetadata
 	}
 	if sizeBytes <= 0 {

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,24 @@ func TestAvatarHandler_uploadAvatar_RejectsUnsupportedFormat(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, response.Code)
 	assert.Empty(t, avatarUseCase.uploadInputs)
 	assertErrorResponse(t, response, "Invalid file format")
+}
+
+// TestAvatarHandler_uploadAvatar_RejectsTooLongFileName проверяет ошибку слишком длинного имени файла.
+func TestAvatarHandler_uploadAvatar_RejectsTooLongFileName(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	fileName := strings.Repeat("a", maxAvatarFileNameLengthBytes+1) + ".png"
+	request := newUploadAvatarRequest(t, testUserID.String(), fileName, pngContent())
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.uploadAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Empty(t, avatarUseCase.uploadInputs)
+	assertErrorResponse(t, response, "Invalid file name")
 }
 
 // TestAvatarHandler_uploadAvatar_RejectsTooLargeFile проверяет ошибку слишком большого файла.
