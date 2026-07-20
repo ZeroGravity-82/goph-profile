@@ -64,7 +64,7 @@ func TestAvatarHandler_getPublicAvatarByEmail_RejectsInvalidEmail(t *testing.T) 
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
 	handler := NewAvatarHandler(avatarUseCase, discardLogger())
-	request := httptest.NewRequest(http.MethodGet, publicAvatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatar", nil)
 	response := httptest.NewRecorder()
 
 	// Act

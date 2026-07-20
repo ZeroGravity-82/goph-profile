@@ -49,7 +49,7 @@ func TestUserHandler_resolveUserByEmail_RejectsInvalidJSON(t *testing.T) {
 	// Arrange
 	userUseCase := &userUseCaseFake{}
 	handler := NewUserHandler(userUseCase, discardLogger())
-	request := httptest.NewRequest(http.MethodPost, userResolveRoutePath, bytes.NewBufferString("{"))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/users/resolve", bytes.NewBufferString("{"))
 	response := httptest.NewRecorder()
 
 	// Act

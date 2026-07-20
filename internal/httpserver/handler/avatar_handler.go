@@ -11,9 +11,7 @@ import (
 )
 
 const (
-	avatarFormatQueryParam = "format"
-	avatarSizeQueryParam   = "size"
-	formFileField          = "file"
+	formFileField = "file"
 
 	// publicAvatarCacheControl разрешает клиентам кешировать публичную выдачу аватарки на сутки.
 	publicAvatarCacheControl = "max-age=86400"
@@ -35,8 +33,8 @@ var (
 
 var defaultAvatarPNG = web.DefaultAvatarPNG
 
-// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор и удаление текущей аватарки, публичная выдача
-// аватарки и получение метаданных.
+// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор и удаление аватарки, публичная выдача аватарки
+// и получение метаданных.
 type avatarUseCase interface {
 	UploadAvatar(ctx context.Context, in usecase.UploadAvatarInput) (usecase.UploadAvatarOutput, error)
 	SelectCurrentAvatar(
@@ -44,6 +42,7 @@ type avatarUseCase interface {
 		in usecase.SelectCurrentAvatarInput,
 	) error
 	DeleteCurrentAvatar(ctx context.Context, in usecase.DeleteCurrentAvatarInput) error
+	DeleteAvatar(ctx context.Context, in usecase.DeleteAvatarInput) error
 	GetCurrentAvatarByEmail(
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,

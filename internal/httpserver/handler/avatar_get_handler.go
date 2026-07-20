@@ -51,7 +51,7 @@ func parseGetAvatarRequest(r *http.Request) (usecase.GetAvatarInput, error) {
 }
 
 func parseAvatarIDPathParam(r *http.Request) (uuid.UUID, error) {
-	avatarID, err := uuid.Parse(chi.URLParam(r, avatarIDRouteParam))
+	avatarID, err := uuid.Parse(chi.URLParam(r, "avatar_id"))
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to parse avatar_id path param: %w", err)
 	}
@@ -62,7 +62,7 @@ func parseAvatarIDPathParam(r *http.Request) (uuid.UUID, error) {
 }
 
 func avatarSizeFromRequest(r *http.Request) (usecase.AvatarSize, error) {
-	switch r.URL.Query().Get(avatarSizeQueryParam) {
+	switch r.URL.Query().Get("size") {
 	case "", string(usecase.AvatarSizeOriginal):
 		return usecase.AvatarSizeOriginal, nil
 	case string(usecase.AvatarSize100):
@@ -75,7 +75,7 @@ func avatarSizeFromRequest(r *http.Request) (usecase.AvatarSize, error) {
 }
 
 func avatarMIMETypeFromRequest(r *http.Request) (string, error) {
-	switch r.URL.Query().Get(avatarFormatQueryParam) {
+	switch r.URL.Query().Get("format") {
 	case "":
 		return "", nil
 	case "jpeg":

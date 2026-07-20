@@ -9,11 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-const avatarRoutePath = "/api/v1/avatars"
-const avatarIDRouteParam = "avatar_id"
-const publicAvatarRoutePath = "/api/v1/avatar"
-const userRoutePath = "/api/v1/users"
-const userResolveRoutePath = userRoutePath + "/resolve"
+const apiPathPrefix = "/api/v1"
 
 // NewRouter собирает и возвращает HTTP-роутер REST API.
 //
@@ -23,6 +19,7 @@ const userResolveRoutePath = userRoutePath + "/resolve"
 //	GET /api/v1/avatar?email={email}
 //	GET /api/v1/avatars/{avatar_id}
 //	GET /api/v1/avatars/{avatar_id}/metadata
+//	DELETE /api/v1/avatars/{avatar_id}
 //	POST /api/v1/users/resolve
 //	PATCH /api/v1/avatar
 //	DELETE /api/v1/avatar
@@ -41,16 +38,16 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 	avatarHandler := NewAvatarHandler(avatarUseCase, logger)
 	userHandler := NewUserHandler(userUseCase, logger)
 
-	r.With(middleware.AllowContentType("multipart/form-data")).Post(avatarRoutePath, avatarHandler.uploadAvatar)
-	r.Get(publicAvatarRoutePath, avatarHandler.getPublicAvatarByEmail)
-	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}", avatarHandler.getAvatar)
-	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}/metadata", avatarHandler.getAvatarMetadata)
-	r.With(middleware.AllowContentType("application/json")).Post(userResolveRoutePath, userHandler.resolveUserByEmail)
-	r.With(middleware.AllowContentType("application/json")).Patch(
-		publicAvatarRoutePath,
-		avatarHandler.selectCurrentAvatar,
-	)
-	r.Delete(publicAvatarRoutePath, avatarHandler.deleteCurrentAvatar)
+	r.Route(apiPathPrefix, func(r chi.Router) {
+		r.With(middleware.AllowContentType("multipart/form-data")).Post("/avatars", avatarHandler.uploadAvatar)
+		r.Get("/avatar", avatarHandler.getPublicAvatarByEmail)
+		r.Get("/avatars/{avatar_id}", avatarHandler.getAvatar)
+		r.Get("/avatars/{avatar_id}/metadata", avatarHandler.getAvatarMetadata)
+		r.Delete("/avatars/{avatar_id}", avatarHandler.deleteAvatar)
+		r.With(middleware.AllowContentType("application/json")).Post("/users/resolve", userHandler.resolveUserByEmail)
+		r.With(middleware.AllowContentType("application/json")).Patch("/avatar", avatarHandler.selectCurrentAvatar)
+		r.Delete("/avatar", avatarHandler.deleteCurrentAvatar)
+	})
 
 	return r
 }

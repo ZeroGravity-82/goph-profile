@@ -53,7 +53,7 @@ func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequestToPath(
 		t,
-		avatarRoutePath+"/",
+		"/api/v1/avatars/",
 		testUserID.String(),
 		"avatar.png",
 		pngContent(),
@@ -72,7 +72,7 @@ func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 	// Arrange
 	router := NewRouter(&avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
-	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatars", nil)
 	response := httptest.NewRecorder()
 
 	// Act
@@ -86,7 +86,7 @@ func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 	// Arrange
 	router := NewRouter(&avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, bytes.NewBufferString("{}"))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", bytes.NewBufferString("{}"))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-User-ID", testUserID.String())
 	response := httptest.NewRecorder()
@@ -139,7 +139,7 @@ func TestNewRouter_DeleteCurrentAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
 	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
-	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
 	// Act
@@ -149,6 +149,25 @@ func TestNewRouter_DeleteCurrentAvatarRoute(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, response.Code)
 	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
 	assert.Equal(t, testUserID, avatarUseCase.deleteCurrentInputs[0].UserID)
+}
+
+// TestNewRouter_DeleteAvatarRoute проверяет регистрацию ручки удаления аватарки по ID.
+func TestNewRouter_DeleteAvatarRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	request := httptest.NewRequest(http.MethodDelete, mustAvatarURL(t, testAvatarID.String()), nil)
+	request.Header.Set("X-User-ID", testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusNoContent, response.Code)
+	require.Len(t, avatarUseCase.deleteAvatarInputs, 1)
+	assert.Equal(t, testUserID, avatarUseCase.deleteAvatarInputs[0].UserID)
+	assert.Equal(t, testAvatarID, avatarUseCase.deleteAvatarInputs[0].AvatarID)
 }
 
 // TestNewRouter_AvatarMetadataRoute проверяет регистрацию ручки получения метаданных аватарки.
@@ -238,7 +257,11 @@ func TestNewRouter_UserResolveRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 	// Arrange
 	userUseCase := &userUseCaseFake{}
 	router := NewRouter(&avatarUseCaseFake{}, userUseCase, discardLogger())
-	request := httptest.NewRequest(http.MethodPost, userResolveRoutePath, bytes.NewBufferString("email=user@example.com"))
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/users/resolve",
+		bytes.NewBufferString("email=user@example.com"),
+	)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response := httptest.NewRecorder()
 

@@ -20,7 +20,7 @@ func TestWithLogging_LogsResponse(t *testing.T) {
 		require.NoError(t, err)
 	})
 	handler := withLogging(newTextLogger(logBuffer))(next)
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", nil)
 	request.RemoteAddr = "203.0.113.10"
 	response := httptest.NewRecorder()
 
@@ -42,7 +42,7 @@ func TestWithLogging_LogsDefaultStatus(t *testing.T) {
 	// Arrange
 	logBuffer := &bytes.Buffer{}
 	handler := withLogging(newTextLogger(logBuffer))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatars", nil)
 	response := httptest.NewRecorder()
 
 	// Act
@@ -58,7 +58,7 @@ func TestWithLogging_LogsDefaultStatus(t *testing.T) {
 func TestSlogLogEntry_Panic(t *testing.T) {
 	// Arrange
 	logBuffer := &bytes.Buffer{}
-	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatars", nil)
 	entry := slogLogEntry{
 		logger:  newTextLogger(logBuffer),
 		request: request,

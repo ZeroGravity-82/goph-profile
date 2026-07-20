@@ -52,7 +52,7 @@ func gunzipResponseBody(t *testing.T, response *httptest.ResponseRecorder) strin
 func newResolveUserRequest(t *testing.T, email string) *http.Request {
 	t.Helper()
 
-	return newResolveUserRequestToPath(t, userResolveRoutePath, email)
+	return newResolveUserRequestToPath(t, "/api/v1/users/resolve", email)
 }
 
 func newResolveUserRequestToPath(t *testing.T, path string, email string) *http.Request {
@@ -87,18 +87,31 @@ func newSelectCurrentAvatarRequestWithBody(
 ) *http.Request {
 	t.Helper()
 
-	request := httptest.NewRequest(http.MethodPatch, publicAvatarRoutePath, body)
+	request := httptest.NewRequest(http.MethodPatch, "/api/v1/avatar", body)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-User-ID", headerUserID)
 
 	return request
 }
 
-func newDeleteCurrentAvatarRequest(userID string) *http.Request {
-	request := httptest.NewRequest(http.MethodDelete, publicAvatarRoutePath, nil)
+func newDeleteCurrentAvatarRequest(t *testing.T, userID string) *http.Request {
+	t.Helper()
+
+	request := httptest.NewRequest(http.MethodDelete, "/api/v1/avatar", nil)
 	request.Header.Set("X-User-ID", userID)
 
 	return request
+}
+
+func newDeleteAvatarRequest(t *testing.T, userID string, avatarID string) *http.Request {
+	t.Helper()
+
+	request := httptest.NewRequest(http.MethodDelete, mustAvatarURL(t, avatarID), nil)
+	request.Header.Set("X-User-ID", userID)
+	routeContext := chi.NewRouteContext()
+	routeContext.URLParams.Add("avatar_id", avatarID)
+
+	return request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
 }
 
 func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, wantError string) {
@@ -112,7 +125,7 @@ func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, want
 func mustAvatarMetadataURL(t *testing.T, avatarID string) string {
 	t.Helper()
 
-	metadataURL, err := url.JoinPath(avatarRoutePath, avatarID, "metadata")
+	metadataURL, err := url.JoinPath("/api/v1/avatars", avatarID, "metadata")
 	require.NoError(t, err)
 
 	return metadataURL
@@ -124,7 +137,7 @@ func mustPublicAvatarURL(t *testing.T, email string) string {
 	values := url.Values{}
 	values.Set("email", email)
 
-	return publicAvatarRoutePath + "?" + values.Encode()
+	return "/api/v1/avatar?" + values.Encode()
 }
 
 func newUploadAvatarRequest(
@@ -135,7 +148,7 @@ func newUploadAvatarRequest(
 ) *http.Request {
 	t.Helper()
 
-	return newUploadAvatarRequestToPath(t, avatarRoutePath, userID, fileName, content)
+	return newUploadAvatarRequestToPath(t, "/api/v1/avatars", userID, fileName, content)
 }
 
 func newUploadAvatarRequestToPath(
@@ -170,7 +183,7 @@ func newUploadAvatarRequestWithoutFile(t *testing.T, userID string) *http.Reques
 	require.NoError(t, writer.WriteField("ignored", "value"))
 	require.NoError(t, writer.Close())
 
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, body)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	request.Header.Set("X-User-ID", userID)
 
@@ -182,7 +195,7 @@ func newGetAvatarMetadataRequest(t *testing.T, avatarID string) *http.Request {
 
 	request := httptest.NewRequest(http.MethodGet, mustAvatarMetadataURL(t, avatarID), nil)
 	routeContext := chi.NewRouteContext()
-	routeContext.URLParams.Add(avatarIDRouteParam, avatarID)
+	routeContext.URLParams.Add("avatar_id", avatarID)
 
 	return request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
 }
@@ -193,14 +206,14 @@ func newGetAvatarRequest(t *testing.T, avatarID string, size string, format stri
 	request := httptest.NewRequest(http.MethodGet, mustAvatarURL(t, avatarID), nil)
 	values := request.URL.Query()
 	if size != "" {
-		values.Set(avatarSizeQueryParam, size)
+		values.Set("size", size)
 	}
 	if format != "" {
-		values.Set(avatarFormatQueryParam, format)
+		values.Set("format", format)
 	}
 	request.URL.RawQuery = values.Encode()
 	routeContext := chi.NewRouteContext()
-	routeContext.URLParams.Add(avatarIDRouteParam, avatarID)
+	routeContext.URLParams.Add("avatar_id", avatarID)
 
 	return request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
 }
@@ -217,7 +230,7 @@ func pngContent() []byte {
 func mustAvatarURL(t *testing.T, avatarID string) string {
 	t.Helper()
 
-	avatarURL, err := url.JoinPath(avatarRoutePath, avatarID)
+	avatarURL, err := url.JoinPath("/api/v1/avatars", avatarID)
 	require.NoError(t, err)
 
 	return avatarURL

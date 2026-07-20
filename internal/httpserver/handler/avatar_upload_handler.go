@@ -192,5 +192,5 @@ func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Re
 }
 
 func avatarURLForID(avatarID uuid.UUID) (string, error) {
-	return url.JoinPath(avatarRoutePath, avatarID.String())
+	return url.JoinPath(apiPathPrefix, "avatars", avatarID.String())
 }

@@ -34,7 +34,7 @@ func (w *errorResponseWriter) WriteHeader(statusCode int) {
 // TestWriteError проверяет JSON-ответ с ошибкой и деталями.
 func TestWriteError(t *testing.T) {
 	// Arrange
-	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatars", nil)
 	response := httptest.NewRecorder()
 
 	// Act
@@ -53,7 +53,7 @@ func TestWriteError(t *testing.T) {
 // TestWriteErrorWithMaxSize проверяет JSON-ответ с ошибкой и максимальным допустимым размером.
 func TestWriteErrorWithMaxSize(t *testing.T) {
 	// Arrange
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", nil)
 	response := httptest.NewRecorder()
 
 	// Act
@@ -81,7 +81,7 @@ func TestWriteJSON_LogsWriteError(t *testing.T) {
 	// Arrange
 	logBuffer := &bytes.Buffer{}
 	logger := newTextLogger(logBuffer)
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", nil)
 	response := &errorResponseWriter{header: http.Header{}}
 
 	// Act

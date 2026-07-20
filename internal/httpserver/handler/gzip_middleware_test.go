@@ -27,7 +27,7 @@ func TestWithGzip_ReadsGzipRequest(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	handler := withGzip(discardLogger())(next)
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, gzipContent(t, []byte("request body")))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", gzipContent(t, []byte("request body")))
 	request.Header.Set("Content-Encoding", "gzip")
 	response := httptest.NewRecorder()
 
@@ -49,7 +49,7 @@ func TestWithGzip_RejectsInvalidGzipRequest(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	handler := withGzip(newTextLogger(logBuffer))(next)
-	request := httptest.NewRequest(http.MethodPost, avatarRoutePath, bytes.NewBufferString("not gzip"))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", bytes.NewBufferString("not gzip"))
 	request.Header.Set("Content-Encoding", "gzip")
 	response := httptest.NewRecorder()
 
@@ -72,7 +72,7 @@ func TestWithGzip_WritesGzipResponse(t *testing.T) {
 		require.NoError(t, err)
 	})
 	handler := withGzip(discardLogger())(next)
-	request := httptest.NewRequest(http.MethodGet, avatarRoutePath, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatars", nil)
 	request.Header.Set("Accept-Encoding", "gzip")
 	response := httptest.NewRecorder()
 
