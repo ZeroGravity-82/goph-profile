@@ -13,7 +13,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
-// TestNewRouter_UploadAvatarRoute проверяет регистрацию маршрута загрузки аватарки.
+// TestNewRouter_UploadAvatarRoute проверяет регистрацию ручки загрузки аватарки.
 func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
@@ -45,7 +45,7 @@ func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 	require.Len(t, avatarUseCase.uploadInputs, 1)
 }
 
-// TestNewRouter_UploadAvatarRoute_StripsTrailingSlash проверяет нормализацию завершающего слеша в маршруте загрузки
+// TestNewRouter_UploadAvatarRoute_StripsTrailingSlash проверяет нормализацию завершающего слеша в ручке загрузки
 // аватарки.
 func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 	// Arrange
@@ -116,7 +116,7 @@ func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 	require.Len(t, avatarUseCase.uploadInputs, 1)
 }
 
-// TestNewRouter_AvatarMetadataRoute проверяет регистрацию маршрута получения метаданных аватарки.
+// TestNewRouter_AvatarMetadataRoute проверяет регистрацию ручки получения метаданных аватарки.
 func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
@@ -133,7 +133,29 @@ func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	assert.Equal(t, testAvatarID, avatarUseCase.metadataInputs[0].AvatarID)
 }
 
-// TestNewRouter_PublicAvatarRoute проверяет регистрацию маршрута публичного получения аватарки по email.
+// TestNewRouter_GetAvatarRoute проверяет регистрацию ручки получения файла аватарки.
+func TestNewRouter_GetAvatarRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{
+		getAvatarOutput: usecase.GetAvatarOutput{
+			Content:  pngContent(),
+			MIMEType: model.MIMEPNG,
+		},
+	}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	request := httptest.NewRequest(http.MethodGet, mustAvatarURL(t, testAvatarID.String()), nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Len(t, avatarUseCase.getAvatarInputs, 1)
+	assert.Equal(t, testAvatarID, avatarUseCase.getAvatarInputs[0].AvatarID)
+}
+
+// TestNewRouter_PublicAvatarRoute проверяет регистрацию ручки публичного получения аватарки по email.
 func TestNewRouter_PublicAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{
@@ -155,7 +177,7 @@ func TestNewRouter_PublicAvatarRoute(t *testing.T) {
 	assert.Equal(t, model.Email("user@example.com"), avatarUseCase.currentByEmailInputs[0].Email)
 }
 
-// TestNewRouter_UserResolveRoute проверяет регистрацию маршрута определения пользователя по email.
+// TestNewRouter_UserResolveRoute проверяет регистрацию ручки определения пользователя по email.
 func TestNewRouter_UserResolveRoute(t *testing.T) {
 	// Arrange
 	userUseCase := &userUseCaseFake{

@@ -20,6 +20,7 @@ const userResolveRoutePath = "/api/v1/users/resolve"
 //
 //	POST /api/v1/avatars
 //	GET /api/v1/avatar?email={email}
+//	GET /api/v1/avatars/{avatar_id}
 //	GET /api/v1/avatars/{avatar_id}/metadata
 //	POST /api/v1/users/resolve
 func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slog.Logger) http.Handler {
@@ -39,6 +40,7 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 
 	r.With(middleware.AllowContentType("multipart/form-data")).Post(avatarRoutePath, avatarHandler.uploadAvatar)
 	r.Get(publicAvatarRoutePath, avatarHandler.getPublicAvatarByEmail)
+	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}", avatarHandler.getAvatar)
 	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}/metadata", avatarHandler.getAvatarMetadata)
 	r.With(middleware.AllowContentType("application/json")).Post(userResolveRoutePath, userHandler.resolveUserByEmail)
 
