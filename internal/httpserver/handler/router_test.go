@@ -133,6 +133,28 @@ func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	assert.Equal(t, testAvatarID, avatarUseCase.metadataInputs[0].AvatarID)
 }
 
+// TestNewRouter_PublicAvatarRoute проверяет регистрацию маршрута публичного получения аватарки по email.
+func TestNewRouter_PublicAvatarRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{
+		currentByEmailOutput: usecase.GetCurrentAvatarByEmailOutput{
+			Content:  pngContent(),
+			MIMEType: model.MIMEPNG,
+		},
+	}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	request := httptest.NewRequest(http.MethodGet, mustPublicAvatarURL(t, "user@example.com"), nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Len(t, avatarUseCase.currentByEmailInputs, 1)
+	assert.Equal(t, model.Email("user@example.com"), avatarUseCase.currentByEmailInputs[0].Email)
+}
+
 // TestNewRouter_UserResolveRoute проверяет регистрацию маршрута определения пользователя по email.
 func TestNewRouter_UserResolveRoute(t *testing.T) {
 	// Arrange

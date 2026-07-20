@@ -79,3 +79,12 @@ func mustAvatarMetadataURL(t *testing.T, avatarID string) string {
 
 	return metadataURL
 }
+
+func mustPublicAvatarURL(t *testing.T, email string) string {
+	t.Helper()
+
+	values := url.Values{}
+	values.Set("email", email)
+
+	return publicAvatarRoutePath + "?" + values.Encode()
+}

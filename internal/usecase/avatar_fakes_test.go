@@ -11,14 +11,21 @@ import (
 type avatarUserRepositoryFake struct {
 	user      model.User
 	err       error
+	emailErr  error
 	updateErr error
 	ids       []uuid.UUID
+	emails    []model.Email
 	updated   []model.User
 }
 
 func (r *avatarUserRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.User, error) {
 	r.ids = append(r.ids, id)
 	return r.user, r.err
+}
+
+func (r *avatarUserRepositoryFake) GetByEmail(_ context.Context, email model.Email) (model.User, error) {
+	r.emails = append(r.emails, email)
+	return r.user, r.emailErr
 }
 
 func (r *avatarUserRepositoryFake) Update(_ context.Context, user model.User) error {
@@ -70,9 +77,12 @@ type objectKeyCall struct {
 
 type fileStoreFake struct {
 	objectKey      string
+	content        []byte
+	getErr         error
 	putErr         error
 	deleteErr      error
 	objectKeyCalls []objectKeyCall
+	gets           []string
 	puts           []putObjectCall
 	deletes        []string
 }
@@ -83,6 +93,11 @@ func (s *fileStoreFake) ObjectKey(userID uuid.UUID, avatarID uuid.UUID) string {
 		return s.objectKey
 	}
 	return testObjectKeyOriginal
+}
+
+func (s *fileStoreFake) Get(_ context.Context, objectKey string) ([]byte, error) {
+	s.gets = append(s.gets, objectKey)
+	return s.content, s.getErr
 }
 
 func (s *fileStoreFake) Put(_ context.Context, objectKey string, content []byte) error {

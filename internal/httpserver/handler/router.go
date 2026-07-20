@@ -11,6 +11,7 @@ import (
 
 const avatarRoutePath = "/api/v1/avatars"
 const avatarIDRouteParam = "avatar_id"
+const publicAvatarRoutePath = "/api/v1/avatar"
 const userResolveRoutePath = "/api/v1/users/resolve"
 
 // NewRouter собирает и возвращает HTTP-роутер REST API.
@@ -18,6 +19,7 @@ const userResolveRoutePath = "/api/v1/users/resolve"
 // Доступные ручки:
 //
 //	POST /api/v1/avatars
+//	GET /api/v1/avatar?email={email}
 //	GET /api/v1/avatars/{avatar_id}/metadata
 //	POST /api/v1/users/resolve
 func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slog.Logger) http.Handler {
@@ -36,6 +38,7 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 	userHandler := NewUserHandler(userUseCase, logger)
 
 	r.With(middleware.AllowContentType("multipart/form-data")).Post(avatarRoutePath, avatarHandler.uploadAvatar)
+	r.Get(publicAvatarRoutePath, avatarHandler.getPublicAvatarByEmail)
 	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}/metadata", avatarHandler.getAvatarMetadata)
 	r.With(middleware.AllowContentType("application/json")).Post(userResolveRoutePath, userHandler.resolveUserByEmail)
 

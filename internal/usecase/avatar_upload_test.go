@@ -52,6 +52,15 @@ func TestAvatarUseCase_UploadAvatar(t *testing.T) {
 	assert.Empty(t, fileStore.deletes)
 }
 
+func validUploadAvatarInput() UploadAvatarInput {
+	return UploadAvatarInput{
+		UserID:   testUserID,
+		FileName: "avatar.png",
+		MIMEType: model.MIMEPNG,
+		Content:  []byte("image content"),
+	}
+}
+
 // TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata проверяет ошибку невалидных метаданных при загрузке аватарки.
 func TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata(t *testing.T) {
 	// Arrange

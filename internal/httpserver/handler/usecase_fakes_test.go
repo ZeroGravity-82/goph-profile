@@ -8,12 +8,15 @@ import (
 )
 
 type avatarUseCaseFake struct {
-	uploadOutput   usecase.UploadAvatarOutput
-	uploadErr      error
-	uploadInputs   []usecase.UploadAvatarInput
-	metadataOutput usecase.GetAvatarMetadataOutput
-	metadataErr    error
-	metadataInputs []usecase.GetAvatarMetadataInput
+	uploadOutput         usecase.UploadAvatarOutput
+	uploadErr            error
+	uploadInputs         []usecase.UploadAvatarInput
+	currentByEmailOutput usecase.GetCurrentAvatarByEmailOutput
+	currentByEmailErr    error
+	currentByEmailInputs []usecase.GetCurrentAvatarByEmailInput
+	metadataOutput       usecase.GetAvatarMetadataOutput
+	metadataErr          error
+	metadataInputs       []usecase.GetAvatarMetadataInput
 }
 
 func (uc *avatarUseCaseFake) UploadAvatar(
@@ -22,6 +25,14 @@ func (uc *avatarUseCaseFake) UploadAvatar(
 ) (usecase.UploadAvatarOutput, error) {
 	uc.uploadInputs = append(uc.uploadInputs, input)
 	return uc.uploadOutput, uc.uploadErr
+}
+
+func (uc *avatarUseCaseFake) GetCurrentAvatarByEmail(
+	_ context.Context,
+	input usecase.GetCurrentAvatarByEmailInput,
+) (usecase.GetCurrentAvatarByEmailOutput, error) {
+	uc.currentByEmailInputs = append(uc.currentByEmailInputs, input)
+	return uc.currentByEmailOutput, uc.currentByEmailErr
 }
 
 func (uc *avatarUseCaseFake) GetAvatarMetadata(
