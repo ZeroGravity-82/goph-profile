@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -229,6 +230,25 @@ func TestNewRouter_PublicAvatarRoute(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 	require.Len(t, avatarUseCase.currentByEmailInputs, 1)
 	assert.Equal(t, model.Email("user@example.com"), avatarUseCase.currentByEmailInputs[0].Email)
+}
+
+// TestNewRouter_ListUserAvatarsRoute проверяет регистрацию ручки получения списка аватарок пользователя.
+func TestNewRouter_ListUserAvatarsRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	userAvatarsURL, err := url.JoinPath("/api/v1/users", testUserID.String(), "avatars")
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodGet, userAvatarsURL, nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Len(t, avatarUseCase.listAvatarsInputs, 1)
+	assert.Equal(t, testUserID, avatarUseCase.listAvatarsInputs[0].UserID)
 }
 
 // TestNewRouter_UserResolveRoute проверяет регистрацию ручки определения пользователя по email.

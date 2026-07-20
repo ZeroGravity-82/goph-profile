@@ -17,6 +17,9 @@ type avatarUseCaseFake struct {
 	deleteCurrentInputs  []usecase.DeleteCurrentAvatarInput
 	deleteAvatarErr      error
 	deleteAvatarInputs   []usecase.DeleteAvatarInput
+	listAvatarsOutput    usecase.ListUserAvatarsOutput
+	listAvatarsErr       error
+	listAvatarsInputs    []usecase.ListUserAvatarsInput
 	currentByEmailOutput usecase.GetCurrentAvatarByEmailOutput
 	currentByEmailErr    error
 	currentByEmailInputs []usecase.GetCurrentAvatarByEmailInput
@@ -58,6 +61,14 @@ func (uc *avatarUseCaseFake) DeleteAvatar(
 ) error {
 	uc.deleteAvatarInputs = append(uc.deleteAvatarInputs, input)
 	return uc.deleteAvatarErr
+}
+
+func (uc *avatarUseCaseFake) ListUserAvatars(
+	_ context.Context,
+	input usecase.ListUserAvatarsInput,
+) (usecase.ListUserAvatarsOutput, error) {
+	uc.listAvatarsInputs = append(uc.listAvatarsInputs, input)
+	return uc.listAvatarsOutput, uc.listAvatarsErr
 }
 
 func (uc *avatarUseCaseFake) GetCurrentAvatarByEmail(

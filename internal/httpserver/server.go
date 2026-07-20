@@ -27,6 +27,10 @@ type avatarUseCase interface {
 	) error
 	DeleteCurrentAvatar(ctx context.Context, in usecase.DeleteCurrentAvatarInput) error
 	DeleteAvatar(ctx context.Context, in usecase.DeleteAvatarInput) error
+	ListUserAvatars(
+		ctx context.Context,
+		in usecase.ListUserAvatarsInput,
+	) (usecase.ListUserAvatarsOutput, error)
 	GetCurrentAvatarByEmail(
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,

@@ -37,6 +37,27 @@ type AvatarMetadataResponse struct {
 	UpdatedAt  time.Time                 `json:"updated_at"`
 }
 
+// ListUserAvatarsItemResponse описывает аватарку в JSON-ответе со списком аватарок пользователя.
+type ListUserAvatarsItemResponse struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	URL       string    `json:"url"`
+	FileName  string    `json:"file_name"`
+	MIMEType  string    `json:"mime_type"`
+	SizeBytes int64     `json:"size_bytes"`
+	Width     *int      `json:"width,omitempty"`
+	Height    *int      `json:"height,omitempty"`
+	Status    string    `json:"status"`
+	IsCurrent bool      `json:"is_current"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ListUserAvatarsResponse описывает JSON-ответ со списком аватарок пользователя.
+type ListUserAvatarsResponse struct {
+	Avatars []ListUserAvatarsItemResponse `json:"avatars"`
+}
+
 // ErrorResponse описывает JSON-ответ с ошибкой HTTP API.
 type ErrorResponse struct {
 	Error   string `json:"error"`

@@ -114,6 +114,19 @@ func newDeleteAvatarRequest(t *testing.T, userID string, avatarID string) *http.
 	return request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
 }
 
+func newListUserAvatarsRequest(t *testing.T, userID string) *http.Request {
+	t.Helper()
+
+	userAvatarsURL, err := url.JoinPath("/api/v1/users", userID, "avatars")
+	require.NoError(t, err)
+
+	request := httptest.NewRequest(http.MethodGet, userAvatarsURL, nil)
+	routeContext := chi.NewRouteContext()
+	routeContext.URLParams.Add("user_id", userID)
+
+	return request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
+}
+
 func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, wantError string) {
 	t.Helper()
 

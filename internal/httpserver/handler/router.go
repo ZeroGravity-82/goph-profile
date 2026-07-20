@@ -20,6 +20,7 @@ const apiPathPrefix = "/api/v1"
 //	GET /api/v1/avatars/{avatar_id}
 //	GET /api/v1/avatars/{avatar_id}/metadata
 //	DELETE /api/v1/avatars/{avatar_id}
+//	GET /api/v1/users/{user_id}/avatars
 //	POST /api/v1/users/resolve
 //	PATCH /api/v1/avatar
 //	DELETE /api/v1/avatar
@@ -44,6 +45,7 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 		r.Get("/avatars/{avatar_id}", avatarHandler.getAvatar)
 		r.Get("/avatars/{avatar_id}/metadata", avatarHandler.getAvatarMetadata)
 		r.Delete("/avatars/{avatar_id}", avatarHandler.deleteAvatar)
+		r.Get("/users/{user_id}/avatars", avatarHandler.listUserAvatars)
 		r.With(middleware.AllowContentType("application/json")).Post("/users/resolve", userHandler.resolveUserByEmail)
 		r.With(middleware.AllowContentType("application/json")).Patch("/avatar", avatarHandler.selectCurrentAvatar)
 		r.Delete("/avatar", avatarHandler.deleteCurrentAvatar)

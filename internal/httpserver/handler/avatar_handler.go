@@ -44,8 +44,8 @@ var (
 
 var defaultAvatarPNG = web.DefaultAvatarPNG
 
-// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор и удаление аватарки, публичная выдача аватарки
-// и получение метаданных.
+// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор, удаление, получение списка, публичная выдача
+// аватарки по email и получение метаданных.
 type avatarUseCase interface {
 	UploadAvatar(ctx context.Context, in usecase.UploadAvatarInput) (usecase.UploadAvatarOutput, error)
 	SelectCurrentAvatar(
@@ -54,6 +54,10 @@ type avatarUseCase interface {
 	) error
 	DeleteCurrentAvatar(ctx context.Context, in usecase.DeleteCurrentAvatarInput) error
 	DeleteAvatar(ctx context.Context, in usecase.DeleteAvatarInput) error
+	ListUserAvatars(
+		ctx context.Context,
+		in usecase.ListUserAvatarsInput,
+	) (usecase.ListUserAvatarsOutput, error)
 	GetCurrentAvatarByEmail(
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,
@@ -471,6 +475,85 @@ func (h *AvatarHandler) writeDeleteAvatarUseCaseError(w http.ResponseWriter, r *
 	}
 	logError(h.logger, r, "failed to delete avatar", err)
 	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+}
+
+// listUserAvatars парсит user_id из пути и возвращает список неудаленных аватарок пользователя.
+func (h *AvatarHandler) listUserAvatars(w http.ResponseWriter, r *http.Request) {
+	userID, err := parseUserIDPathParam(r)
+	if err != nil {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid user_id", "")
+		return
+	}
+
+	output, err := h.avatarUseCase.ListUserAvatars(r.Context(), usecase.ListUserAvatarsInput{
+		UserID: userID,
+	})
+	if err != nil {
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
+			return
+		}
+		logError(h.logger, r, "failed to list user avatars", err)
+		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+		return
+	}
+
+	response, err := newListUserAvatarsResponse(output)
+	if err != nil {
+		logError(h.logger, r, "failed to build user avatars response", err)
+		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+		return
+	}
+
+	writeJSON(h.logger, w, r, http.StatusOK, response)
+}
+
+func parseUserIDPathParam(r *http.Request) (uuid.UUID, error) {
+	userID, err := uuid.Parse(chi.URLParam(r, "user_id"))
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to parse user_id path param: %w", err)
+	}
+	if userID == uuid.Nil {
+		return uuid.Nil, errors.New("invalid user_id path param")
+	}
+	return userID, nil
+}
+
+func newListUserAvatarsResponse(output usecase.ListUserAvatarsOutput) (dto.ListUserAvatarsResponse, error) {
+	avatars := make([]dto.ListUserAvatarsItemResponse, 0, len(output.Avatars))
+	for _, avatar := range output.Avatars {
+		response, err := newListUserAvatarsItemResponse(avatar)
+		if err != nil {
+			return dto.ListUserAvatarsResponse{}, err
+		}
+		avatars = append(avatars, response)
+	}
+
+	return dto.ListUserAvatarsResponse{Avatars: avatars}, nil
+}
+
+func newListUserAvatarsItemResponse(
+	avatar usecase.ListUserAvatarsItemOutput,
+) (dto.ListUserAvatarsItemResponse, error) {
+	avatarURL, err := avatarURLForID(avatar.ID)
+	if err != nil {
+		return dto.ListUserAvatarsItemResponse{}, err
+	}
+
+	return dto.ListUserAvatarsItemResponse{
+		ID:        avatar.ID.String(),
+		UserID:    avatar.UserID.String(),
+		URL:       avatarURL,
+		FileName:  avatar.FileName,
+		MIMEType:  avatar.MIMEType,
+		SizeBytes: avatar.SizeBytes,
+		Width:     avatar.Width,
+		Height:    avatar.Height,
+		Status:    string(avatar.Status),
+		IsCurrent: avatar.IsCurrent,
+		CreatedAt: avatar.CreatedAt,
+		UpdatedAt: avatar.UpdatedAt,
+	}, nil
 }
 
 // getPublicAvatarByEmail парсит email из query-параметра и возвращает текущую аватарку или PNG-заглушку.

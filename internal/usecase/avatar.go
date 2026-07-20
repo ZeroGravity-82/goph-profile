@@ -48,6 +48,31 @@ type DeleteAvatarInput struct {
 	AvatarID uuid.UUID
 }
 
+// ListUserAvatarsInput описывает входные данные сценария получения списка аватарок пользователя.
+type ListUserAvatarsInput struct {
+	UserID uuid.UUID
+}
+
+// ListUserAvatarsItemOutput описывает элемент в результате сценария получения списка аватарок пользователя.
+type ListUserAvatarsItemOutput struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	FileName  string
+	MIMEType  string
+	SizeBytes int64
+	Width     *int
+	Height    *int
+	Status    model.AvatarStatus
+	IsCurrent bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// ListUserAvatarsOutput описывает результат сценария получения списка аватарок пользователя.
+type ListUserAvatarsOutput struct {
+	Avatars []ListUserAvatarsItemOutput
+}
+
 // MarkAvatarReadyInput описывает входные данные сценария завершения обработки аватарки.
 type MarkAvatarReadyInput struct {
 	AvatarID          uuid.UUID
@@ -152,6 +177,7 @@ type avatarUserRepository interface {
 // avatarRepository описывает нужные операции с аватарками.
 type avatarRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.Avatar, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Avatar, error)
 	Create(ctx context.Context, avatar model.Avatar) error
 	Update(ctx context.Context, avatar model.Avatar) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -470,6 +496,61 @@ func avatarObjectKeys(avatar model.Avatar) []string {
 		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb300)
 	}
 	return objectKeys
+}
+
+// ListUserAvatars возвращает список неудаленных аватарок пользователя.
+func (uc *AvatarUseCase) ListUserAvatars(
+	ctx context.Context,
+	in ListUserAvatarsInput,
+) (ListUserAvatarsOutput, error) {
+	if uc.userRepo == nil {
+		return ListUserAvatarsOutput{}, errors.New("user repository is not provided")
+	}
+	if uc.avatarRepo == nil {
+		return ListUserAvatarsOutput{}, errors.New("avatar repository is not provided")
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, in.UserID)
+	if err != nil {
+		return ListUserAvatarsOutput{}, fmt.Errorf("get user by id: %w", err)
+	}
+
+	avatars, err := uc.avatarRepo.ListByUserID(ctx, in.UserID)
+	if err != nil {
+		return ListUserAvatarsOutput{}, fmt.Errorf("list user avatars: %w", err)
+	}
+
+	result := ListUserAvatarsOutput{Avatars: make([]ListUserAvatarsItemOutput, 0, len(avatars))}
+	for _, avatar := range avatars {
+		if avatar.UserID != user.ID || !avatarVisibleInList(avatar) {
+			continue
+		}
+		result.Avatars = append(result.Avatars, listUserAvatarsItemOutput(avatar, user.CurrentAvatarID))
+	}
+
+	return result, nil
+}
+
+func avatarVisibleInList(avatar model.Avatar) bool {
+	return avatar.DeletedAt == nil &&
+		avatar.Status != model.AvatarStatusDeleting &&
+		avatar.Status != model.AvatarStatusDeleted
+}
+
+func listUserAvatarsItemOutput(avatar model.Avatar, currentAvatarID *uuid.UUID) ListUserAvatarsItemOutput {
+	return ListUserAvatarsItemOutput{
+		ID:        avatar.ID,
+		UserID:    avatar.UserID,
+		FileName:  avatar.FileName,
+		MIMEType:  avatar.MIMEType,
+		SizeBytes: avatar.SizeBytes,
+		Width:     avatar.Width,
+		Height:    avatar.Height,
+		Status:    avatar.Status,
+		IsCurrent: currentAvatarID != nil && *currentAvatarID == avatar.ID,
+		CreatedAt: avatar.CreatedAt,
+		UpdatedAt: avatar.UpdatedAt,
+	}
 }
 
 // MarkAvatarReady завершает успешную обработку аватарки.

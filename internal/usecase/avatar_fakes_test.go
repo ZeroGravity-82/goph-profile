@@ -35,11 +35,14 @@ func (r *avatarUserRepositoryFake) Update(_ context.Context, user model.User) er
 
 type avatarRepositoryFake struct {
 	avatar     model.Avatar
+	avatars    []model.Avatar
 	getErr     error
+	listErr    error
 	createErr  error
 	updateErr  error
 	deleteErr  error
 	ids        []uuid.UUID
+	userIDs    []uuid.UUID
 	created    []model.Avatar
 	updated    []model.Avatar
 	deletedIDs []uuid.UUID
@@ -48,6 +51,11 @@ type avatarRepositoryFake struct {
 func (r *avatarRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.Avatar, error) {
 	r.ids = append(r.ids, id)
 	return r.avatar, r.getErr
+}
+
+func (r *avatarRepositoryFake) ListByUserID(_ context.Context, userID uuid.UUID) ([]model.Avatar, error) {
+	r.userIDs = append(r.userIDs, userID)
+	return r.avatars, r.listErr
 }
 
 func (r *avatarRepositoryFake) Create(_ context.Context, avatar model.Avatar) error {
