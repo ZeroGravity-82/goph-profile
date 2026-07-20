@@ -361,6 +361,110 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsInternalServerError(t *testing
 	assertErrorResponse(t, response, "Internal server error")
 }
 
+// TestAvatarHandler_deleteCurrentAvatar проверяет успешное удаление текущей аватарки.
+func TestAvatarHandler_deleteCurrentAvatar(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.deleteCurrentAvatar(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusNoContent, response.Code)
+	assert.Empty(t, response.Body.String())
+	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
+	assert.Equal(t, testUserID, avatarUseCase.deleteCurrentInputs[0].UserID)
+}
+
+// TestAvatarHandler_deleteCurrentAvatar_RejectsInvalidUserIDHeader проверяет ошибку невалидного заголовка X-User-ID.
+func TestAvatarHandler_deleteCurrentAvatar_RejectsInvalidUserIDHeader(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	request := newDeleteCurrentAvatarRequest("not-a-uuid")
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.deleteCurrentAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Empty(t, avatarUseCase.deleteCurrentInputs)
+	assertErrorResponse(t, response, "Invalid X-User-ID header")
+}
+
+// TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.
+func TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: usecase.ErrUserNotFound}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.deleteCurrentAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusNotFound, response.Code)
+	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
+	assertErrorResponse(t, response, "User not found")
+}
+
+// TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствующей текущей аватарки.
+func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: usecase.ErrAvatarNotFound}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.deleteCurrentAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusNotFound, response.Code)
+	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
+	assertErrorResponse(t, response, "Avatar not found")
+}
+
+// TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarForbidden проверяет ошибку удаления чужой аватарки.
+func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: model.ErrAvatarForbidden}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.deleteCurrentAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
+	assertErrorResponse(t, response, "Forbidden")
+}
+
+// TestAvatarHandler_deleteCurrentAvatar_ReturnsInternalServerError проверяет внутреннюю ошибку удаления текущей
+// аватарки.
+func TestAvatarHandler_deleteCurrentAvatar_ReturnsInternalServerError(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: errors.New("database error")}
+	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.deleteCurrentAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusInternalServerError, response.Code)
+	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
+	assertErrorResponse(t, response, "Internal server error")
+}
+
 // TestAvatarHandler_getPublicAvatarByEmail проверяет успешное получение текущей аватарки по email.
 func TestAvatarHandler_getPublicAvatarByEmail(t *testing.T) {
 	// Arrange

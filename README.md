@@ -198,7 +198,8 @@ CREATE TYPE avatar_status AS ENUM (
 # Пользователь и текущая аватарка:
 POST   /api/v1/users/resolve
 GET    /api/v1/avatar?email={email}
-PATCH  /api/v1/avatar/current
+PATCH  /api/v1/avatar
+DELETE /api/v1/avatar
 
 # Операции с конкретной аватаркой по ее ID:
 POST   /api/v1/avatars
@@ -209,7 +210,6 @@ DELETE /api/v1/avatars/{avatar_id}
 # Операции с аватарками через владельца:
 GET    /api/v1/users/{user_id}/avatar
 GET    /api/v1/users/{user_id}/avatars
-DELETE /api/v1/users/{user_id}/avatar
 
 # Служебные и web-ручки:
 GET    /health
@@ -348,7 +348,7 @@ GET /api/v1/avatars/{avatar_id}/metadata
 ### Выбор текущей аватарки
 
 ```http
-PATCH /api/v1/avatar/current
+PATCH /api/v1/avatar
 Content-Type: application/json
 X-User-ID: user-id
 ```
@@ -380,19 +380,19 @@ X-User-ID: user-id
 ### Удаление текущей аватарки пользователя
 
 ```http
-DELETE /api/v1/users/{user_id}/avatar
+DELETE /api/v1/avatar
 X-User-ID: user-id
 ```
 
-Ручка удаляет текущую выбранную аватарку пользователя: API делает мягкое удаление записи аватарки, сбрасывает ссылку `app_user.current_avatar_id` и возвращает `204 No Content`. Физическое удаление исходного изображения и миниатюр из MinIO/S3 выполняется асинхронно воркером.
+Ручка удаляет текущую выбранную аватарку пользователя из `X-User-ID`: API делает мягкое удаление записи аватарки, сбрасывает ссылку `app_user.current_avatar_id` и возвращает `204 No Content`. Физическое удаление исходного изображения и миниатюр из MinIO/S3 выполняется асинхронно воркером.
 
 Если текущая аватарка не выбрана, ручка остается идемпотентной и возвращает `204 No Content`.
 
 Ошибки:
 
-- `400 Bad Request` - некорректный `user_id` или `X-User-ID`;
-- `403 Forbidden` - `X-User-ID` не совпадает с пользователем из пути;
-- `404 Not Found` - пользователь не найден;
+- `400 Bad Request` - некорректный `X-User-ID`;
+- `403 Forbidden` - текущая аватарка принадлежит другому пользователю;
+- `404 Not Found` - пользователь или текущая аватарка не найдены;
 - `500 Internal Server Error` - внутренняя ошибка без раскрытия деталей инфраструктуры.
 
 ### Определение пользователя по email

@@ -46,14 +46,15 @@ var (
 
 var defaultAvatarPNG = web.DefaultAvatarPNG
 
-// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор текущей аватарки, публичная выдача и получение
-// метаданных.
+// avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор и удаление текущей аватарки, публичная выдача
+// аватарки и получение метаданных.
 type avatarUseCase interface {
 	UploadAvatar(ctx context.Context, in usecase.UploadAvatarInput) (usecase.UploadAvatarOutput, error)
 	SelectCurrentAvatar(
 		ctx context.Context,
 		in usecase.SelectCurrentAvatarInput,
 	) error
+	DeleteCurrentAvatar(ctx context.Context, in usecase.DeleteCurrentAvatarInput) error
 	GetCurrentAvatarByEmail(
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,
@@ -365,6 +366,48 @@ func (h *AvatarHandler) writeSelectCurrentAvatarUseCaseError(w http.ResponseWrit
 		return
 	}
 	logError(h.logger, r, "failed to select current avatar", err)
+	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
+}
+
+// deleteCurrentAvatar парсит X-User-ID и передает пользователя в сценарий удаления текущей аватарки.
+func (h *AvatarHandler) deleteCurrentAvatar(w http.ResponseWriter, r *http.Request) {
+	input, err := parseDeleteCurrentAvatarRequest(r)
+	if err != nil {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid X-User-ID header", "")
+		return
+	}
+
+	if err = h.avatarUseCase.DeleteCurrentAvatar(r.Context(), input); err != nil {
+		h.writeDeleteCurrentAvatarUseCaseError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseDeleteCurrentAvatarRequest(r *http.Request) (usecase.DeleteCurrentAvatarInput, error) {
+	userID, err := parseUserIDHeader(r)
+	if err != nil {
+		return usecase.DeleteCurrentAvatarInput{}, errInvalidUserIDHeader
+	}
+
+	return usecase.DeleteCurrentAvatarInput{UserID: userID}, nil
+}
+
+func (h *AvatarHandler) writeDeleteCurrentAvatarUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, usecase.ErrUserNotFound) {
+		writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
+		return
+	}
+	if errors.Is(err, usecase.ErrAvatarNotFound) {
+		writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
+		return
+	}
+	if errors.Is(err, model.ErrAvatarForbidden) {
+		writeError(h.logger, w, r, http.StatusForbidden, "Forbidden", "")
+		return
+	}
+	logError(h.logger, r, "failed to delete current avatar", err)
 	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 }
 

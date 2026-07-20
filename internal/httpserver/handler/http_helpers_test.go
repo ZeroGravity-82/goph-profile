@@ -83,9 +83,16 @@ func newSelectCurrentAvatarRequestWithBody(
 ) *http.Request {
 	t.Helper()
 
-	request := httptest.NewRequest(http.MethodPatch, avatarCurrentRoutePath, body)
+	request := httptest.NewRequest(http.MethodPatch, publicAvatarRoutePath, body)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-User-ID", headerUserID)
+
+	return request
+}
+
+func newDeleteCurrentAvatarRequest(userID string) *http.Request {
+	request := httptest.NewRequest(http.MethodDelete, publicAvatarRoutePath, nil)
+	request.Header.Set("X-User-ID", userID)
 
 	return request
 }

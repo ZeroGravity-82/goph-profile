@@ -134,6 +134,23 @@ func TestNewRouter_SelectCurrentAvatarRoute(t *testing.T) {
 	assert.Equal(t, testAvatarID, avatarUseCase.selectCurrentInputs[0].AvatarID)
 }
 
+// TestNewRouter_DeleteCurrentAvatarRoute проверяет регистрацию ручки удаления текущей аватарки.
+func TestNewRouter_DeleteCurrentAvatarRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	request := newDeleteCurrentAvatarRequest(testUserID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusNoContent, response.Code)
+	require.Len(t, avatarUseCase.deleteCurrentInputs, 1)
+	assert.Equal(t, testUserID, avatarUseCase.deleteCurrentInputs[0].UserID)
+}
+
 // TestNewRouter_AvatarMetadataRoute проверяет регистрацию ручки получения метаданных аватарки.
 func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	// Arrange

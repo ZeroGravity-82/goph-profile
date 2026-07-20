@@ -12,7 +12,6 @@ import (
 const avatarRoutePath = "/api/v1/avatars"
 const avatarIDRouteParam = "avatar_id"
 const publicAvatarRoutePath = "/api/v1/avatar"
-const avatarCurrentRoutePath = publicAvatarRoutePath + "/current"
 const userRoutePath = "/api/v1/users"
 const userResolveRoutePath = userRoutePath + "/resolve"
 
@@ -25,7 +24,8 @@ const userResolveRoutePath = userRoutePath + "/resolve"
 //	GET /api/v1/avatars/{avatar_id}
 //	GET /api/v1/avatars/{avatar_id}/metadata
 //	POST /api/v1/users/resolve
-//	PATCH /api/v1/avatar/current
+//	PATCH /api/v1/avatar
+//	DELETE /api/v1/avatar
 func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = logging.NopLogger()
@@ -47,9 +47,10 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 	r.Get(avatarRoutePath+"/{"+avatarIDRouteParam+"}/metadata", avatarHandler.getAvatarMetadata)
 	r.With(middleware.AllowContentType("application/json")).Post(userResolveRoutePath, userHandler.resolveUserByEmail)
 	r.With(middleware.AllowContentType("application/json")).Patch(
-		avatarCurrentRoutePath,
+		publicAvatarRoutePath,
 		avatarHandler.selectCurrentAvatar,
 	)
+	r.Delete(publicAvatarRoutePath, avatarHandler.deleteCurrentAvatar)
 
 	return r
 }
