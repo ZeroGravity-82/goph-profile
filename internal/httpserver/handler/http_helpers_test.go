@@ -63,6 +63,33 @@ func newResolveUserRequestToPath(t *testing.T, path string, email string) *http.
 	return request
 }
 
+func newSelectCurrentAvatarRequest(
+	t *testing.T,
+	headerUserID string,
+	avatarID string,
+) *http.Request {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	require.NoError(t, json.NewEncoder(body).Encode(dto.SelectCurrentAvatarRequest{AvatarID: avatarID}))
+
+	return newSelectCurrentAvatarRequestWithBody(t, headerUserID, body)
+}
+
+func newSelectCurrentAvatarRequestWithBody(
+	t *testing.T,
+	headerUserID string,
+	body *bytes.Buffer,
+) *http.Request {
+	t.Helper()
+
+	request := httptest.NewRequest(http.MethodPatch, avatarCurrentRoutePath, body)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-User-ID", headerUserID)
+
+	return request
+}
+
 func assertErrorResponse(t *testing.T, response *httptest.ResponseRecorder, wantError string) {
 	t.Helper()
 

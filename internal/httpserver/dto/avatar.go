@@ -11,6 +11,11 @@ type UploadAvatarResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// SelectCurrentAvatarRequest описывает JSON-запрос выбора текущей аватарки пользователя.
+type SelectCurrentAvatarRequest struct {
+	AvatarID string `json:"avatar_id"`
+}
+
 // AvatarThumbnailResponse описывает доступную миниатюру аватарки в JSON-ответе с публичными метаданными аватарки.
 type AvatarThumbnailResponse struct {
 	Size string `json:"size"`

@@ -195,9 +195,10 @@ CREATE TYPE avatar_status AS ENUM (
 Планируемые API-ручки MVP:
 
 ```http
-# Пользователь и публичное получение текущей аватарки по email:
+# Пользователь и текущая аватарка:
 POST   /api/v1/users/resolve
 GET    /api/v1/avatar?email={email}
+PATCH  /api/v1/avatar/current
 
 # Операции с конкретной аватаркой по ее ID:
 POST   /api/v1/avatars
@@ -208,7 +209,6 @@ DELETE /api/v1/avatars/{avatar_id}
 # Операции с аватарками через владельца:
 GET    /api/v1/users/{user_id}/avatar
 GET    /api/v1/users/{user_id}/avatars
-PATCH  /api/v1/users/{user_id}/avatar/current
 DELETE /api/v1/users/{user_id}/avatar
 
 # Служебные и web-ручки:
@@ -348,7 +348,7 @@ GET /api/v1/avatars/{avatar_id}/metadata
 ### Выбор текущей аватарки
 
 ```http
-PATCH /api/v1/users/{user_id}/avatar/current
+PATCH /api/v1/avatar/current
 Content-Type: application/json
 X-User-ID: user-id
 ```
@@ -361,7 +361,7 @@ X-User-ID: user-id
 }
 ```
 
-Ручка выбирает готовую аватарку пользователя как текущую. Выбранная аватарка должна принадлежать пользователю из пути, иметь статус `ready` и не иметь `deleted_at`.
+Ручка выбирает готовую аватарку пользователя как текущую. Пользователь определяется по `X-User-ID`. Выбранная аватарка должна принадлежать этому пользователю, иметь статус `ready` и не иметь `deleted_at`.
 
 Успешный ответ:
 
@@ -371,7 +371,7 @@ X-User-ID: user-id
 
 Ошибки:
 
-- `400 Bad Request` - некорректный `user_id`, `X-User-ID` или `avatar_id`;
+- `400 Bad Request` - некорректный `X-User-ID` или `avatar_id`;
 - `403 Forbidden` - пользователь пытается выбрать чужую аватарку;
 - `404 Not Found` - пользователь или аватарка не найдены;
 - `409 Conflict` - аватарка еще не обработана или уже удалена;

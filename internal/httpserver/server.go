@@ -21,6 +21,10 @@ const (
 
 type avatarUseCase interface {
 	UploadAvatar(ctx context.Context, in usecase.UploadAvatarInput) (usecase.UploadAvatarOutput, error)
+	SelectCurrentAvatar(
+		ctx context.Context,
+		in usecase.SelectCurrentAvatarInput,
+	) error
 	GetCurrentAvatarByEmail(
 		ctx context.Context,
 		in usecase.GetCurrentAvatarByEmailInput,

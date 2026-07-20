@@ -116,6 +116,24 @@ func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 	require.Len(t, avatarUseCase.uploadInputs, 1)
 }
 
+// TestNewRouter_SelectCurrentAvatarRoute проверяет регистрацию ручки выбора текущей аватарки.
+func TestNewRouter_SelectCurrentAvatarRoute(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
+	response := httptest.NewRecorder()
+
+	// Act
+	router.ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusNoContent, response.Code)
+	require.Len(t, avatarUseCase.selectCurrentInputs, 1)
+	assert.Equal(t, testUserID, avatarUseCase.selectCurrentInputs[0].UserID)
+	assert.Equal(t, testAvatarID, avatarUseCase.selectCurrentInputs[0].AvatarID)
+}
+
 // TestNewRouter_AvatarMetadataRoute проверяет регистрацию ручки получения метаданных аватарки.
 func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	// Arrange

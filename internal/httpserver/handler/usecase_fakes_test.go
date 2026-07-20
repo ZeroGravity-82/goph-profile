@@ -11,6 +11,8 @@ type avatarUseCaseFake struct {
 	uploadOutput         usecase.UploadAvatarOutput
 	uploadErr            error
 	uploadInputs         []usecase.UploadAvatarInput
+	selectCurrentErr     error
+	selectCurrentInputs  []usecase.SelectCurrentAvatarInput
 	currentByEmailOutput usecase.GetCurrentAvatarByEmailOutput
 	currentByEmailErr    error
 	currentByEmailInputs []usecase.GetCurrentAvatarByEmailInput
@@ -28,6 +30,14 @@ func (uc *avatarUseCaseFake) UploadAvatar(
 ) (usecase.UploadAvatarOutput, error) {
 	uc.uploadInputs = append(uc.uploadInputs, input)
 	return uc.uploadOutput, uc.uploadErr
+}
+
+func (uc *avatarUseCaseFake) SelectCurrentAvatar(
+	_ context.Context,
+	input usecase.SelectCurrentAvatarInput,
+) error {
+	uc.selectCurrentInputs = append(uc.selectCurrentInputs, input)
+	return uc.selectCurrentErr
 }
 
 func (uc *avatarUseCaseFake) GetCurrentAvatarByEmail(

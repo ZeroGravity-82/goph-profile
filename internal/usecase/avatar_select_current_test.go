@@ -26,12 +26,10 @@ func TestAvatarUseCase_SelectCurrentAvatar(t *testing.T) {
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, testUserID, result.UserID)
-	assert.Equal(t, testAvatarID, result.CurrentAvatarID)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	require.Len(t, userRepo.updated, 1)
@@ -53,12 +51,10 @@ func TestAvatarUseCase_SelectCurrentAvatar_IsIdempotent(t *testing.T) {
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, testAvatarID, result.CurrentAvatarID)
-	assert.Equal(t, now, result.UpdatedAt)
 	assert.Empty(t, userRepo.updated)
 }
 
@@ -73,11 +69,10 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.ErrorIs(t, err, ErrUserNotFound)
-	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Empty(t, avatarRepo.ids)
 	assert.Empty(t, userRepo.updated)
@@ -95,11 +90,10 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.ErrorIs(t, err, ErrAvatarNotFound)
-	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	assert.Empty(t, userRepo.updated)
@@ -119,11 +113,10 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) 
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.ErrorIs(t, err, model.ErrAvatarForbidden)
-	assert.Zero(t, result)
 	assert.Empty(t, userRepo.updated)
 }
 
@@ -139,11 +132,10 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotReady(t *testing.T) {
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.ErrorIs(t, err, model.ErrAvatarNotReady)
-	assert.Zero(t, result)
 	assert.Empty(t, userRepo.updated)
 }
 
@@ -160,11 +152,10 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUpdateUserError(t *testing.T) 
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
 	// Act
-	result, err := useCase.SelectCurrentAvatar(ctx, input)
+	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
 	require.ErrorIs(t, err, updateErr)
-	assert.Zero(t, result)
 	require.Len(t, userRepo.updated, 1)
 	require.NotNil(t, userRepo.updated[0].CurrentAvatarID)
 	assert.Equal(t, testAvatarID, *userRepo.updated[0].CurrentAvatarID)

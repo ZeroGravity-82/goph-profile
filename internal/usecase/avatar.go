@@ -37,13 +37,6 @@ type SelectCurrentAvatarInput struct {
 	AvatarID uuid.UUID
 }
 
-// SelectCurrentAvatarOutput описывает результат сценария выбора текущей аватарки.
-type SelectCurrentAvatarOutput struct {
-	UserID          uuid.UUID
-	CurrentAvatarID uuid.UUID
-	UpdatedAt       time.Time
-}
-
 // DeleteCurrentAvatarInput описывает входные данные сценария удаления текущей аватарки.
 type DeleteCurrentAvatarInput struct {
 	UserID uuid.UUID
@@ -326,45 +319,37 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 func (uc *AvatarUseCase) SelectCurrentAvatar(
 	ctx context.Context,
 	in SelectCurrentAvatarInput,
-) (SelectCurrentAvatarOutput, error) {
+) error {
 	if uc.userRepo == nil {
-		return SelectCurrentAvatarOutput{}, errors.New("user repository is not provided")
+		return errors.New("user repository is not provided")
 	}
 	if uc.avatarRepo == nil {
-		return SelectCurrentAvatarOutput{}, errors.New("avatar repository is not provided")
+		return errors.New("avatar repository is not provided")
 	}
 
 	user, err := uc.userRepo.GetByID(ctx, in.UserID)
 	if err != nil {
-		return SelectCurrentAvatarOutput{}, fmt.Errorf("get user by id: %w", err)
+		return fmt.Errorf("get user by id: %w", err)
 	}
 
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
-		return SelectCurrentAvatarOutput{}, fmt.Errorf("get avatar by id: %w", err)
+		return fmt.Errorf("get avatar by id: %w", err)
 	}
 
 	alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
 	if err = user.SelectCurrentAvatar(avatar, time.Now().UTC()); err != nil {
-		return SelectCurrentAvatarOutput{}, err
+		return err
 	}
 	if alreadyCurrent {
-		return SelectCurrentAvatarOutput{
-			UserID:          user.ID,
-			CurrentAvatarID: *user.CurrentAvatarID,
-			UpdatedAt:       user.UpdatedAt,
-		}, nil
+		return nil
 	}
 
 	if err = uc.userRepo.Update(ctx, user); err != nil {
-		return SelectCurrentAvatarOutput{}, fmt.Errorf("update current avatar: %w", err)
+		return fmt.Errorf("update current avatar: %w", err)
 	}
 
-	return SelectCurrentAvatarOutput{
-		UserID:          user.ID,
-		CurrentAvatarID: *user.CurrentAvatarID,
-		UpdatedAt:       user.UpdatedAt,
-	}, nil
+	return nil
 }
 
 // DeleteCurrentAvatar удаляет текущую аватарку пользователя.

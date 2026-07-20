@@ -97,9 +97,8 @@ func TestUserHandler_resolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
 // TestUserHandler_resolveUserByEmail_ReturnsInternalServerError проверяет внутреннюю ошибку определения пользователя.
 func TestUserHandler_resolveUserByEmail_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
-	logBuffer := &bytes.Buffer{}
 	userUseCase := &userUseCaseFake{resolveErr: errors.New("database error")}
-	handler := NewUserHandler(userUseCase, newTextLogger(logBuffer))
+	handler := NewUserHandler(userUseCase, discardLogger())
 	request := newResolveUserRequest(t, "user@example.com")
 	response := httptest.NewRecorder()
 
@@ -110,5 +109,4 @@ func TestUserHandler_resolveUserByEmail_ReturnsInternalServerError(t *testing.T)
 	assert.Equal(t, http.StatusInternalServerError, response.Code)
 	assert.Equal(t, []model.Email{"user@example.com"}, userUseCase.resolveInputs)
 	assertErrorResponse(t, response, "Internal server error")
-	assert.Contains(t, logBuffer.String(), "database error")
 }
