@@ -296,23 +296,23 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 	}
 
 	if _, err = uc.userRepo.GetByID(ctx, in.UserID); err != nil {
-		return UploadAvatarOutput{}, fmt.Errorf("get user by id: %w", err)
+		return UploadAvatarOutput{}, fmt.Errorf("failed to get user by id: %w", err)
 	}
 
 	if err = uc.fileStorage.Put(ctx, objectKeyOriginal, in.Content); err != nil {
-		return UploadAvatarOutput{}, fmt.Errorf("put original avatar: %w", err)
+		return UploadAvatarOutput{}, fmt.Errorf("failed to put original avatar: %w", err)
 	}
 
 	if err = uc.avatarRepo.Create(ctx, avatar); err != nil {
 		deleteErr := uc.fileStorage.Delete(ctx, objectKeyOriginal)
 		if deleteErr != nil {
 			return UploadAvatarOutput{}, fmt.Errorf(
-				"failed to delete uploaded original after create avatar error: %w; delete error: %w",
+				"failed to rollback avatar upload: %w; delete object: %w",
 				err,
 				deleteErr,
 			)
 		}
-		return UploadAvatarOutput{}, fmt.Errorf("create avatar: %w", err)
+		return UploadAvatarOutput{}, fmt.Errorf("failed to create avatar: %w", err)
 	}
 
 	message := AvatarProcessingMessage{
@@ -326,8 +326,7 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 
 		if deleteAvatarErr != nil && deleteObjectErr != nil {
 			return UploadAvatarOutput{}, fmt.Errorf(
-				"failed to delete avatar and uploaded original after publish avatar processing message error: %w; "+
-					"delete avatar error: %w; delete error: %w",
+				"failed to rollback avatar upload: %w; delete avatar: %w; delete object: %w",
 				err,
 				deleteAvatarErr,
 				deleteObjectErr,
@@ -335,20 +334,20 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 		}
 		if deleteAvatarErr != nil {
 			return UploadAvatarOutput{}, fmt.Errorf(
-				"failed to delete avatar after publish avatar processing message error: %w; delete avatar error: %w",
+				"failed to rollback avatar upload: %w; delete avatar: %w",
 				err,
 				deleteAvatarErr,
 			)
 		}
 		if deleteObjectErr != nil {
 			return UploadAvatarOutput{}, fmt.Errorf(
-				"failed to delete uploaded original after publish avatar processing message error: %w; delete error: %w",
+				"failed to rollback avatar upload: %w; delete object: %w",
 				err,
 				deleteObjectErr,
 			)
 		}
 
-		return UploadAvatarOutput{}, fmt.Errorf("publish avatar processing message: %w", err)
+		return UploadAvatarOutput{}, fmt.Errorf("failed to publish avatar processing message: %w", err)
 	}
 
 	return UploadAvatarOutput{
@@ -370,12 +369,12 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 ) error {
 	user, err := uc.userRepo.GetByID(ctx, in.UserID)
 	if err != nil {
-		return fmt.Errorf("get user by id: %w", err)
+		return fmt.Errorf("failed to get user by id: %w", err)
 	}
 
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
-		return fmt.Errorf("get avatar by id: %w", err)
+		return fmt.Errorf("failed to get avatar by id: %w", err)
 	}
 
 	alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
@@ -387,7 +386,7 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 	}
 
 	if err = uc.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("update current avatar: %w", err)
+		return fmt.Errorf("failed to update current avatar: %w", err)
 	}
 
 	return nil
@@ -400,7 +399,7 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
 		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
 		if err != nil {
-			return fmt.Errorf("get user by id: %w", err)
+			return fmt.Errorf("failed to get user by id: %w", err)
 		}
 		if user.CurrentAvatarID == nil {
 			return nil
@@ -408,7 +407,7 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 
 		avatar, err := uc.avatarRepo.GetByID(txCtx, *user.CurrentAvatarID)
 		if err != nil {
-			return fmt.Errorf("get current avatar by id: %w", err)
+			return fmt.Errorf("failed to get current avatar by id: %w", err)
 		}
 		if avatar.UserID != user.ID {
 			return model.ErrAvatarForbidden
@@ -421,10 +420,10 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 		user.ClearCurrentAvatar(avatar.ID, now)
 
 		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
-			return fmt.Errorf("update deleting avatar: %w", err)
+			return fmt.Errorf("failed to update deleting avatar: %w", err)
 		}
 		if err = uc.userRepo.Update(txCtx, user); err != nil {
-			return fmt.Errorf("clear current avatar: %w", err)
+			return fmt.Errorf("failed to clear current avatar: %w", err)
 		}
 
 		message = AvatarDeletionMessage{
@@ -441,7 +440,7 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 	}
 
 	if err := uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
-		return fmt.Errorf("publish avatar deletion message: %w", err)
+		return fmt.Errorf("failed to publish avatar deletion message: %w", err)
 	}
 
 	return nil
@@ -453,12 +452,12 @@ func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput)
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
 		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
 		if err != nil {
-			return fmt.Errorf("get user by id: %w", err)
+			return fmt.Errorf("failed to get user by id: %w", err)
 		}
 
 		avatar, err := uc.avatarRepo.GetByID(txCtx, in.AvatarID)
 		if err != nil {
-			return fmt.Errorf("get avatar by id: %w", err)
+			return fmt.Errorf("failed to get avatar by id: %w", err)
 		}
 		if avatar.UserID != user.ID {
 			return model.ErrAvatarForbidden
@@ -471,11 +470,11 @@ func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput)
 		clearCurrent := user.ClearCurrentAvatar(avatar.ID, now)
 
 		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
-			return fmt.Errorf("update deleting avatar: %w", err)
+			return fmt.Errorf("failed to update deleting avatar: %w", err)
 		}
 		if clearCurrent {
 			if err = uc.userRepo.Update(txCtx, user); err != nil {
-				return fmt.Errorf("clear current avatar: %w", err)
+				return fmt.Errorf("failed to clear current avatar: %w", err)
 			}
 		}
 
@@ -489,7 +488,7 @@ func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput)
 	}
 
 	if err := uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
-		return fmt.Errorf("publish avatar deletion message: %w", err)
+		return fmt.Errorf("failed to publish avatar deletion message: %w", err)
 	}
 
 	return nil
@@ -513,12 +512,12 @@ func (uc *AvatarUseCase) ListUserAvatars(
 ) (ListUserAvatarsOutput, error) {
 	user, err := uc.userRepo.GetByID(ctx, in.UserID)
 	if err != nil {
-		return ListUserAvatarsOutput{}, fmt.Errorf("get user by id: %w", err)
+		return ListUserAvatarsOutput{}, fmt.Errorf("failed to get user by id: %w", err)
 	}
 
 	avatars, err := uc.avatarRepo.ListByUserID(ctx, in.UserID)
 	if err != nil {
-		return ListUserAvatarsOutput{}, fmt.Errorf("list user avatars: %w", err)
+		return ListUserAvatarsOutput{}, fmt.Errorf("failed to list user avatars: %w", err)
 	}
 
 	result := ListUserAvatarsOutput{Avatars: make([]ListUserAvatarsItemOutput, 0, len(avatars))}
@@ -564,7 +563,7 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 		var err error
 		avatar, err = uc.avatarRepo.GetByID(txCtx, in.AvatarID)
 		if err != nil {
-			return fmt.Errorf("get avatar by id: %w", err)
+			return fmt.Errorf("failed to get avatar by id: %w", err)
 		}
 
 		now := time.Now().UTC()
@@ -580,7 +579,7 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 
 		user, err := uc.userRepo.GetByID(txCtx, avatar.UserID)
 		if err != nil {
-			return fmt.Errorf("get user by id: %w", err)
+			return fmt.Errorf("failed to get user by id: %w", err)
 		}
 		selectAsCurrent := user.CurrentAvatarID == nil
 		if selectAsCurrent {
@@ -590,11 +589,11 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 		}
 
 		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
-			return fmt.Errorf("update ready avatar: %w", err)
+			return fmt.Errorf("failed to update ready avatar: %w", err)
 		}
 		if selectAsCurrent {
 			if err = uc.userRepo.Update(txCtx, user); err != nil {
-				return fmt.Errorf("update current avatar: %w", err)
+				return fmt.Errorf("failed to update current avatar: %w", err)
 			}
 		}
 		return nil
@@ -621,7 +620,7 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 ) (MarkAvatarFailedOutput, error) {
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
-		return MarkAvatarFailedOutput{}, fmt.Errorf("get avatar by id: %w", err)
+		return MarkAvatarFailedOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
 	}
 
 	if err = avatar.MarkFailed(time.Now().UTC()); err != nil {
@@ -629,7 +628,7 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 	}
 
 	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
-		return MarkAvatarFailedOutput{}, fmt.Errorf("update failed avatar: %w", err)
+		return MarkAvatarFailedOutput{}, fmt.Errorf("failed to update failed avatar: %w", err)
 	}
 
 	return MarkAvatarFailedOutput{
@@ -648,7 +647,7 @@ func (uc *AvatarUseCase) GetAvatar(ctx context.Context, in GetAvatarInput) (GetA
 
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
-		return GetAvatarOutput{}, fmt.Errorf("get avatar by id: %w", err)
+		return GetAvatarOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
 	}
 	if err = avatar.CanBeCurrent(); err != nil {
 		return GetAvatarOutput{}, ErrAvatarNotFound
@@ -664,7 +663,7 @@ func (uc *AvatarUseCase) GetAvatar(ctx context.Context, in GetAvatarInput) (GetA
 
 	content, err := uc.fileStorage.Get(ctx, objectKey)
 	if err != nil {
-		return GetAvatarOutput{}, fmt.Errorf("get avatar object: %w", err)
+		return GetAvatarOutput{}, fmt.Errorf("failed to get avatar object: %w", err)
 	}
 
 	return GetAvatarOutput{
@@ -701,7 +700,7 @@ func (uc *AvatarUseCase) GetAvatarMetadata(
 ) (GetAvatarMetadataOutput, error) {
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
-		return GetAvatarMetadataOutput{}, fmt.Errorf("get avatar by id: %w", err)
+		return GetAvatarMetadataOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
 	}
 
 	return getAvatarMetadataOutput(avatar), nil
@@ -740,7 +739,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByEmail(
 		if errors.Is(err, ErrUserNotFound) {
 			return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
 		}
-		return GetCurrentAvatarByEmailOutput{}, fmt.Errorf("get user by email: %w", err)
+		return GetCurrentAvatarByEmailOutput{}, fmt.Errorf("failed to get user by email: %w", err)
 	}
 	if user.CurrentAvatarID == nil {
 		return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
@@ -772,7 +771,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
 		if errors.Is(err, ErrUserNotFound) {
 			return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
 		}
-		return GetCurrentAvatarByUserIDOutput{}, fmt.Errorf("get user by id: %w", err)
+		return GetCurrentAvatarByUserIDOutput{}, fmt.Errorf("failed to get user by id: %w", err)
 	}
 	if user.CurrentAvatarID == nil {
 		return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
@@ -796,7 +795,7 @@ func (uc *AvatarUseCase) getCurrentAvatar(ctx context.Context, user model.User) 
 		if errors.Is(err, ErrAvatarNotFound) {
 			return currentAvatarOutput{UseDefaultAvatar: true}, nil
 		}
-		return currentAvatarOutput{}, fmt.Errorf("get current avatar by id: %w", err)
+		return currentAvatarOutput{}, fmt.Errorf("failed to get current avatar by id: %w", err)
 	}
 	if avatar.UserID != user.ID {
 		return currentAvatarOutput{}, model.ErrAvatarForbidden
@@ -807,7 +806,7 @@ func (uc *AvatarUseCase) getCurrentAvatar(ctx context.Context, user model.User) 
 
 	content, err := uc.fileStorage.Get(ctx, avatar.ObjectKeyOriginal)
 	if err != nil {
-		return currentAvatarOutput{}, fmt.Errorf("get original avatar object: %w", err)
+		return currentAvatarOutput{}, fmt.Errorf("failed to get original avatar object: %w", err)
 	}
 
 	return currentAvatarOutput{

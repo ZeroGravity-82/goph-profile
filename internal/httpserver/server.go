@@ -92,7 +92,7 @@ func NewHTTPServer(
 func (s *HTTPServer) Run(ctx context.Context) error {
 	router, err := handler.NewRouter(s.avatarUseCase, s.userUseCase, s.logger)
 	if err != nil {
-		return fmt.Errorf("create router: %w", err)
+		return fmt.Errorf("failed to create router: %w", err)
 	}
 	srv := &http.Server{
 		Addr:              s.addr,
@@ -116,12 +116,12 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 			s.logger.Info("http server stopped with graceful shutdown")
 			return nil
 		}
-		return fmt.Errorf("http server stopped with error: %w", err)
+		return fmt.Errorf("failed to stop http server: %w", err)
 	case err := <-errCh:
 		if err == nil || errors.Is(err, http.ErrServerClosed) {
 			s.logger.Info("http server closed")
 			return nil
 		}
-		return fmt.Errorf("http server error: %w", err)
+		return fmt.Errorf("failed to run http server: %w", err)
 	}
 }

@@ -41,7 +41,7 @@ WHERE id = $1`
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.Avatar{}, usecase.ErrAvatarNotFound
 		}
-		return model.Avatar{}, fmt.Errorf("select avatar by id: %w", err)
+		return model.Avatar{}, fmt.Errorf("failed to select avatar by id: %w", err)
 	}
 
 	return model.Avatar{
@@ -76,7 +76,7 @@ ORDER BY created_at DESC, id DESC`
 	var rows []dto.Avatar
 	exec := executorFromContext(ctx, r.db)
 	if err := exec.SelectContext(ctx, &rows, q, userID); err != nil {
-		return nil, fmt.Errorf("select user avatars: %w", err)
+		return nil, fmt.Errorf("failed to select user avatars: %w", err)
 	}
 
 	avatars := make([]model.Avatar, 0, len(rows))
@@ -113,7 +113,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
 	exec := executorFromContext(ctx, r.db)
 	_, err := exec.ExecContext(ctx, q, avatarArgs(avatar)...)
 	if err != nil {
-		return fmt.Errorf("insert avatar: %w", err)
+		return fmt.Errorf("failed to insert avatar: %w", err)
 	}
 	return nil
 }
@@ -172,12 +172,12 @@ WHERE id = $1`
 		avatar.DeletedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("update avatar: %w", err)
+		return fmt.Errorf("failed to update avatar: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("get updated avatar count: %w", err)
+		return fmt.Errorf("failed to get updated avatar count: %w", err)
 	}
 	if rowsAffected == 0 {
 		return usecase.ErrAvatarNotFound
@@ -192,12 +192,12 @@ func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	exec := executorFromContext(ctx, r.db)
 	result, err := exec.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("delete avatar: %w", err)
+		return fmt.Errorf("failed to delete avatar: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("get deleted avatar count: %w", err)
+		return fmt.Errorf("failed to get deleted avatar count: %w", err)
 	}
 	if rowsAffected == 0 {
 		return usecase.ErrAvatarNotFound

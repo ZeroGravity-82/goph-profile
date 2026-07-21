@@ -40,11 +40,11 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 	)
 	avatarHandler, err := NewAvatarHandler(avatarUseCase, logger)
 	if err != nil {
-		return nil, fmt.Errorf("create avatar handler: %w", err)
+		return nil, fmt.Errorf("failed to create avatar handler: %w", err)
 	}
 	userHandler, err := NewUserHandler(userUseCase, logger)
 	if err != nil {
-		return nil, fmt.Errorf("create user handler: %w", err)
+		return nil, fmt.Errorf("failed to create user handler: %w", err)
 	}
 
 	r.Route(apiPathPrefix, func(r chi.Router) {

@@ -41,12 +41,12 @@ WHERE id = $1`
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.User{}, usecase.ErrUserNotFound
 		}
-		return model.User{}, fmt.Errorf("select user by id: %w", err)
+		return model.User{}, fmt.Errorf("failed to select user by id: %w", err)
 	}
 
 	user, err := userFromDTO(row)
 	if err != nil {
-		return model.User{}, fmt.Errorf("map user by id: %w", err)
+		return model.User{}, fmt.Errorf("failed to map user by id: %w", err)
 	}
 	return user, nil
 }
@@ -78,12 +78,12 @@ WHERE email = $1`
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.User{}, usecase.ErrUserNotFound
 		}
-		return model.User{}, fmt.Errorf("select user by email: %w", err)
+		return model.User{}, fmt.Errorf("failed to select user by email: %w", err)
 	}
 
 	user, err := userFromDTO(row)
 	if err != nil {
-		return model.User{}, fmt.Errorf("map user by email: %w", err)
+		return model.User{}, fmt.Errorf("failed to map user by email: %w", err)
 	}
 	return user, nil
 }
@@ -92,7 +92,7 @@ WHERE email = $1`
 func (r *UserRepository) Create(ctx context.Context, email model.Email) (model.User, error) {
 	id, err := model.NewUserID()
 	if err != nil {
-		return model.User{}, fmt.Errorf("create user id: %w", err)
+		return model.User{}, fmt.Errorf("failed to create user id: %w", err)
 	}
 	now := time.Now().UTC()
 	user, err := model.NewUser(id, email, now)
@@ -119,7 +119,7 @@ VALUES ($1, $2, $3, $4, $5)`
 		if isUniqueViolation(err) {
 			return model.User{}, usecase.ErrEmailAlreadyTaken
 		}
-		return model.User{}, fmt.Errorf("insert user: %w", err)
+		return model.User{}, fmt.Errorf("failed to insert user: %w", err)
 	}
 	return user, nil
 }
@@ -157,12 +157,12 @@ WHERE id = $1`
 		if isUniqueViolation(err) {
 			return usecase.ErrEmailAlreadyTaken
 		}
-		return fmt.Errorf("update user: %w", err)
+		return fmt.Errorf("failed to update user: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("get updated user count: %w", err)
+		return fmt.Errorf("failed to get updated user count: %w", err)
 	}
 	if rowsAffected == 0 {
 		return usecase.ErrUserNotFound

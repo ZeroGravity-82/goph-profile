@@ -32,7 +32,7 @@ func TestHTTPServer_Run_ReturnsListenError(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "http server error")
+	assert.Contains(t, err.Error(), "failed to run http server")
 }
 
 // TestHTTPServer_Run_ShutsDownOnContextCancel проверяет graceful shutdown.

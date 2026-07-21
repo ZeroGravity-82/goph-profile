@@ -37,7 +37,7 @@ func Test_isUniqueViolation(t *testing.T) {
 		},
 		{
 			name: "wrapped typed pg error",
-			err:  fmt.Errorf("insert user: %w", &pgconn.PgError{Code: pgerrcode.UniqueViolation}),
+			err:  fmt.Errorf("failed to insert user: %w", &pgconn.PgError{Code: pgerrcode.UniqueViolation}),
 			want: true,
 		},
 		{

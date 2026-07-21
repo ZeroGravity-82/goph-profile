@@ -52,7 +52,7 @@ func (uc *UserUseCase) ResolveUserByEmail(
 		return resolveUserByEmailOutput(user), nil
 	}
 	if !errors.Is(err, ErrUserNotFound) {
-		return ResolveUserByEmailOutput{}, fmt.Errorf("get user by email: %w", err)
+		return ResolveUserByEmailOutput{}, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
 	user, err = uc.userRepo.Create(ctx, email)
@@ -60,12 +60,12 @@ func (uc *UserUseCase) ResolveUserByEmail(
 		return resolveUserByEmailOutput(user), nil
 	}
 	if !errors.Is(err, ErrEmailAlreadyTaken) {
-		return ResolveUserByEmailOutput{}, fmt.Errorf("create user by email: %w", err)
+		return ResolveUserByEmailOutput{}, fmt.Errorf("failed to create user by email: %w", err)
 	}
 
 	user, err = uc.userRepo.GetByEmail(ctx, email)
 	if err != nil {
-		return ResolveUserByEmailOutput{}, fmt.Errorf("get user after email conflict: %w", err)
+		return ResolveUserByEmailOutput{}, fmt.Errorf("failed to get user after email conflict: %w", err)
 	}
 
 	return resolveUserByEmailOutput(user), nil
