@@ -750,11 +750,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByEmail(
 		return GetCurrentAvatarByEmailOutput{}, err
 	}
 
-	return GetCurrentAvatarByEmailOutput{
-		Content:          output.Content,
-		MIMEType:         output.MIMEType,
-		UseDefaultAvatar: output.UseDefaultAvatar,
-	}, nil
+	return GetCurrentAvatarByEmailOutput(output), nil
 }
 
 // GetCurrentAvatarByUserID возвращает текущую готовую аватарку пользователя или признак выдачи заглушки.
@@ -782,11 +778,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
 		return GetCurrentAvatarByUserIDOutput{}, err
 	}
 
-	return GetCurrentAvatarByUserIDOutput{
-		Content:          output.Content,
-		MIMEType:         output.MIMEType,
-		UseDefaultAvatar: output.UseDefaultAvatar,
-	}, nil
+	return GetCurrentAvatarByUserIDOutput(output), nil
 }
 
 func (uc *AvatarUseCase) getCurrentAvatar(ctx context.Context, user model.User) (currentAvatarOutput, error) {
