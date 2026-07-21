@@ -26,12 +26,12 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/web"
 )
 
+const formFileField = "file"
+
+// avatarCacheControl разрешает клиентам кешировать выдачу аватарки на сутки.
+const avatarCacheControl = "max-age=86400"
+
 const (
-	formFileField = "file"
-
-	// avatarCacheControl разрешает клиентам кешировать выдачу аватарки на сутки.
-	avatarCacheControl = "max-age=86400"
-
 	maxAvatarFileNameLengthBytes      = 255
 	maxAvatarFileSizeBytes            = 10 * 1024 * 1024
 	maxFormMultipartOverheadSizeBytes = 1024 * 1024
@@ -600,7 +600,12 @@ func newListUserAvatarsItemResponse(
 
 // getCurrentAvatarByEmail парсит email из query-параметра и возвращает текущую аватарку или PNG-заглушку.
 func (h *AvatarHandler) getCurrentAvatarByEmail(w http.ResponseWriter, r *http.Request) {
-	email, err := emailFromAvatarRequest(r)
+	rawEmail := r.URL.Query().Get("email")
+	if len(rawEmail) > maxEmailSizeBytes {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
+		return
+	}
+	email, err := model.NewEmail(rawEmail)
 	if err != nil {
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
 		return
@@ -624,10 +629,6 @@ func (h *AvatarHandler) getCurrentAvatarByEmail(w http.ResponseWriter, r *http.R
 		return
 	}
 	writeAvatarContent(h.logger, w, r, output.MIMEType, output.Content)
-}
-
-func emailFromAvatarRequest(r *http.Request) (model.Email, error) {
-	return model.NewEmail(r.URL.Query().Get("email"))
 }
 
 // getCurrentAvatarByUserID парсит user_id из пути и возвращает текущую аватарку или PNG-заглушку.

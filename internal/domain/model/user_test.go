@@ -1,7 +1,6 @@
 package model
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -30,7 +29,6 @@ func TestNewEmail_RejectsInvalidEmail(t *testing.T) {
 		{name: "empty local", raw: "@example.com"},
 		{name: "empty domain", raw: "user@"},
 		{name: "spaces", raw: "user name@example.com"},
-		{name: "too long", raw: strings.Repeat("a", MaxEmailSizeBytes-10) + "@example.com"},
 	}
 
 	for _, tt := range tests {

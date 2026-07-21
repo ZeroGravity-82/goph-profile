@@ -7,11 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	// MaxEmailSizeBytes ограничивает нормализованный email пользователя.
-	MaxEmailSizeBytes = 255
-)
-
 // User описывает пользователя сервиса.
 type User struct {
 	ID              uuid.UUID
@@ -23,7 +18,7 @@ type User struct {
 
 // Email содержит нормализованный email пользователя.
 //
-// Новый email нужно создавать через NewEmail, только так он буден валидным и нормализованным.
+// Новый email нужно создавать через NewEmail, только так он будет валидным и нормализованным.
 type Email string
 
 // NewEmail нормализует email и проверяет доменные ограничения.
@@ -39,9 +34,6 @@ func NewEmail(raw string) (Email, error) {
 func (e Email) Validate() error {
 	email := string(e)
 	if email == "" {
-		return ErrInvalidEmail
-	}
-	if len(email) > MaxEmailSizeBytes {
 		return ErrInvalidEmail
 	}
 	if strings.Count(email, "@") != 1 {

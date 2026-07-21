@@ -13,6 +13,8 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
+const maxEmailSizeBytes = 255
+
 // userUseCase описывает сценарии работы с пользователями: определение пользователя по email.
 type userUseCase interface {
 	ResolveUserByEmail(ctx context.Context, email model.Email) (usecase.ResolveUserByEmailOutput, error)
@@ -47,6 +49,10 @@ func (h *UserHandler) resolveUserByEmail(w http.ResponseWriter, r *http.Request)
 	request, err := resolveUserRequestFromRequest(r)
 	if err != nil {
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid request body", "")
+		return
+	}
+	if len(request.Email) > maxEmailSizeBytes {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid email", "")
 		return
 	}
 	email, err := model.NewEmail(request.Email)

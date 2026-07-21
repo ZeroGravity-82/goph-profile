@@ -72,7 +72,7 @@ func TestUserHandler_resolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
 		{name: "empty local", email: "@example.com"},
 		{name: "empty domain", email: "user@"},
 		{name: "spaces", email: "user name@example.com"},
-		{name: "too long", email: strings.Repeat("a", model.MaxEmailSizeBytes-10) + "@example.com"},
+		{name: "too long", email: strings.Repeat("a", 256) + "@example.com"},
 	}
 
 	for _, tt := range tests {
