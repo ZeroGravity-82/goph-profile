@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -70,8 +71,11 @@ func integrationServerConfig(t *testing.T) config.ServerConfig {
 	require.NotEmpty(t, fileStorageSecretKey)
 	require.NotEmpty(t, fileStorageBucket)
 
+	repoRoot := filepath.Clean(filepath.Join("..", "..", ".."))
 	return config.ServerConfig{
 		HTTPServerAddr: "127.0.0.1:0",
+		TLSCertPath:    filepath.Join(repoRoot, "certs", "server.crt"),
+		TLSKeyPath:     filepath.Join(repoRoot, "certs", "server.key"),
 		DatabaseURI:    databaseURI,
 		FileStorage: config.FileStorage{
 			Endpoint:  fileStorageEndpoint,

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 
@@ -43,6 +44,11 @@ func New(cfg config.ServerConfig, logger *slog.Logger) (*App, error) {
 }
 
 func buildApp(ctx context.Context, cfg config.ServerConfig, db *sqlx.DB, logger *slog.Logger) (*App, error) {
+	tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tls certificate: %w", err)
+	}
+
 	userRepo, err := postgres.NewUserRepository(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user repository: %w", err)
@@ -82,12 +88,25 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *sqlx.DB, logger 
 		return nil, fmt.Errorf("failed to create avatar use case: %w", err)
 	}
 
-	httpSrv, err := httpserver.NewHTTPServer(cfg.HTTPServerAddr, avatarUseCase, userUseCase, logger)
+	httpSrv, err := httpserver.NewHTTPServer(
+		cfg.HTTPServerAddr,
+		httpTLSConfig(tlsCert),
+		avatarUseCase,
+		userUseCase,
+		logger,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http server: %w", err)
 	}
 
 	return &App{db: db, httpSrv: httpSrv, logger: logger}, nil
+}
+
+func httpTLSConfig(tlsCert tls.Certificate) *tls.Config {
+	return &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		MinVersion:   tls.VersionTLS12,
+	}
 }
 
 type avatarMessagePublisher struct{}

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"log/slog"
 	"net"
@@ -21,6 +22,7 @@ func TestHTTPServer_Run_ReturnsListenError(t *testing.T) {
 
 	server, err := NewHTTPServer(
 		listener.Addr().String(),
+		testTLSConfig(),
 		&avatarUseCaseFake{},
 		&userUseCaseFake{},
 		discardLogger(),
@@ -41,7 +43,13 @@ func TestHTTPServer_Run_ShutsDownOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server, err := NewHTTPServer("127.0.0.1:0", &avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
+	server, err := NewHTTPServer(
+		"127.0.0.1:0",
+		testTLSConfig(),
+		&avatarUseCaseFake{},
+		&userUseCaseFake{},
+		discardLogger(),
+	)
 	require.NoError(t, err)
 
 	// Act
@@ -62,4 +70,12 @@ func TestHTTPServer_Run_ShutsDownOnContextCancel(t *testing.T) {
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func testTLSConfig() *tls.Config {
+	return &tls.Config{
+		Certificates: []tls.Certificate{
+			{Certificate: [][]byte{[]byte("test certificate")}},
+		},
+	}
 }

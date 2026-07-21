@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -55,6 +56,7 @@ type userUseCase interface {
 // Он запускает роутер, собранный handler.NewRouter, на указанном адресе.
 type HTTPServer struct {
 	addr          string
+	tlsConfig     *tls.Config
 	avatarUseCase avatarUseCase
 	userUseCase   userUseCase
 	logger        *slog.Logger
@@ -63,12 +65,16 @@ type HTTPServer struct {
 // NewHTTPServer создает новый HTTPServer.
 func NewHTTPServer(
 	addr string,
+	tlsConfig *tls.Config,
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
 	logger *slog.Logger,
 ) (*HTTPServer, error) {
 	if addr == "" {
 		return nil, errors.New("http server address is not provided")
+	}
+	if tlsConfig == nil {
+		return nil, errors.New("TLS config is not provided")
 	}
 	if avatarUseCase == nil {
 		return nil, errors.New("avatar usecase is not provided")
@@ -82,6 +88,7 @@ func NewHTTPServer(
 
 	return &HTTPServer{
 		addr:          addr,
+		tlsConfig:     tlsConfig,
 		avatarUseCase: avatarUseCase,
 		userUseCase:   userUseCase,
 		logger:        logger,
@@ -98,12 +105,13 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 		Addr:              s.addr,
 		Handler:           router,
 		ReadHeaderTimeout: readHeaderTimeout,
+		TLSConfig:         s.tlsConfig,
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
 		s.logger.Info("starting http server", slog.String("addr", s.addr))
-		errCh <- srv.ListenAndServe()
+		errCh <- srv.ListenAndServeTLS("", "")
 	}()
 
 	select {

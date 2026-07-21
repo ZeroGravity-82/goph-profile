@@ -1,4 +1,6 @@
 http_address: localhost:3202
+tls_cert: certs/server.crt
+tls_key: certs/server.key
 database_uri: postgres://change-me-db-user:change-me-db-password@localhost:5432/change-me-db-name?sslmode=disable
 file_storage:
   endpoint: localhost:9000

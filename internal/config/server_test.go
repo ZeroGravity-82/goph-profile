@@ -117,6 +117,8 @@ func TestLoadServer_LoadsDefaults(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, "localhost:3201", cfg.HTTPServerAddr)
+	assert.Equal(t, "certs/server.crt", cfg.TLSCertPath)
+	assert.Equal(t, "certs/server.key", cfg.TLSKeyPath)
 	assert.Equal(t, "postgres://user:pass@localhost/db", cfg.DatabaseURI)
 	assert.Equal(t, "localhost:9000", cfg.FileStorage.Endpoint)
 	assert.Equal(t, "access", cfg.FileStorage.AccessKey)
@@ -170,6 +172,8 @@ func TestLoadServer_Priority(t *testing.T) {
 	// Arrange
 	configPath := writeTempConfig(t, `
 http_address: localhost:3202
+tls_cert: certs/file-server.crt
+tls_key: certs/file-server.key
 database_uri: postgres://file-db
 file_storage:
   endpoint: localhost:9000
@@ -184,6 +188,7 @@ logging:
 `)
 	unsetConfigEnv(t)
 	t.Setenv("GOPH_PROFILE_HTTP_ADDRESS", "127.0.0.1:3204")
+	t.Setenv("GOPH_PROFILE_TLS_CERT", "certs/env-server.crt")
 	t.Setenv("GOPH_PROFILE_FILE_STORAGE_ENDPOINT", "localhost:9002")
 	t.Setenv("GOPH_PROFILE_FILE_STORAGE_BUCKET", "env-bucket")
 	t.Setenv("GOPH_PROFILE_LOGGING_LEVEL", "error")
@@ -192,6 +197,8 @@ logging:
 		"--config", configPath,
 		"--database-uri", "postgres://flag-db",
 		"--http-address", "127.0.0.1:3203",
+		"--tls-cert", "certs/flag-server.crt",
+		"--tls-key", "certs/flag-server.key",
 		"--file-storage.endpoint", "localhost:9001",
 		"--file-storage.access-key", "flag-access",
 		"--file-storage.secret-key", "flag-object-secret",
@@ -208,6 +215,8 @@ logging:
 	require.NoError(t, err)
 	assert.Equal(t, "postgres://flag-db", cfg.DatabaseURI)
 	assert.Equal(t, "127.0.0.1:3203", cfg.HTTPServerAddr)
+	assert.Equal(t, "certs/flag-server.crt", cfg.TLSCertPath)
+	assert.Equal(t, "certs/flag-server.key", cfg.TLSKeyPath)
 	assert.Equal(t, "localhost:9001", cfg.FileStorage.Endpoint)
 	assert.Equal(t, "flag-access", cfg.FileStorage.AccessKey)
 	assert.Equal(t, "flag-object-secret", cfg.FileStorage.SecretKey)
@@ -259,6 +268,8 @@ func unsetConfigEnv(t *testing.T) {
 
 	for _, key := range []string{
 		"GOPH_PROFILE_HTTP_ADDRESS",
+		"GOPH_PROFILE_TLS_CERT",
+		"GOPH_PROFILE_TLS_KEY",
 		"GOPH_PROFILE_DATABASE_URI",
 		"GOPH_PROFILE_FILE_STORAGE_ENDPOINT",
 		"GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY",

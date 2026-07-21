@@ -13,6 +13,8 @@ const (
 	defaultLoggingFormat     = "json"
 	defaultLoggingAddSource  = false
 	defaultHTTPServerAddr    = "localhost:3201"
+	defaultTLSCertPath       = "certs/server.crt"
+	defaultTLSKeyPath        = "certs/server.key"
 	defaultFileStorageUseSSL = false
 )
 
@@ -52,6 +54,10 @@ type FileStorage struct {
 //
 // HTTPServerAddr - адрес HTTP-сервера в формате host:port.
 //
+// TLSCertPath - путь к TLS-сертификату HTTP-сервера.
+//
+// TLSKeyPath - путь к приватному TLS-ключу HTTP-сервера.
+//
 // DatabaseURI - строка подключения к базе данных.
 //
 // FileStorage - настройки S3-совместимого хранилища файлов.
@@ -59,6 +65,8 @@ type FileStorage struct {
 // Logging - настройки логирования сервиса.
 type ServerConfig struct {
 	HTTPServerAddr string      `koanf:"http_address"`
+	TLSCertPath    string      `koanf:"tls_cert"`
+	TLSKeyPath     string      `koanf:"tls_key"`
 	DatabaseURI    string      `koanf:"database_uri"`
 	FileStorage    FileStorage `koanf:"file_storage"`
 	Logging        Logging     `koanf:"logging"`
@@ -84,6 +92,8 @@ func parseFlags(args []string) (*pflag.FlagSet, string, error) {
 	flags := pflag.NewFlagSet("goph-profile-server", pflag.ContinueOnError)
 	flags.StringP("config", "c", "", "path to config file")
 	flags.String("http-address", "", `HTTP server address (default "`+defaultHTTPServerAddr+`")`)
+	flags.String("tls-cert", "", "TLS certificate path for HTTP server")
+	flags.String("tls-key", "", "TLS private key path for HTTP server")
 	flags.String("database-uri", "", "database connection URI")
 	flags.String("file-storage.endpoint", "", "S3-compatible file storage address")
 	flags.String("file-storage.access-key", "", "S3-compatible file storage access key")
@@ -110,6 +120,8 @@ func serverDefaults() map[string]any {
 		configKey("logging", "level"):        defaultLoggingLevel,
 		configKey("logging", "add_source"):   defaultLoggingAddSource,
 		configKey("http_address"):            defaultHTTPServerAddr,
+		configKey("tls_cert"):                defaultTLSCertPath,
+		configKey("tls_key"):                 defaultTLSKeyPath,
 		configKey("file_storage", "use_ssl"): defaultFileStorageUseSSL,
 	}
 }
@@ -117,6 +129,12 @@ func serverDefaults() map[string]any {
 func validateServerConfig(cfg ServerConfig) error {
 	if err := validateServerAddr(cfg.HTTPServerAddr); err != nil {
 		return err
+	}
+	if cfg.TLSCertPath == "" {
+		return errors.New("TLS certificate path is required")
+	}
+	if cfg.TLSKeyPath == "" {
+		return errors.New("TLS private key path is required")
 	}
 	if cfg.DatabaseURI == "" {
 		return errors.New("database URI is required")
