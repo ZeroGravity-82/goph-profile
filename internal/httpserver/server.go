@@ -51,6 +51,20 @@ type userUseCase interface {
 	ResolveUserByEmail(ctx context.Context, email model.Email) (usecase.ResolveUserByEmailOutput, error)
 }
 
+// HealthCheck проверяет доступность внешней зависимости.
+type HealthCheck func(ctx context.Context) error
+
+// HealthChecks содержит именованные проверки внешних зависимостей.
+type HealthChecks map[string]HealthCheck
+
+func (checks HealthChecks) handlerChecks() map[string]func(context.Context) error {
+	result := make(map[string]func(context.Context) error, len(checks))
+	for name, check := range checks {
+		result[name] = check
+	}
+	return result
+}
+
 // HTTPServer запускает основной REST API.
 //
 // Он запускает роутер, собранный handler.NewRouter, на указанном адресе.
@@ -59,6 +73,7 @@ type HTTPServer struct {
 	tlsConfig     *tls.Config
 	avatarUseCase avatarUseCase
 	userUseCase   userUseCase
+	healthChecks  HealthChecks
 	logger        *slog.Logger
 }
 
@@ -68,6 +83,7 @@ func NewHTTPServer(
 	tlsConfig *tls.Config,
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
+	healthChecks HealthChecks,
 	logger *slog.Logger,
 ) (*HTTPServer, error) {
 	if addr == "" {
@@ -82,6 +98,9 @@ func NewHTTPServer(
 	if userUseCase == nil {
 		return nil, errors.New("user usecase is not provided")
 	}
+	if len(healthChecks) == 0 {
+		return nil, errors.New("health checks are not provided")
+	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -91,13 +110,19 @@ func NewHTTPServer(
 		tlsConfig:     tlsConfig,
 		avatarUseCase: avatarUseCase,
 		userUseCase:   userUseCase,
+		healthChecks:  healthChecks,
 		logger:        logger,
 	}, nil
 }
 
 // Run запускает HTTP-сервер и блокируется, пока не отменен контекст или сервер не остановится с ошибкой.
 func (s *HTTPServer) Run(ctx context.Context) error {
-	router, err := handler.NewRouter(s.avatarUseCase, s.userUseCase, s.logger)
+	router, err := handler.NewRouter(
+		s.avatarUseCase,
+		s.userUseCase,
+		s.healthChecks.handlerChecks(),
+		s.logger,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create router: %w", err)
 	}

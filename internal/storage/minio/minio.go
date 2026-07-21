@@ -105,6 +105,18 @@ func validateObjectKey(objectKey string) error {
 	return nil
 }
 
+// Ping проверяет доступность S3-хранилища и bucket с файлами аватарок.
+func (s *MinIOStorage) Ping(ctx context.Context) error {
+	exists, err := s.client.BucketExists(ctx, s.bucket)
+	if err != nil {
+		return fmt.Errorf("failed to check minio bucket: %w", err)
+	}
+	if !exists {
+		return errors.New("minio bucket does not exist")
+	}
+	return nil
+}
+
 // Get читает объект по ключу.
 func (s *MinIOStorage) Get(ctx context.Context, objectKey string) ([]byte, error) {
 	if err := validateObjectKey(objectKey); err != nil {

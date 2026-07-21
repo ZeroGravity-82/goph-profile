@@ -235,6 +235,26 @@ func (p *Publisher) publishJSON(ctx context.Context, routingKey string, messageI
 	return nil
 }
 
+// Ping проверяет, что текущее подключение и канал RabbitMQ открыты.
+func (p *Publisher) Ping(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("failed to ping rabbitmq: %w", ctx.Err())
+	default:
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.conn == nil || p.conn.IsClosed() {
+		return errors.New("rabbitmq connection is closed")
+	}
+	if p.channel == nil || p.channel.IsClosed() {
+		return errors.New("rabbitmq channel is closed")
+	}
+	return nil
+}
+
 // Close закрывает канал и соединение RabbitMQ.
 func (p *Publisher) Close() error {
 	var err error

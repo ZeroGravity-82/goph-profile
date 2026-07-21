@@ -115,6 +115,11 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *sqlx.DB, logger 
 		httpTLSConfig(tlsCert),
 		avatarUseCase,
 		userUseCase,
+		httpserver.HealthChecks{
+			"postgres": db.PingContext,
+			"s3":       fileStorage.Ping,
+			"rabbitmq": publisher.Ping,
+		},
 		logger,
 	)
 	if err != nil {

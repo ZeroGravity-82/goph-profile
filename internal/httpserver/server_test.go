@@ -25,6 +25,7 @@ func TestHTTPServer_Run_ReturnsListenError(t *testing.T) {
 		testTLSConfig(),
 		&avatarUseCaseFake{},
 		&userUseCaseFake{},
+		testHealthChecks(),
 		discardLogger(),
 	)
 	require.NoError(t, err)
@@ -48,6 +49,7 @@ func TestHTTPServer_Run_ShutsDownOnContextCancel(t *testing.T) {
 		testTLSConfig(),
 		&avatarUseCaseFake{},
 		&userUseCaseFake{},
+		testHealthChecks(),
 		discardLogger(),
 	)
 	require.NoError(t, err)
@@ -76,6 +78,14 @@ func testTLSConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{
 			{Certificate: [][]byte{[]byte("test certificate")}},
+		},
+	}
+}
+
+func testHealthChecks() HealthChecks {
+	return HealthChecks{
+		"test": func(_ context.Context) error {
+			return nil
 		},
 	}
 }

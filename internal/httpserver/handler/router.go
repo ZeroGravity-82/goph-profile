@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,7 +27,13 @@ const apiPathPrefix = "/api/v1"
 //	POST /api/v1/users/resolve
 //	PATCH /api/v1/avatar
 //	DELETE /api/v1/avatar
-func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slog.Logger) (http.Handler, error) {
+//	GET /health
+func NewRouter(
+	avatarUseCase avatarUseCase,
+	userUseCase userUseCase,
+	healthChecks map[string]func(context.Context) error,
+	logger *slog.Logger,
+) (http.Handler, error) {
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -46,6 +53,10 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user handler: %w", err)
 	}
+	healthHandler, err := NewHealthHandler(healthChecks, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create health handler: %w", err)
+	}
 
 	r.Route(apiPathPrefix, func(r chi.Router) {
 		r.With(middleware.AllowContentType("multipart/form-data")).Post("/avatars", avatarHandler.uploadAvatar)
@@ -59,6 +70,7 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 		r.With(middleware.AllowContentType("application/json")).Patch("/avatar", avatarHandler.selectCurrentAvatar)
 		r.Delete("/avatar", avatarHandler.deleteCurrentAvatar)
 	})
+	r.Get("/health", healthHandler.getHealth)
 
 	return r, nil
 }
