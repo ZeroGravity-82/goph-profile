@@ -7,6 +7,7 @@ TEST_FILE_STORAGE_ENDPOINT ?= localhost:19000
 TEST_FILE_STORAGE_ACCESS_KEY ?= gophprofile
 TEST_FILE_STORAGE_SECRET_KEY ?= userpassword
 TEST_FILE_STORAGE_BUCKET ?= goph-profile-test
+TEST_QUEUE_URL ?= amqp://gophprofile:userpassword@localhost:15672/
 
 .PHONY: help fmt test lint vet up down integration-up integration-down test-integration
 
@@ -33,10 +34,10 @@ down: ## Остановить и удалить контейнеры Docker Comp
 
 # --- Интеграционная инфраструктура (Docker Compose) ---
 
-integration-up: ## Запустить изолированные PostgreSQL и MinIO для интеграционных тестов
+integration-up: ## Запустить изолированные PostgreSQL, MinIO и RabbitMQ для интеграционных тестов
 	$(TEST_DC) up -d --wait
 
-integration-down: ## Остановить и удалить контейнеры PostgreSQL и MinIO для интеграционных тестов
+integration-down: ## Остановить и удалить контейнеры PostgreSQL, MinIO и RabbitMQ для интеграционных тестов
 	$(TEST_DC) down
 
 # --- Интеграционные тесты ---
@@ -47,4 +48,5 @@ test-integration: integration-up ## Запустить интеграционн�
 	TEST_FILE_STORAGE_ACCESS_KEY='$(TEST_FILE_STORAGE_ACCESS_KEY)' \
 	TEST_FILE_STORAGE_SECRET_KEY='$(TEST_FILE_STORAGE_SECRET_KEY)' \
 	TEST_FILE_STORAGE_BUCKET='$(TEST_FILE_STORAGE_BUCKET)' \
+	TEST_QUEUE_URL='$(TEST_QUEUE_URL)' \
 	go test -p 1 -tags=integration ./internal/...

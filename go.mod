@@ -16,6 +16,7 @@ require (
 	github.com/knadh/koanf/v2 v2.3.5
 	github.com/minio/minio-go/v7 v7.2.1
 	github.com/pressly/goose/v3 v3.27.2
+	github.com/rabbitmq/amqp091-go v1.13.0
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 )

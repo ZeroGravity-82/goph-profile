@@ -33,3 +33,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  rabbitmq-test:
+    image: rabbitmq:3.13-management
+    ports:
+      - "15672:5672"
+      - "25672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: gophprofile
+      RABBITMQ_DEFAULT_PASS: userpassword
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+sbwt none +sbwtdcpu none +sbwtdio none"
+    tmpfs:
+      - /var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

@@ -29,6 +29,7 @@ func TestLoadServer_RequiresDatabaseURI(t *testing.T) {
 	// Arrange
 	unsetConfigEnv(t)
 	setRequiredFileStorageEnv(t)
+	setRequiredQueueEnv(t)
 	setArgs(t, "server")
 
 	// Act
@@ -74,6 +75,66 @@ func TestLoadServer_RequiresFileStorageFields(t *testing.T) {
 			unsetConfigEnv(t)
 			t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
 			setRequiredFileStorageEnv(t)
+			setRequiredQueueEnv(t)
+			t.Setenv(tt.unsetKey, "")
+			setArgs(t, "server")
+
+			// Act
+			_, err := LoadServer()
+
+			// Assert
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErrMsg)
+		})
+	}
+}
+
+// TestLoadServer_RequiresQueueFields проверяет обязательность настроек очереди сообщений.
+func TestLoadServer_RequiresQueueFields(t *testing.T) {
+	tests := []struct {
+		name       string
+		unsetKey   string
+		wantErrMsg string
+	}{
+		{
+			name:       "url",
+			unsetKey:   "GOPH_PROFILE_QUEUE_URL",
+			wantErrMsg: "queue URL is required",
+		},
+		{
+			name:       "exchange",
+			unsetKey:   "GOPH_PROFILE_QUEUE_EXCHANGE",
+			wantErrMsg: "queue exchange is required",
+		},
+		{
+			name:       "avatar processing queue",
+			unsetKey:   "GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE",
+			wantErrMsg: "queue avatar processing queue is required",
+		},
+		{
+			name:       "avatar deletion queue",
+			unsetKey:   "GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE",
+			wantErrMsg: "queue avatar deletion queue is required",
+		},
+		{
+			name:       "avatar processing routing key",
+			unsetKey:   "GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY",
+			wantErrMsg: "queue avatar processing routing key is required",
+		},
+		{
+			name:       "avatar deletion routing key",
+			unsetKey:   "GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY",
+			wantErrMsg: "queue avatar deletion routing key is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			unsetConfigEnv(t)
+			t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
+			setRequiredFileStorageEnv(t)
+			setRequiredQueueEnv(t)
 			t.Setenv(tt.unsetKey, "")
 			setArgs(t, "server")
 
@@ -93,6 +154,7 @@ func TestLoadServer_RejectsInvalidHTTPServerAddr(t *testing.T) {
 	unsetConfigEnv(t)
 	t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
 	setRequiredFileStorageEnv(t)
+	setRequiredQueueEnv(t)
 	setArgs(t, "server", "--http-address", "http://localhost:3201")
 
 	// Act
@@ -109,6 +171,7 @@ func TestLoadServer_LoadsDefaults(t *testing.T) {
 	unsetConfigEnv(t)
 	t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
 	setRequiredFileStorageEnv(t)
+	t.Setenv("GOPH_PROFILE_QUEUE_URL", "amqp://user:pass@localhost:5672/")
 	setArgs(t, "server")
 
 	// Act
@@ -125,6 +188,12 @@ func TestLoadServer_LoadsDefaults(t *testing.T) {
 	assert.Equal(t, "secret", cfg.FileStorage.SecretKey)
 	assert.Equal(t, "goph-profile", cfg.FileStorage.Bucket)
 	assert.Equal(t, false, cfg.FileStorage.UseSSL)
+	assert.Equal(t, "amqp://user:pass@localhost:5672/", cfg.Queue.URL)
+	assert.Equal(t, "goph-profile.avatar", cfg.Queue.Exchange)
+	assert.Equal(t, "goph-profile.avatar-processing", cfg.Queue.AvatarProcessingQueue)
+	assert.Equal(t, "goph-profile.avatar-deletion", cfg.Queue.AvatarDeletionQueue)
+	assert.Equal(t, "avatar.process", cfg.Queue.AvatarProcessingRoutingKey)
+	assert.Equal(t, "avatar.delete", cfg.Queue.AvatarDeletionRoutingKey)
 	assert.Equal(t, "json", cfg.Logging.Format)
 	assert.Equal(t, "info", cfg.Logging.Level)
 	assert.Equal(t, false, cfg.Logging.AddSource)
@@ -181,6 +250,13 @@ file_storage:
   secret_key: file-secret
   bucket: file-bucket
   use_ssl: true
+queue:
+  url: amqp://file-user:file-pass@localhost:5672/
+  exchange: file-exchange
+  avatar_processing_queue: file-process-queue
+  avatar_deletion_queue: file-delete-queue
+  avatar_processing_routing_key: file.process
+  avatar_deletion_routing_key: file.delete
 logging:
   format: json
   level: warn
@@ -191,6 +267,9 @@ logging:
 	t.Setenv("GOPH_PROFILE_TLS_CERT", "certs/env-server.crt")
 	t.Setenv("GOPH_PROFILE_FILE_STORAGE_ENDPOINT", "localhost:9002")
 	t.Setenv("GOPH_PROFILE_FILE_STORAGE_BUCKET", "env-bucket")
+	t.Setenv("GOPH_PROFILE_QUEUE_URL", "amqp://env-user:env-pass@localhost:5672/")
+	t.Setenv("GOPH_PROFILE_QUEUE_EXCHANGE", "env-exchange")
+	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE", "env-process-queue")
 	t.Setenv("GOPH_PROFILE_LOGGING_LEVEL", "error")
 	setArgs(t,
 		"server",
@@ -204,6 +283,12 @@ logging:
 		"--file-storage.secret-key", "flag-object-secret",
 		"--file-storage.bucket", "flag-bucket",
 		"--file-storage.use-ssl=false",
+		"--queue.url", "amqp://flag-user:flag-pass@localhost:5672/",
+		"--queue.exchange", "flag-exchange",
+		"--queue.avatar-processing-queue", "flag-process-queue",
+		"--queue.avatar-deletion-queue", "flag-delete-queue",
+		"--queue.avatar-processing-routing-key", "flag.process",
+		"--queue.avatar-deletion-routing-key", "flag.delete",
 		"--logging.level", "debug",
 		"--logging.add-source",
 	)
@@ -222,6 +307,12 @@ logging:
 	assert.Equal(t, "flag-object-secret", cfg.FileStorage.SecretKey)
 	assert.Equal(t, "flag-bucket", cfg.FileStorage.Bucket)
 	assert.Equal(t, false, cfg.FileStorage.UseSSL)
+	assert.Equal(t, "amqp://flag-user:flag-pass@localhost:5672/", cfg.Queue.URL)
+	assert.Equal(t, "flag-exchange", cfg.Queue.Exchange)
+	assert.Equal(t, "flag-process-queue", cfg.Queue.AvatarProcessingQueue)
+	assert.Equal(t, "flag-delete-queue", cfg.Queue.AvatarDeletionQueue)
+	assert.Equal(t, "flag.process", cfg.Queue.AvatarProcessingRoutingKey)
+	assert.Equal(t, "flag.delete", cfg.Queue.AvatarDeletionRoutingKey)
 	assert.Equal(t, "json", cfg.Logging.Format)
 	assert.Equal(t, "debug", cfg.Logging.Level)
 	assert.True(t, cfg.Logging.AddSource)
@@ -238,6 +329,8 @@ file_storage:
   access_key: access
   secret_key: object-secret
   bucket: goph-profile
+queue:
+  url: amqp://file-user:file-pass@localhost:5672/
 `)
 	unsetConfigEnv(t)
 	t.Setenv("GOPH_PROFILE_DATABASE_URI", "")
@@ -263,6 +356,17 @@ func setRequiredFileStorageEnv(t *testing.T) {
 	t.Setenv("GOPH_PROFILE_FILE_STORAGE_BUCKET", "goph-profile")
 }
 
+func setRequiredQueueEnv(t *testing.T) {
+	t.Helper()
+
+	t.Setenv("GOPH_PROFILE_QUEUE_URL", "amqp://user:pass@localhost:5672/")
+	t.Setenv("GOPH_PROFILE_QUEUE_EXCHANGE", "goph-profile.avatar")
+	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE", "goph-profile.avatar-processing")
+	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE", "goph-profile.avatar-deletion")
+	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY", "avatar.process")
+	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY", "avatar.delete")
+}
+
 func unsetConfigEnv(t *testing.T) {
 	t.Helper()
 
@@ -276,6 +380,12 @@ func unsetConfigEnv(t *testing.T) {
 		"GOPH_PROFILE_FILE_STORAGE_SECRET_KEY",
 		"GOPH_PROFILE_FILE_STORAGE_BUCKET",
 		"GOPH_PROFILE_FILE_STORAGE_USE_SSL",
+		"GOPH_PROFILE_QUEUE_URL",
+		"GOPH_PROFILE_QUEUE_EXCHANGE",
+		"GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE",
+		"GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE",
+		"GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY",
+		"GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY",
 		"GOPH_PROFILE_LOGGING_FORMAT",
 		"GOPH_PROFILE_LOGGING_LEVEL",
 		"GOPH_PROFILE_LOGGING_ADD_SOURCE",

@@ -91,6 +91,9 @@ func mapEnvKey(key string) string {
 	if strings.HasPrefix(key, "file_storage_") {
 		return configKey("file_storage", strings.TrimPrefix(key, "file_storage_"))
 	}
+	if strings.HasPrefix(key, "queue_") {
+		return configKey("queue", strings.TrimPrefix(key, "queue_"))
+	}
 	return key
 }
 

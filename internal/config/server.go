@@ -16,6 +16,11 @@ const (
 	defaultTLSCertPath       = "certs/server.crt"
 	defaultTLSKeyPath        = "certs/server.key"
 	defaultFileStorageUseSSL = false
+	defaultQueueExchange     = "goph-profile.avatar"
+	defaultQueueProcessQueue = "goph-profile.avatar-processing"
+	defaultQueueDeleteQueue  = "goph-profile.avatar-deletion"
+	defaultQueueProcessKey   = "avatar.process"
+	defaultQueueDeleteKey    = "avatar.delete"
 )
 
 // Logging описывает настройки логирования сервиса.
@@ -50,6 +55,28 @@ type FileStorage struct {
 	UseSSL    bool   `koanf:"use_ssl"`
 }
 
+// Queue описывает настройки очереди сообщений.
+//
+// URL - строка подключения к RabbitMQ в формате amqp://user:password@host:port/vhost.
+//
+// Exchange - имя обменника для задач обработки и удаления аватарок.
+//
+// AvatarProcessingQueue - очередь задач обработки исходных файлов аватарок.
+//
+// AvatarDeletionQueue - очередь задач удаления файлов аватарок.
+//
+// AvatarProcessingRoutingKey - ключ маршрутизации задач обработки исходных файлов.
+//
+// AvatarDeletionRoutingKey - ключ маршрутизации задач удаления файлов.
+type Queue struct {
+	URL                        string `koanf:"url"`
+	Exchange                   string `koanf:"exchange"`
+	AvatarProcessingQueue      string `koanf:"avatar_processing_queue"`
+	AvatarDeletionQueue        string `koanf:"avatar_deletion_queue"`
+	AvatarProcessingRoutingKey string `koanf:"avatar_processing_routing_key"`
+	AvatarDeletionRoutingKey   string `koanf:"avatar_deletion_routing_key"`
+}
+
 // ServerConfig описывает конфигурацию HTTP-сервиса.
 //
 // HTTPServerAddr - адрес HTTP-сервера в формате host:port.
@@ -62,6 +89,8 @@ type FileStorage struct {
 //
 // FileStorage - настройки S3-совместимого хранилища файлов.
 //
+// Queue - настройки очереди сообщений.
+//
 // Logging - настройки логирования сервиса.
 type ServerConfig struct {
 	HTTPServerAddr string      `koanf:"http_address"`
@@ -69,6 +98,7 @@ type ServerConfig struct {
 	TLSKeyPath     string      `koanf:"tls_key"`
 	DatabaseURI    string      `koanf:"database_uri"`
 	FileStorage    FileStorage `koanf:"file_storage"`
+	Queue          Queue       `koanf:"queue"`
 	Logging        Logging     `koanf:"logging"`
 }
 
@@ -100,6 +130,12 @@ func parseFlags(args []string) (*pflag.FlagSet, string, error) {
 	flags.String("file-storage.secret-key", "", "S3-compatible file storage secret key")
 	flags.String("file-storage.bucket", "", "S3-compatible file storage bucket")
 	flags.Bool("file-storage.use-ssl", false, "use SSL for S3-compatible file storage")
+	flags.String("queue.url", "", "message queue connection URL")
+	flags.String("queue.exchange", "", "message queue exchange name")
+	flags.String("queue.avatar-processing-queue", "", "avatar processing queue")
+	flags.String("queue.avatar-deletion-queue", "", "avatar deletion queue")
+	flags.String("queue.avatar-processing-routing-key", "", "avatar processing routing key")
+	flags.String("queue.avatar-deletion-routing-key", "", "avatar deletion routing key")
 	flags.String("logging.format", "", "log format: text or json")
 	flags.String("logging.level", "", "log level: debug, info, warn or error")
 	flags.Bool("logging.add-source", false, "add source location to logs")
@@ -116,13 +152,18 @@ func parseFlags(args []string) (*pflag.FlagSet, string, error) {
 
 func serverDefaults() map[string]any {
 	return map[string]any{
-		configKey("logging", "format"):       defaultLoggingFormat,
-		configKey("logging", "level"):        defaultLoggingLevel,
-		configKey("logging", "add_source"):   defaultLoggingAddSource,
-		configKey("http_address"):            defaultHTTPServerAddr,
-		configKey("tls_cert"):                defaultTLSCertPath,
-		configKey("tls_key"):                 defaultTLSKeyPath,
-		configKey("file_storage", "use_ssl"): defaultFileStorageUseSSL,
+		configKey("logging", "format"):                      defaultLoggingFormat,
+		configKey("logging", "level"):                       defaultLoggingLevel,
+		configKey("logging", "add_source"):                  defaultLoggingAddSource,
+		configKey("http_address"):                           defaultHTTPServerAddr,
+		configKey("tls_cert"):                               defaultTLSCertPath,
+		configKey("tls_key"):                                defaultTLSKeyPath,
+		configKey("file_storage", "use_ssl"):                defaultFileStorageUseSSL,
+		configKey("queue", "exchange"):                      defaultQueueExchange,
+		configKey("queue", "avatar_processing_queue"):       defaultQueueProcessQueue,
+		configKey("queue", "avatar_deletion_queue"):         defaultQueueDeleteQueue,
+		configKey("queue", "avatar_processing_routing_key"): defaultQueueProcessKey,
+		configKey("queue", "avatar_deletion_routing_key"):   defaultQueueDeleteKey,
 	}
 }
 
@@ -150,6 +191,24 @@ func validateServerConfig(cfg ServerConfig) error {
 	}
 	if cfg.FileStorage.Bucket == "" {
 		return errors.New("file storage bucket is required")
+	}
+	if cfg.Queue.URL == "" {
+		return errors.New("queue URL is required")
+	}
+	if cfg.Queue.Exchange == "" {
+		return errors.New("queue exchange is required")
+	}
+	if cfg.Queue.AvatarProcessingQueue == "" {
+		return errors.New("queue avatar processing queue is required")
+	}
+	if cfg.Queue.AvatarDeletionQueue == "" {
+		return errors.New("queue avatar deletion queue is required")
+	}
+	if cfg.Queue.AvatarProcessingRoutingKey == "" {
+		return errors.New("queue avatar processing routing key is required")
+	}
+	if cfg.Queue.AvatarDeletionRoutingKey == "" {
+		return errors.New("queue avatar deletion routing key is required")
 	}
 	return nil
 }

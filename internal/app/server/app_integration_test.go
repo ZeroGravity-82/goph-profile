@@ -14,7 +14,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
 )
 
-// TestApp_NewRunAndClose_Integration проверяет сборку серверного приложения на реальных PostgreSQL и MinIO.
+// TestApp_NewRunAndClose_Integration проверяет сборку серверного приложения на реальных PostgreSQL, MinIO и RabbitMQ.
 func TestApp_NewRunAndClose_Integration(t *testing.T) {
 	// Arrange
 	cfg := integrationServerConfig(t)
@@ -67,9 +67,14 @@ func integrationServerConfig(t *testing.T) config.ServerConfig {
 	fileStorageAccessKey := os.Getenv("TEST_FILE_STORAGE_ACCESS_KEY")
 	fileStorageSecretKey := os.Getenv("TEST_FILE_STORAGE_SECRET_KEY")
 	fileStorageBucket := os.Getenv("TEST_FILE_STORAGE_BUCKET")
+	rabbitMQURL := os.Getenv("TEST_QUEUE_URL")
+	if rabbitMQURL == "" {
+		t.Skip("TEST_QUEUE_URL is not set")
+	}
 	require.NotEmpty(t, fileStorageAccessKey)
 	require.NotEmpty(t, fileStorageSecretKey)
 	require.NotEmpty(t, fileStorageBucket)
+	require.NotEmpty(t, rabbitMQURL)
 
 	repoRoot := filepath.Clean(filepath.Join("..", "..", ".."))
 	return config.ServerConfig{
@@ -83,6 +88,14 @@ func integrationServerConfig(t *testing.T) config.ServerConfig {
 			SecretKey: fileStorageSecretKey,
 			Bucket:    fileStorageBucket,
 			UseSSL:    false,
+		},
+		Queue: config.Queue{
+			URL:                        rabbitMQURL,
+			Exchange:                   "goph-profile.integration.avatar",
+			AvatarProcessingQueue:      "goph-profile.integration.avatar-processing",
+			AvatarDeletionQueue:        "goph-profile.integration.avatar-deletion",
+			AvatarProcessingRoutingKey: "avatar.process",
+			AvatarDeletionRoutingKey:   "avatar.delete",
 		},
 	}
 }
