@@ -484,7 +484,7 @@ func (h *AvatarHandler) writeDeleteAvatarUseCaseError(w http.ResponseWriter, r *
 	writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 }
 
-// listUserAvatars парсит user_id из пути и возвращает список неудаленных аватарок пользователя.
+// listUserAvatars парсит user_id из пути и возвращает список аватарок пользователя.
 func (h *AvatarHandler) listUserAvatars(w http.ResponseWriter, r *http.Request) {
 	userID, err := parseUserIDPathParam(r)
 	if err != nil {

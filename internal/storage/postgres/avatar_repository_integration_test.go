@@ -91,7 +91,7 @@ func assertAvatarEqual(t *testing.T, want model.Avatar, got model.Avatar) {
 	assert.True(t, got.DeletedAt.Equal(*want.DeletedAt))
 }
 
-// TestAvatarRepository_ListByUserID проверяет список неудаленных аватарок пользователя.
+// TestAvatarRepository_ListByUserID проверяет, что список не содержит удаляемые, удаленные и чужие аватарки.
 func TestAvatarRepository_ListByUserID(t *testing.T) {
 	// Arrange
 	ctx := context.Background()

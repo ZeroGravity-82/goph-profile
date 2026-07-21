@@ -505,7 +505,7 @@ func avatarObjectKeys(avatar model.Avatar) []string {
 	return objectKeys
 }
 
-// ListUserAvatars возвращает список неудаленных аватарок пользователя.
+// ListUserAvatars возвращает список аватарок пользователя.
 func (uc *AvatarUseCase) ListUserAvatars(
 	ctx context.Context,
 	in ListUserAvatarsInput,
@@ -639,7 +639,7 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 	}, nil
 }
 
-// GetAvatar возвращает файл готовой неудаленной аватарки.
+// GetAvatar возвращает файл готовой аватарки.
 func (uc *AvatarUseCase) GetAvatar(ctx context.Context, in GetAvatarInput) (GetAvatarOutput, error) {
 	if in.AvatarID == uuid.Nil {
 		return GetAvatarOutput{}, model.ErrInvalidID

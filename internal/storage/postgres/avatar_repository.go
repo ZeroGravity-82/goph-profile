@@ -62,7 +62,7 @@ WHERE id = $1`
 	}, nil
 }
 
-// ListByUserID возвращает неудаленные аватарки пользователя.
+// ListByUserID возвращает аватарки пользователя.
 func (r *AvatarRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Avatar, error) {
 	const q = `
 SELECT id, user_id, file_name, mime_type, size_bytes, width, height, object_key_original, object_key_thumb_100,

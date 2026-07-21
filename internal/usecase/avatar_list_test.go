@@ -13,7 +13,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 )
 
-// TestAvatarUseCase_ListUserAvatars проверяет получение списка неудаленных аватарок пользователя.
+// TestAvatarUseCase_ListUserAvatars проверяет, что список не содержит удаляемые и чужие аватарки.
 func TestAvatarUseCase_ListUserAvatars(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
