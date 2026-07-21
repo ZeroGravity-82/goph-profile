@@ -22,7 +22,7 @@ func TestAvatarHandler_getCurrentAvatarByEmail(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustCurrentAvatarByEmailURL(t, "  User@Example.COM  "), nil)
 	response := httptest.NewRecorder()
 
@@ -44,7 +44,7 @@ func TestAvatarHandler_getCurrentAvatarByEmail_ReturnsDefaultAvatar(t *testing.T
 	avatarUseCase := &avatarUseCaseFake{
 		currentByEmailOutput: usecase.GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustCurrentAvatarByEmailURL(t, "user@example.com"), nil)
 	response := httptest.NewRecorder()
 
@@ -63,7 +63,7 @@ func TestAvatarHandler_getCurrentAvatarByEmail_ReturnsDefaultAvatar(t *testing.T
 func TestAvatarHandler_getCurrentAvatarByEmail_RejectsInvalidEmail(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatar", nil)
 	response := httptest.NewRecorder()
 
@@ -80,7 +80,7 @@ func TestAvatarHandler_getCurrentAvatarByEmail_RejectsInvalidEmail(t *testing.T)
 func TestAvatarHandler_getCurrentAvatarByEmail_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{currentByEmailErr: errors.New("storage error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustCurrentAvatarByEmailURL(t, "user@example.com"), nil)
 	response := httptest.NewRecorder()
 
@@ -102,7 +102,7 @@ func TestAvatarHandler_getCurrentAvatarByUserID(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newCurrentAvatarByUserIDRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -124,7 +124,7 @@ func TestAvatarHandler_getCurrentAvatarByUserID_ReturnsDefaultAvatar(t *testing.
 	avatarUseCase := &avatarUseCaseFake{
 		currentByUserOutput: usecase.GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newCurrentAvatarByUserIDRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -143,7 +143,7 @@ func TestAvatarHandler_getCurrentAvatarByUserID_ReturnsDefaultAvatar(t *testing.
 func TestAvatarHandler_getCurrentAvatarByUserID_RejectsInvalidUserID(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newCurrentAvatarByUserIDRequest(t, "not-a-uuid")
 	response := httptest.NewRecorder()
 
@@ -160,7 +160,7 @@ func TestAvatarHandler_getCurrentAvatarByUserID_RejectsInvalidUserID(t *testing.
 func TestAvatarHandler_getCurrentAvatarByUserID_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{currentByUserErr: errors.New("storage error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newCurrentAvatarByUserIDRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 

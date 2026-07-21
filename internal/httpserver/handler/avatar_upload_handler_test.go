@@ -30,7 +30,7 @@ func TestAvatarHandler_uploadAvatar(t *testing.T) {
 			CreatedAt: createdAt,
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -59,7 +59,7 @@ func TestAvatarHandler_uploadAvatar(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsInvalidUserID(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, "not-a-uuid", "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -76,7 +76,7 @@ func TestAvatarHandler_uploadAvatar_RejectsInvalidUserID(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsMissingFile(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequestWithoutFile(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -93,7 +93,7 @@ func TestAvatarHandler_uploadAvatar_RejectsMissingFile(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsUnsupportedFormat(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.txt", []byte("not an image"))
 	response := httptest.NewRecorder()
 
@@ -110,7 +110,7 @@ func TestAvatarHandler_uploadAvatar_RejectsUnsupportedFormat(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsTooLongFileName(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	fileName := strings.Repeat("a", maxAvatarFileNameLengthBytes+1) + ".png"
 	request := newUploadAvatarRequest(t, testUserID.String(), fileName, pngContent())
 	response := httptest.NewRecorder()
@@ -128,7 +128,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLongFileName(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	content := bytes.Repeat([]byte{0x89}, maxAvatarFileSizeBytes+1)
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", content)
 	response := httptest.NewRecorder()
@@ -150,7 +150,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{uploadErr: usecase.ErrUserNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -167,7 +167,7 @@ func TestAvatarHandler_uploadAvatar_ReturnsUserNotFound(t *testing.T) {
 func TestAvatarHandler_uploadAvatar_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{uploadErr: errors.New("database error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 

@@ -18,7 +18,7 @@ import (
 func TestAvatarHandler_selectCurrentAvatar(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -37,7 +37,7 @@ func TestAvatarHandler_selectCurrentAvatar(t *testing.T) {
 func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidUserIDHeader(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, "not-a-uuid", testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -54,7 +54,7 @@ func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidUserIDHeader(t *testing
 func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidRequestBody(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequestWithBody(
 		t,
 		testUserID.String(),
@@ -75,7 +75,7 @@ func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidRequestBody(t *testing.
 func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidAvatarID(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), "not-a-uuid")
 	response := httptest.NewRecorder()
 
@@ -92,7 +92,7 @@ func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidAvatarID(t *testing.T) 
 func TestAvatarHandler_selectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: usecase.ErrUserNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -109,7 +109,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: usecase.ErrAvatarNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -126,7 +126,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: model.ErrAvatarForbidden}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -143,7 +143,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) 
 func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarNotReady(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: model.ErrAvatarNotReady}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -160,7 +160,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarNotReady(t *testing.T) {
 func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarDeleted(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: model.ErrAvatarDeleted}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -177,7 +177,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarDeleted(t *testing.T) {
 func TestAvatarHandler_selectCurrentAvatar_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: errors.New("database error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -194,7 +194,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsInternalServerError(t *testing
 func TestAvatarHandler_deleteCurrentAvatar(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -212,7 +212,7 @@ func TestAvatarHandler_deleteCurrentAvatar(t *testing.T) {
 func TestAvatarHandler_deleteCurrentAvatar_RejectsInvalidUserIDHeader(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, "not-a-uuid")
 	response := httptest.NewRecorder()
 
@@ -229,7 +229,7 @@ func TestAvatarHandler_deleteCurrentAvatar_RejectsInvalidUserIDHeader(t *testing
 func TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: usecase.ErrUserNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -246,7 +246,7 @@ func TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: usecase.ErrAvatarNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -263,7 +263,7 @@ func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: model.ErrAvatarForbidden}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -281,7 +281,7 @@ func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarForbidden(t *testing.T) 
 func TestAvatarHandler_deleteCurrentAvatar_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: errors.New("database error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 

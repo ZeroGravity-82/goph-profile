@@ -42,7 +42,7 @@ func TestAvatarHandler_listUserAvatars(t *testing.T) {
 			},
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newListUserAvatarsRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -78,7 +78,7 @@ func TestAvatarHandler_listUserAvatars(t *testing.T) {
 func TestAvatarHandler_listUserAvatars_RejectsInvalidUserID(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newListUserAvatarsRequest(t, "not-a-uuid")
 	response := httptest.NewRecorder()
 
@@ -95,7 +95,7 @@ func TestAvatarHandler_listUserAvatars_RejectsInvalidUserID(t *testing.T) {
 func TestAvatarHandler_listUserAvatars_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{listAvatarsErr: usecase.ErrUserNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newListUserAvatarsRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -112,7 +112,7 @@ func TestAvatarHandler_listUserAvatars_ReturnsUserNotFound(t *testing.T) {
 func TestAvatarHandler_listUserAvatars_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{listAvatarsErr: errors.New("database error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newListUserAvatarsRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 

@@ -70,6 +70,12 @@ func NewHTTPServer(
 	if addr == "" {
 		return nil, errors.New("http server address is not provided")
 	}
+	if avatarUseCase == nil {
+		return nil, errors.New("avatar usecase is not provided")
+	}
+	if userUseCase == nil {
+		return nil, errors.New("user usecase is not provided")
+	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -84,7 +90,10 @@ func NewHTTPServer(
 
 // Run запускает HTTP-сервер и блокируется, пока не отменен контекст или сервер не остановится с ошибкой.
 func (s *HTTPServer) Run(ctx context.Context) error {
-	router := handler.NewRouter(s.avatarUseCase, s.userUseCase, s.logger)
+	router, err := handler.NewRouter(s.avatarUseCase, s.userUseCase, s.logger)
+	if err != nil {
+		return fmt.Errorf("create router: %w", err)
+	}
 	srv := &http.Server{
 		Addr:              s.addr,
 		Handler:           router,

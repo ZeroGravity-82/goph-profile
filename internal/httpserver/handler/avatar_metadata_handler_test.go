@@ -41,7 +41,7 @@ func TestAvatarHandler_getAvatarMetadata(t *testing.T) {
 			UpdatedAt:         updatedAt,
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarMetadataRequest(t, testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -78,7 +78,7 @@ func TestAvatarHandler_getAvatarMetadata(t *testing.T) {
 func TestAvatarHandler_getAvatarMetadata_RejectsInvalidAvatarID(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarMetadataRequest(t, "not-a-uuid")
 	response := httptest.NewRecorder()
 
@@ -95,7 +95,7 @@ func TestAvatarHandler_getAvatarMetadata_RejectsInvalidAvatarID(t *testing.T) {
 func TestAvatarHandler_getAvatarMetadata_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{metadataErr: usecase.ErrAvatarNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarMetadataRequest(t, testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -112,7 +112,7 @@ func TestAvatarHandler_getAvatarMetadata_ReturnsAvatarNotFound(t *testing.T) {
 func TestAvatarHandler_getAvatarMetadata_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{metadataErr: errors.New("database error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarMetadataRequest(t, testAvatarID.String())
 	response := httptest.NewRecorder()
 

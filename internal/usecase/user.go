@@ -43,9 +43,6 @@ func (uc *UserUseCase) ResolveUserByEmail(
 	ctx context.Context,
 	email model.Email,
 ) (ResolveUserByEmailOutput, error) {
-	if uc.userRepo == nil {
-		return ResolveUserByEmailOutput{}, errors.New("user repository is not provided")
-	}
 	if err := email.Validate(); err != nil {
 		return ResolveUserByEmailOutput{}, err
 	}

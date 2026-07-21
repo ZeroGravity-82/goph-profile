@@ -26,7 +26,7 @@ func TestUserHandler_resolveUserByEmail(t *testing.T) {
 			Email: model.Email("user@example.com"),
 		},
 	}
-	handler := NewUserHandler(userUseCase, discardLogger())
+	handler := mustUserHandler(t, userUseCase, discardLogger())
 	request := newResolveUserRequest(t, "  User@Example.COM  ")
 	response := httptest.NewRecorder()
 
@@ -48,7 +48,7 @@ func TestUserHandler_resolveUserByEmail(t *testing.T) {
 func TestUserHandler_resolveUserByEmail_RejectsInvalidJSON(t *testing.T) {
 	// Arrange
 	userUseCase := &userUseCaseFake{}
-	handler := NewUserHandler(userUseCase, discardLogger())
+	handler := mustUserHandler(t, userUseCase, discardLogger())
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/users/resolve", bytes.NewBufferString("{"))
 	response := httptest.NewRecorder()
 
@@ -79,7 +79,7 @@ func TestUserHandler_resolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			userUseCase := &userUseCaseFake{}
-			handler := NewUserHandler(userUseCase, discardLogger())
+			handler := mustUserHandler(t, userUseCase, discardLogger())
 			request := newResolveUserRequest(t, tt.email)
 			response := httptest.NewRecorder()
 
@@ -98,7 +98,7 @@ func TestUserHandler_resolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
 func TestUserHandler_resolveUserByEmail_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	userUseCase := &userUseCaseFake{resolveErr: errors.New("database error")}
-	handler := NewUserHandler(userUseCase, discardLogger())
+	handler := mustUserHandler(t, userUseCase, discardLogger())
 	request := newResolveUserRequest(t, "user@example.com")
 	response := httptest.NewRecorder()
 

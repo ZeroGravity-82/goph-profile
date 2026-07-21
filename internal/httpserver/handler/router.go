@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +26,7 @@ const apiPathPrefix = "/api/v1"
 //	POST /api/v1/users/resolve
 //	PATCH /api/v1/avatar
 //	DELETE /api/v1/avatar
-func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slog.Logger) http.Handler {
+func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slog.Logger) (http.Handler, error) {
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -37,8 +38,14 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 		withLogging(logger),
 		withGzip(logger),
 	)
-	avatarHandler := NewAvatarHandler(avatarUseCase, logger)
-	userHandler := NewUserHandler(userUseCase, logger)
+	avatarHandler, err := NewAvatarHandler(avatarUseCase, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create avatar handler: %w", err)
+	}
+	userHandler, err := NewUserHandler(userUseCase, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create user handler: %w", err)
+	}
 
 	r.Route(apiPathPrefix, func(r chi.Router) {
 		r.With(middleware.AllowContentType("multipart/form-data")).Post("/avatars", avatarHandler.uploadAvatar)
@@ -53,5 +60,5 @@ func NewRouter(avatarUseCase avatarUseCase, userUseCase userUseCase, logger *slo
 		r.Delete("/avatar", avatarHandler.deleteCurrentAvatar)
 	})
 
-	return r
+	return r, nil
 }

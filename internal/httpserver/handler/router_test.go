@@ -18,7 +18,7 @@ import (
 func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -34,7 +34,7 @@ func TestNewRouter_UploadAvatarRoute(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, nil)
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, nil)
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()
 
@@ -51,7 +51,7 @@ func TestNewRouter_UploadAvatarRoute_WithNilLogger(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequestToPath(
 		t,
 		"/api/v1/avatars/",
@@ -72,7 +72,7 @@ func TestNewRouter_UploadAvatarRoute_StripsTrailingSlash(t *testing.T) {
 // TestNewRouter_ReturnsMethodNotAllowed проверяет ошибку неподдержанного HTTP-метода.
 func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 	// Arrange
-	router := NewRouter(&avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, &avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/avatars", nil)
 	response := httptest.NewRecorder()
 
@@ -86,7 +86,7 @@ func TestNewRouter_ReturnsMethodNotAllowed(t *testing.T) {
 // TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType проверяет ошибку неподдерживаемого content-type.
 func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 	// Arrange
-	router := NewRouter(&avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, &avatarUseCaseFake{}, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", bytes.NewBufferString("{}"))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-User-ID", testUserID.String())
@@ -104,7 +104,7 @@ func TestNewRouter_UploadAvatarRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	gzipRequestBody(t, request)
 	response := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestNewRouter_UploadAvatarRoute_ReadsGzipRequest(t *testing.T) {
 func TestNewRouter_SelectCurrentAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
 
@@ -139,7 +139,7 @@ func TestNewRouter_SelectCurrentAvatarRoute(t *testing.T) {
 func TestNewRouter_DeleteCurrentAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
 
@@ -156,7 +156,7 @@ func TestNewRouter_DeleteCurrentAvatarRoute(t *testing.T) {
 func TestNewRouter_DeleteAvatarRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodDelete, mustAvatarURL(t, testAvatarID.String()), nil)
 	request.Header.Set("X-User-ID", testUserID.String())
 	response := httptest.NewRecorder()
@@ -175,7 +175,7 @@ func TestNewRouter_DeleteAvatarRoute(t *testing.T) {
 func TestNewRouter_AvatarMetadataRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustAvatarMetadataURL(t, testAvatarID.String()), nil)
 	response := httptest.NewRecorder()
 
@@ -197,7 +197,7 @@ func TestNewRouter_GetAvatarRoute(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustAvatarURL(t, testAvatarID.String()), nil)
 	response := httptest.NewRecorder()
 
@@ -219,7 +219,7 @@ func TestNewRouter_CurrentAvatarByEmailRoute(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	request := httptest.NewRequest(http.MethodGet, mustCurrentAvatarByEmailURL(t, "user@example.com"), nil)
 	response := httptest.NewRecorder()
 
@@ -241,7 +241,7 @@ func TestNewRouter_CurrentAvatarByUserIDRoute(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	currentAvatarURL, err := url.JoinPath("/api/v1/users", testUserID.String(), "avatar")
 	require.NoError(t, err)
 	request := httptest.NewRequest(http.MethodGet, currentAvatarURL, nil)
@@ -260,7 +260,7 @@ func TestNewRouter_CurrentAvatarByUserIDRoute(t *testing.T) {
 func TestNewRouter_ListUserAvatarsRoute(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	router := NewRouter(avatarUseCase, &userUseCaseFake{}, discardLogger())
+	router := mustRouter(t, avatarUseCase, &userUseCaseFake{}, discardLogger())
 	userAvatarsURL, err := url.JoinPath("/api/v1/users", testUserID.String(), "avatars")
 	require.NoError(t, err)
 	request := httptest.NewRequest(http.MethodGet, userAvatarsURL, nil)
@@ -284,7 +284,7 @@ func TestNewRouter_UserResolveRoute(t *testing.T) {
 			Email: model.Email("user@example.com"),
 		},
 	}
-	router := NewRouter(&avatarUseCaseFake{}, userUseCase, discardLogger())
+	router := mustRouter(t, &avatarUseCaseFake{}, userUseCase, discardLogger())
 	request := newResolveUserRequest(t, "user@example.com")
 	response := httptest.NewRecorder()
 
@@ -300,7 +300,7 @@ func TestNewRouter_UserResolveRoute(t *testing.T) {
 func TestNewRouter_UserResolveRoute_ReturnsUnsupportedMediaType(t *testing.T) {
 	// Arrange
 	userUseCase := &userUseCaseFake{}
-	router := NewRouter(&avatarUseCaseFake{}, userUseCase, discardLogger())
+	router := mustRouter(t, &avatarUseCaseFake{}, userUseCase, discardLogger())
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/users/resolve",

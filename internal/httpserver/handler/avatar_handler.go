@@ -83,7 +83,10 @@ type AvatarHandler struct {
 func NewAvatarHandler(
 	avatarUseCase avatarUseCase,
 	logger *slog.Logger,
-) *AvatarHandler {
+) (*AvatarHandler, error) {
+	if avatarUseCase == nil {
+		return nil, errors.New("avatar usecase is not provided")
+	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -91,7 +94,7 @@ func NewAvatarHandler(
 	return &AvatarHandler{
 		avatarUseCase: avatarUseCase,
 		logger:        logger,
-	}
+	}, nil
 }
 
 // uploadAvatar парсит multipart-запрос, проверяет X-User-ID и передает файл в сценарий загрузки аватарки.

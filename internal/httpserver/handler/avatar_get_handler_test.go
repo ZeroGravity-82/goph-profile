@@ -22,7 +22,7 @@ func TestAvatarHandler_getAvatar(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "100x100", "png")
 	response := httptest.NewRecorder()
 
@@ -49,7 +49,7 @@ func TestAvatarHandler_getAvatar_UsesOriginalSizeByDefault(t *testing.T) {
 			MIMEType: model.MIMEPNG,
 		},
 	}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "", "")
 	response := httptest.NewRecorder()
 
@@ -67,7 +67,7 @@ func TestAvatarHandler_getAvatar_UsesOriginalSizeByDefault(t *testing.T) {
 func TestAvatarHandler_getAvatar_RejectsInvalidAvatarID(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, "not-a-uuid", "", "")
 	response := httptest.NewRecorder()
 
@@ -84,7 +84,7 @@ func TestAvatarHandler_getAvatar_RejectsInvalidAvatarID(t *testing.T) {
 func TestAvatarHandler_getAvatar_RejectsInvalidSize(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "200x200", "")
 	response := httptest.NewRecorder()
 
@@ -101,7 +101,7 @@ func TestAvatarHandler_getAvatar_RejectsInvalidSize(t *testing.T) {
 func TestAvatarHandler_getAvatar_RejectsInvalidFormat(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "", "gif")
 	response := httptest.NewRecorder()
 
@@ -118,7 +118,7 @@ func TestAvatarHandler_getAvatar_RejectsInvalidFormat(t *testing.T) {
 func TestAvatarHandler_getAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{getAvatarErr: usecase.ErrAvatarNotFound}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "", "")
 	response := httptest.NewRecorder()
 
@@ -135,7 +135,7 @@ func TestAvatarHandler_getAvatar_ReturnsAvatarNotFound(t *testing.T) {
 func TestAvatarHandler_getAvatar_ReturnsFormatMismatch(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{getAvatarErr: model.ErrInvalidAvatarMetadata}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "", "jpeg")
 	response := httptest.NewRecorder()
 
@@ -152,7 +152,7 @@ func TestAvatarHandler_getAvatar_ReturnsFormatMismatch(t *testing.T) {
 func TestAvatarHandler_getAvatar_ReturnsInternalServerError(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{getAvatarErr: errors.New("storage error")}
-	handler := NewAvatarHandler(avatarUseCase, discardLogger())
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "", "")
 	response := httptest.NewRecorder()
 

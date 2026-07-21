@@ -28,7 +28,10 @@ type UserHandler struct {
 func NewUserHandler(
 	userUseCase userUseCase,
 	logger *slog.Logger,
-) *UserHandler {
+) (*UserHandler, error) {
+	if userUseCase == nil {
+		return nil, errors.New("user usecase is not provided")
+	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
@@ -36,7 +39,7 @@ func NewUserHandler(
 	return &UserHandler{
 		userUseCase: userUseCase,
 		logger:      logger,
-	}
+	}, nil
 }
 
 // resolveUserByEmail парсит JSON-запрос и передает email в сценарий определения пользователя.

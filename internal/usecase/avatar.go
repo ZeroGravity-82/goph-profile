@@ -277,19 +277,6 @@ func NewAvatarUseCase(
 
 // UploadAvatar загружает аватарку.
 func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput) (UploadAvatarOutput, error) {
-	if uc.userRepo == nil {
-		return UploadAvatarOutput{}, errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return UploadAvatarOutput{}, errors.New("avatar repository is not provided")
-	}
-	if uc.fileStorage == nil {
-		return UploadAvatarOutput{}, errors.New("file storage is not provided")
-	}
-	if uc.publisher == nil {
-		return UploadAvatarOutput{}, errors.New("avatar message publisher is not provided")
-	}
-
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return UploadAvatarOutput{}, fmt.Errorf("failed to create avatar id: %w", err)
@@ -381,13 +368,6 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 	ctx context.Context,
 	in SelectCurrentAvatarInput,
 ) error {
-	if uc.userRepo == nil {
-		return errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return errors.New("avatar repository is not provided")
-	}
-
 	user, err := uc.userRepo.GetByID(ctx, in.UserID)
 	if err != nil {
 		return fmt.Errorf("get user by id: %w", err)
@@ -415,19 +395,6 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 
 // DeleteCurrentAvatar удаляет текущую аватарку пользователя.
 func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurrentAvatarInput) error {
-	if uc.userRepo == nil {
-		return errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return errors.New("avatar repository is not provided")
-	}
-	if uc.transactor == nil {
-		return errors.New("transactor is not provided")
-	}
-	if uc.publisher == nil {
-		return errors.New("avatar message publisher is not provided")
-	}
-
 	var message AvatarDeletionMessage
 	shouldPublish := false
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -482,19 +449,6 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 
 // DeleteAvatar удаляет аватарку пользователя.
 func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput) error {
-	if uc.userRepo == nil {
-		return errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return errors.New("avatar repository is not provided")
-	}
-	if uc.transactor == nil {
-		return errors.New("transactor is not provided")
-	}
-	if uc.publisher == nil {
-		return errors.New("avatar message publisher is not provided")
-	}
-
 	var message AvatarDeletionMessage
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
 		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
@@ -557,13 +511,6 @@ func (uc *AvatarUseCase) ListUserAvatars(
 	ctx context.Context,
 	in ListUserAvatarsInput,
 ) (ListUserAvatarsOutput, error) {
-	if uc.userRepo == nil {
-		return ListUserAvatarsOutput{}, errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return ListUserAvatarsOutput{}, errors.New("avatar repository is not provided")
-	}
-
 	user, err := uc.userRepo.GetByID(ctx, in.UserID)
 	if err != nil {
 		return ListUserAvatarsOutput{}, fmt.Errorf("get user by id: %w", err)
@@ -612,16 +559,6 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 	ctx context.Context,
 	in MarkAvatarReadyInput,
 ) (MarkAvatarReadyOutput, error) {
-	if uc.userRepo == nil {
-		return MarkAvatarReadyOutput{}, errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return MarkAvatarReadyOutput{}, errors.New("avatar repository is not provided")
-	}
-	if uc.transactor == nil {
-		return MarkAvatarReadyOutput{}, errors.New("transactor is not provided")
-	}
-
 	var avatar model.Avatar
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
@@ -682,10 +619,6 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 	ctx context.Context,
 	in MarkAvatarFailedInput,
 ) (MarkAvatarFailedOutput, error) {
-	if uc.avatarRepo == nil {
-		return MarkAvatarFailedOutput{}, errors.New("avatar repository is not provided")
-	}
-
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
 		return MarkAvatarFailedOutput{}, fmt.Errorf("get avatar by id: %w", err)
@@ -709,12 +642,6 @@ func (uc *AvatarUseCase) MarkAvatarFailed(
 
 // GetAvatar возвращает файл готовой неудаленной аватарки.
 func (uc *AvatarUseCase) GetAvatar(ctx context.Context, in GetAvatarInput) (GetAvatarOutput, error) {
-	if uc.avatarRepo == nil {
-		return GetAvatarOutput{}, errors.New("avatar repository is not provided")
-	}
-	if uc.fileStorage == nil {
-		return GetAvatarOutput{}, errors.New("file storage is not provided")
-	}
 	if in.AvatarID == uuid.Nil {
 		return GetAvatarOutput{}, model.ErrInvalidID
 	}
@@ -772,10 +699,6 @@ func (uc *AvatarUseCase) GetAvatarMetadata(
 	ctx context.Context,
 	in GetAvatarMetadataInput,
 ) (GetAvatarMetadataOutput, error) {
-	if uc.avatarRepo == nil {
-		return GetAvatarMetadataOutput{}, errors.New("avatar repository is not provided")
-	}
-
 	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
 	if err != nil {
 		return GetAvatarMetadataOutput{}, fmt.Errorf("get avatar by id: %w", err)
@@ -808,15 +731,6 @@ func (uc *AvatarUseCase) GetCurrentAvatarByEmail(
 	ctx context.Context,
 	in GetCurrentAvatarByEmailInput,
 ) (GetCurrentAvatarByEmailOutput, error) {
-	if uc.userRepo == nil {
-		return GetCurrentAvatarByEmailOutput{}, errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return GetCurrentAvatarByEmailOutput{}, errors.New("avatar repository is not provided")
-	}
-	if uc.fileStorage == nil {
-		return GetCurrentAvatarByEmailOutput{}, errors.New("file storage is not provided")
-	}
 	if err := in.Email.Validate(); err != nil {
 		return GetCurrentAvatarByEmailOutput{}, err
 	}
@@ -849,15 +763,6 @@ func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
 	ctx context.Context,
 	in GetCurrentAvatarByUserIDInput,
 ) (GetCurrentAvatarByUserIDOutput, error) {
-	if uc.userRepo == nil {
-		return GetCurrentAvatarByUserIDOutput{}, errors.New("user repository is not provided")
-	}
-	if uc.avatarRepo == nil {
-		return GetCurrentAvatarByUserIDOutput{}, errors.New("avatar repository is not provided")
-	}
-	if uc.fileStorage == nil {
-		return GetCurrentAvatarByUserIDOutput{}, errors.New("file storage is not provided")
-	}
 	if in.UserID == uuid.Nil {
 		return GetCurrentAvatarByUserIDOutput{}, model.ErrInvalidID
 	}
