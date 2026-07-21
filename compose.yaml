@@ -22,8 +22,8 @@ services:
       - '9000:9000' # Порт для API (S3)
       - '9001:9001' # Порт для веб-консоли управления
     environment:
-      MINIO_ROOT_USER: gophkeeper
-      MINIO_ROOT_PASSWORD: gophkeeperpassword
+      MINIO_ROOT_USER: gophprofile
+      MINIO_ROOT_PASSWORD: userpassword
     volumes:
       - minio-data:/data:rw
     healthcheck:
