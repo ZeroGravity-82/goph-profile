@@ -2,6 +2,7 @@ package imageproc
 
 import (
 	"bytes"
+	"encoding/base64"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -44,6 +45,22 @@ func TestBuildAvatarThumbnails_DecodesJPEG(t *testing.T) {
 	assertPNGSize(t, thumbnails.Thumb300, 300, 300)
 }
 
+// TestBuildAvatarThumbnails_DecodesWebP проверяет обработку WebP-файла.
+func TestBuildAvatarThumbnails_DecodesWebP(t *testing.T) {
+	// Arrange
+	content := testWebP(t)
+
+	// Act
+	thumbnails, err := BuildAvatarThumbnails(content)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, 1, thumbnails.Width)
+	assert.Equal(t, 1, thumbnails.Height)
+	assertPNGSize(t, thumbnails.Thumb100, 100, 100)
+	assertPNGSize(t, thumbnails.Thumb300, 300, 300)
+}
+
 // testPNG создает PNG-файл заданного размера.
 func testPNG(t *testing.T, width int, height int) []byte {
 	t.Helper()
@@ -62,6 +79,15 @@ func testJPEG(t *testing.T, width int, height int) []byte {
 	var buf bytes.Buffer
 	require.NoError(t, jpeg.Encode(&buf, img, nil))
 	return buf.Bytes()
+}
+
+// testWebP возвращает минимальный WebP-файл 1x1.
+func testWebP(t *testing.T) []byte {
+	t.Helper()
+
+	content, err := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
+	require.NoError(t, err)
+	return content
 }
 
 // testImage создает тестовое изображение заданного размера.
