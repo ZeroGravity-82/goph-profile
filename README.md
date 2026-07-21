@@ -581,26 +581,30 @@ tls_key
 
 ## Локальный запуск
 
-Команды будут уточнены после создания кода, Makefile и compose-файлов.
-
-Локальный сценарий после появления кода и скрипта генерации сертификатов будет следующим:
+Сгенерируйте локальные TLS-сертификаты, если их еще нет:
 
 ```bash
 ./certs/generate-local-certs.sh
-make up
-make test
-make lint
-go run ./cmd/server -c config/server.local.yaml
-go run ./cmd/worker -c config/worker.local.yaml
 ```
 
-Локальная инфраструктура MVP:
+Запустите локальные PostgreSQL и MinIO:
+
+```bash
+docker compose up -d
+```
+
+Запустите сервер:
+
+```bash
+go run ./cmd/server -c config/server.local.yaml
+```
+
+Текущая локальная инфраструктура:
 
 - PostgreSQL;
-- MinIO;
-- RabbitMQ;
-- server;
-- воркер.
+- MinIO.
+
+RabbitMQ и воркер асинхронной обработки будут добавлены отдельным шагом.
 
 Dockerfile должен быть multi-stage: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками `server` и `worker`. Web-ресурсы копируются в runtime-образ рядом с `server`; их использует только HTTP-сервер для раздачи SPA и `default-avatar.png`.
 
@@ -613,13 +617,22 @@ go test ./...
 golangci-lint run
 ```
 
-Интеграционные тесты, которым нужны PostgreSQL, MinIO или RabbitMQ, должны запускаться отдельной командой или с build tag `integration`:
+Интеграционные тесты, которым нужны PostgreSQL, MinIO или RabbitMQ, должны запускаться отдельной командой или с тегом сборки `integration`:
 
 ```bash
-go test -tags=integration ./...
+docker compose -f compose.test.yaml up -d
+
+TEST_DATABASE_URI='postgres://gophprofile:userpassword@localhost:15432/gophprofile_test?sslmode=disable' \
+TEST_FILE_STORAGE_ENDPOINT='localhost:19000' \
+TEST_FILE_STORAGE_ACCESS_KEY='gophprofile' \
+TEST_FILE_STORAGE_SECRET_KEY='userpassword' \
+TEST_FILE_STORAGE_BUCKET='goph-profile-test' \
+  go test -tags=integration ./...
+
+docker compose -f compose.test.yaml down
 ```
 
-Для изолированного тестового окружения используется `testcontainers-go`, если тесту нужен реальный PostgreSQL, MinIO или RabbitMQ.
+Для изолированного тестового окружения используется `compose.test.yaml`. Тестовые PostgreSQL и MinIO работают на отдельных портах и используют `tmpfs`, чтобы не сохранять данные между запусками.
 
 Целевое покрытие тестами для MVP - больше 50%. Способ расчета покрытия нужно уточнить после появления структуры пакетов.
 
