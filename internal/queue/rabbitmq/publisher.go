@@ -18,7 +18,7 @@ const (
 	publishTimeout = 5 * time.Second
 )
 
-// Config описывает настройки RabbitMQ publisher для задач аватарок.
+// Config описывает настройки паблишера RabbitMQ для задач аватарок.
 type Config struct {
 	URL                        string
 	Exchange                   string
@@ -28,7 +28,7 @@ type Config struct {
 	AvatarDeletionRoutingKey   string
 }
 
-// Publisher публикует задачи по аватаркам в RabbitMQ.
+// Publisher публикует задачи аватарок в RabbitMQ.
 type Publisher struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
@@ -36,7 +36,7 @@ type Publisher struct {
 	mu      sync.Mutex
 }
 
-// NewPublisher создает подключение к RabbitMQ, включает publisher confirms и объявляет обменник, очереди и связи
+// NewPublisher создает подключение к RabbitMQ, включает подтверждения публикации и создает обменник, очереди и связи
 // между ними.
 func NewPublisher(ctx context.Context, cfg Config) (*Publisher, error) {
 	if err := validateConfig(cfg); err != nil {
@@ -62,6 +62,7 @@ func NewPublisher(ctx context.Context, cfg Config) (*Publisher, error) {
 	return publisher, nil
 }
 
+// validateConfig проверяет обязательные настройки подключения и очередей RabbitMQ.
 func validateConfig(cfg Config) error {
 	if strings.TrimSpace(cfg.URL) == "" {
 		return errors.New("rabbitmq URL is not provided")
@@ -84,6 +85,7 @@ func validateConfig(cfg Config) error {
 	return nil
 }
 
+// newPublisherWithConnection создает канал RabbitMQ, включает подтверждения публикации и готовит очереди.
 func newPublisherWithConnection(conn *amqp.Connection, cfg Config) (*Publisher, error) {
 	channel, err := conn.Channel()
 	if err != nil {
@@ -92,7 +94,7 @@ func newPublisherWithConnection(conn *amqp.Connection, cfg Config) (*Publisher, 
 
 	if err = channel.Confirm(false); err != nil {
 		_ = channel.Close()
-		return nil, fmt.Errorf("failed to enable rabbitmq publisher confirms: %w", err)
+		return nil, fmt.Errorf("failed to enable rabbitmq publish confirmations: %w", err)
 	}
 	publisher := &Publisher{
 		conn:    conn,
@@ -140,17 +142,26 @@ type avatarProcessingMessage struct {
 
 // PublishAvatarProcessing публикует задачу обработки исходного файла аватарки.
 func (p *Publisher) PublishAvatarProcessing(ctx context.Context, message usecase.AvatarProcessingMessage) error {
-	payload := avatarProcessingMessage{
+	return p.publishJSON(
+		ctx,
+		p.cfg.AvatarProcessingRoutingKey,
+		avatarProcessingMessageID(message),
+		newAvatarProcessingMessage(message),
+	)
+}
+
+// newAvatarProcessingMessage преобразует задачу обработки аватарки в JSON-сообщение RabbitMQ.
+func newAvatarProcessingMessage(message usecase.AvatarProcessingMessage) avatarProcessingMessage {
+	return avatarProcessingMessage{
 		AvatarID:          message.AvatarID.String(),
 		UserID:            message.UserID.String(),
 		ObjectKeyOriginal: message.ObjectKeyOriginal,
 	}
-	return p.publishJSON(
-		ctx,
-		p.cfg.AvatarProcessingRoutingKey,
-		"avatar-processing:"+message.AvatarID.String(),
-		payload,
-	)
+}
+
+// avatarProcessingMessageID возвращает стабильный идентификатор сообщения обработки аватарки.
+func avatarProcessingMessageID(message usecase.AvatarProcessingMessage) string {
+	return "avatar-processing:" + message.AvatarID.String()
 }
 
 type avatarDeletionMessage struct {
@@ -160,13 +171,28 @@ type avatarDeletionMessage struct {
 
 // PublishAvatarDeletion публикует задачу удаления файлов аватарки.
 func (p *Publisher) PublishAvatarDeletion(ctx context.Context, message usecase.AvatarDeletionMessage) error {
-	payload := avatarDeletionMessage{
+	return p.publishJSON(
+		ctx,
+		p.cfg.AvatarDeletionRoutingKey,
+		avatarDeletionMessageID(message),
+		newAvatarDeletionMessage(message),
+	)
+}
+
+// newAvatarDeletionMessage преобразует задачу удаления файлов аватарки в JSON-сообщение RabbitMQ.
+func newAvatarDeletionMessage(message usecase.AvatarDeletionMessage) avatarDeletionMessage {
+	return avatarDeletionMessage{
 		AvatarID:   message.AvatarID.String(),
 		ObjectKeys: message.ObjectKeys,
 	}
-	return p.publishJSON(ctx, p.cfg.AvatarDeletionRoutingKey, "avatar-deletion:"+message.AvatarID.String(), payload)
 }
 
+// avatarDeletionMessageID возвращает стабильный идентификатор сообщения удаления файлов аватарки.
+func avatarDeletionMessageID(message usecase.AvatarDeletionMessage) string {
+	return "avatar-deletion:" + message.AvatarID.String()
+}
+
+// publishJSON публикует JSON-сообщение и ждет подтверждения RabbitMQ.
 func (p *Publisher) publishJSON(ctx context.Context, routingKey string, messageID string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {

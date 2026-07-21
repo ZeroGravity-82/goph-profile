@@ -13,18 +13,16 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 )
 
-// TestAvatarUseCase_MarkAvatarFailed проверяет завершение обработки аватарки ошибкой.
-func TestAvatarUseCase_MarkAvatarFailed(t *testing.T) {
+// TestAvatarWorkerUseCase_MarkAvatarFailed проверяет завершение обработки аватарки ошибкой.
+func TestAvatarWorkerUseCase_MarkAvatarFailed(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(
+	useCase := mustAvatarWorkerUseCase(
 		t,
 		&avatarUserRepositoryFake{},
 		avatarRepo,
-		&fileStoreFake{},
-		&avatarMessagePublisherFake{},
 	)
 	input := MarkAvatarFailedInput{AvatarID: testAvatarID}
 
@@ -41,17 +39,15 @@ func TestAvatarUseCase_MarkAvatarFailed(t *testing.T) {
 	assert.Equal(t, model.AvatarStatusFailed, avatarRepo.updated[0].Status)
 }
 
-// TestAvatarUseCase_MarkAvatarFailed_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки.
-func TestAvatarUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T) {
+// TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки.
+func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
-	useCase := mustAvatarUseCase(
+	useCase := mustAvatarWorkerUseCase(
 		t,
 		&avatarUserRepositoryFake{},
 		avatarRepo,
-		&fileStoreFake{},
-		&avatarMessagePublisherFake{},
 	)
 
 	// Act
@@ -64,18 +60,16 @@ func TestAvatarUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T) {
 	assert.Empty(t, avatarRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarFailed_ReturnsInvalidTransition проверяет ошибку недопустимого перехода статуса.
-func TestAvatarUseCase_MarkAvatarFailed_ReturnsInvalidTransition(t *testing.T) {
+// TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsInvalidTransition проверяет ошибку недопустимого перехода статуса.
+func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsInvalidTransition(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	avatarRepo := &avatarRepositoryFake{avatar: mustReadyUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(
+	useCase := mustAvatarWorkerUseCase(
 		t,
 		&avatarUserRepositoryFake{},
 		avatarRepo,
-		&fileStoreFake{},
-		&avatarMessagePublisherFake{},
 	)
 
 	// Act
@@ -88,19 +82,17 @@ func TestAvatarUseCase_MarkAvatarFailed_ReturnsInvalidTransition(t *testing.T) {
 	assert.Empty(t, avatarRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarFailed_ReturnsUpdateAvatarError проверяет ошибку сохранения аватарки.
-func TestAvatarUseCase_MarkAvatarFailed_ReturnsUpdateAvatarError(t *testing.T) {
+// TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsUpdateAvatarError проверяет ошибку сохранения аватарки.
+func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsUpdateAvatarError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	updateErr := errors.New("update avatar error")
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now), updateErr: updateErr}
-	useCase := mustAvatarUseCase(
+	useCase := mustAvatarWorkerUseCase(
 		t,
 		&avatarUserRepositoryFake{},
 		avatarRepo,
-		&fileStoreFake{},
-		&avatarMessagePublisherFake{},
 	)
 
 	// Act

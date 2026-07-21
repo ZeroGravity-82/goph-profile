@@ -89,6 +89,30 @@ func TestMinIOStorage_ObjectKeyOriginal(t *testing.T) {
 	)
 }
 
+// TestMinIOStorage_ObjectKeyThumbnails проверяет стабильный формат ключей миниатюр аватарки.
+func TestMinIOStorage_ObjectKeyThumbnails(t *testing.T) {
+	// Arrange
+	storage := &MinIOStorage{}
+	userID := uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001")
+	avatarID := uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003")
+
+	// Act
+	thumb100Key := storage.ObjectKeyThumb100(userID, avatarID)
+	thumb300Key := storage.ObjectKeyThumb300(userID, avatarID)
+
+	// Assert
+	assert.Equal(
+		t,
+		"users/018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001/avatars/018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003/thumb-100.png",
+		thumb100Key,
+	)
+	assert.Equal(
+		t,
+		"users/018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001/avatars/018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003/thumb-300.png",
+		thumb300Key,
+	)
+}
+
 // TestMinIOStorage_PutRequiresObjectKey проверяет локальную валидацию ключа объекта перед записью.
 func TestMinIOStorage_PutRequiresObjectKey(t *testing.T) {
 	// Arrange

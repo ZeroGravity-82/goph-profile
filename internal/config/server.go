@@ -105,7 +105,7 @@ type ServerConfig struct {
 // LoadServer читает конфигурацию сервера с учетом приоритета "дефолтное значение < значение из конфигурационного
 // файла < переменная окружения < флаг командной строки".
 func LoadServer() (ServerConfig, error) {
-	flags, configPath, err := parseFlags(os.Args[1:])
+	flags, configPath, err := parseServerFlags(os.Args[1:])
 	if err != nil {
 		return ServerConfig{}, err
 	}
@@ -118,53 +118,30 @@ func LoadServer() (ServerConfig, error) {
 	})
 }
 
-func parseFlags(args []string) (*pflag.FlagSet, string, error) {
+func parseServerFlags(args []string) (*pflag.FlagSet, string, error) {
 	flags := pflag.NewFlagSet("goph-profile-server", pflag.ContinueOnError)
 	flags.StringP("config", "c", "", "path to config file")
 	flags.String("http-address", "", `HTTP server address (default "`+defaultHTTPServerAddr+`")`)
 	flags.String("tls-cert", "", "TLS certificate path for HTTP server")
 	flags.String("tls-key", "", "TLS private key path for HTTP server")
-	flags.String("database-uri", "", "database connection URI")
-	flags.String("file-storage.endpoint", "", "S3-compatible file storage address")
-	flags.String("file-storage.access-key", "", "S3-compatible file storage access key")
-	flags.String("file-storage.secret-key", "", "S3-compatible file storage secret key")
-	flags.String("file-storage.bucket", "", "S3-compatible file storage bucket")
-	flags.Bool("file-storage.use-ssl", false, "use SSL for S3-compatible file storage")
-	flags.String("queue.url", "", "message queue connection URL")
-	flags.String("queue.exchange", "", "message queue exchange name")
-	flags.String("queue.avatar-processing-queue", "", "avatar processing queue")
-	flags.String("queue.avatar-deletion-queue", "", "avatar deletion queue")
-	flags.String("queue.avatar-processing-routing-key", "", "avatar processing routing key")
-	flags.String("queue.avatar-deletion-routing-key", "", "avatar deletion routing key")
-	flags.String("logging.format", "", "log format: text or json")
-	flags.String("logging.level", "", "log level: debug, info, warn or error")
-	flags.Bool("logging.add-source", false, "add source location to logs")
+	addCommonFlags(flags)
 
 	if err := flags.Parse(args); err != nil {
 		return nil, "", fmt.Errorf("failed to parse CLI flags: %w", err)
 	}
-	configPath, err := flags.GetString("config")
+	configPath, err := configPathFromFlags(flags)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to read config flag: %w", err)
+		return nil, "", err
 	}
 	return flags, configPath, nil
 }
 
 func serverDefaults() map[string]any {
-	return map[string]any{
-		configKey("logging", "format"):                      defaultLoggingFormat,
-		configKey("logging", "level"):                       defaultLoggingLevel,
-		configKey("logging", "add_source"):                  defaultLoggingAddSource,
-		configKey("http_address"):                           defaultHTTPServerAddr,
-		configKey("tls_cert"):                               defaultTLSCertPath,
-		configKey("tls_key"):                                defaultTLSKeyPath,
-		configKey("file_storage", "use_ssl"):                defaultFileStorageUseSSL,
-		configKey("queue", "exchange"):                      defaultQueueExchange,
-		configKey("queue", "avatar_processing_queue"):       defaultQueueProcessQueue,
-		configKey("queue", "avatar_deletion_queue"):         defaultQueueDeleteQueue,
-		configKey("queue", "avatar_processing_routing_key"): defaultQueueProcessKey,
-		configKey("queue", "avatar_deletion_routing_key"):   defaultQueueDeleteKey,
-	}
+	defaults := commonDefaults()
+	defaults[configKey("http_address")] = defaultHTTPServerAddr
+	defaults[configKey("tls_cert")] = defaultTLSCertPath
+	defaults[configKey("tls_key")] = defaultTLSKeyPath
+	return defaults
 }
 
 func validateServerConfig(cfg ServerConfig) error {
@@ -177,38 +154,5 @@ func validateServerConfig(cfg ServerConfig) error {
 	if cfg.TLSKeyPath == "" {
 		return errors.New("TLS private key path is required")
 	}
-	if cfg.DatabaseURI == "" {
-		return errors.New("database URI is required")
-	}
-	if cfg.FileStorage.Endpoint == "" {
-		return errors.New("file storage endpoint is required")
-	}
-	if cfg.FileStorage.AccessKey == "" {
-		return errors.New("file storage access key is required")
-	}
-	if cfg.FileStorage.SecretKey == "" {
-		return errors.New("file storage secret key is required")
-	}
-	if cfg.FileStorage.Bucket == "" {
-		return errors.New("file storage bucket is required")
-	}
-	if cfg.Queue.URL == "" {
-		return errors.New("queue URL is required")
-	}
-	if cfg.Queue.Exchange == "" {
-		return errors.New("queue exchange is required")
-	}
-	if cfg.Queue.AvatarProcessingQueue == "" {
-		return errors.New("queue avatar processing queue is required")
-	}
-	if cfg.Queue.AvatarDeletionQueue == "" {
-		return errors.New("queue avatar deletion queue is required")
-	}
-	if cfg.Queue.AvatarProcessingRoutingKey == "" {
-		return errors.New("queue avatar processing routing key is required")
-	}
-	if cfg.Queue.AvatarDeletionRoutingKey == "" {
-		return errors.New("queue avatar deletion routing key is required")
-	}
-	return nil
+	return validateCommonConfig(cfg.DatabaseURI, cfg.FileStorage, cfg.Queue)
 }

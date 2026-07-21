@@ -24,7 +24,7 @@ type UserHandler struct {
 	logger      *slog.Logger
 }
 
-// NewUserHandler создает новый UserHandler.
+// NewUserHandler создает UserHandler.
 func NewUserHandler(
 	userUseCase userUseCase,
 	logger *slog.Logger,

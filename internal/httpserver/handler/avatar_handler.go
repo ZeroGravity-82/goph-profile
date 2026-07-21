@@ -79,7 +79,7 @@ type AvatarHandler struct {
 	logger        *slog.Logger
 }
 
-// NewAvatarHandler создает новый AvatarHandler.
+// NewAvatarHandler создает AvatarHandler.
 func NewAvatarHandler(
 	avatarUseCase avatarUseCase,
 	logger *slog.Logger,

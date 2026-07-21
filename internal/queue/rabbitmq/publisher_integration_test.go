@@ -4,7 +4,6 @@ package rabbitmq
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,14 +14,16 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
-// TestPublisher_PublishAvatarProcessing_Integration проверяет публикацию задачи обработки аватарки в RabbitMQ.
-func TestPublisher_PublishAvatarProcessing_Integration(t *testing.T) {
+// TestPublisher_PublishesAvatarProcessingMessage проверяет доставку задачи обработки аватарки в очередь.
+func TestPublisher_PublishesAvatarProcessingMessage(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	cfg := newIntegrationConfig(t)
-	publisher := newIntegrationPublisher(t, ctx, cfg)
-	avatarID := uuid.New()
-	userID := uuid.New()
+	cfg := newTestConfig(t)
+	publisher := newTestPublisher(t, ctx, cfg)
+	avatarID, err := uuid.NewV7()
+	require.NoError(t, err)
+	userID, err := uuid.NewV7()
+	require.NoError(t, err)
 	message := usecase.AvatarProcessingMessage{
 		AvatarID:          avatarID,
 		UserID:            userID,
@@ -30,7 +31,7 @@ func TestPublisher_PublishAvatarProcessing_Integration(t *testing.T) {
 	}
 
 	// Act
-	err := publisher.PublishAvatarProcessing(ctx, message)
+	err = publisher.PublishAvatarProcessing(ctx, message)
 
 	// Assert
 	require.NoError(t, err)
@@ -45,20 +46,21 @@ func TestPublisher_PublishAvatarProcessing_Integration(t *testing.T) {
 	}`, string(delivery.Body))
 }
 
-// TestPublisher_PublishAvatarDeletion_Integration проверяет публикацию задачи удаления файлов аватарки в RabbitMQ.
-func TestPublisher_PublishAvatarDeletion_Integration(t *testing.T) {
+// TestPublisher_PublishesAvatarDeletionMessage проверяет доставку задачи удаления файлов аватарки в очередь.
+func TestPublisher_PublishesAvatarDeletionMessage(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	cfg := newIntegrationConfig(t)
-	publisher := newIntegrationPublisher(t, ctx, cfg)
-	avatarID := uuid.New()
+	cfg := newTestConfig(t)
+	publisher := newTestPublisher(t, ctx, cfg)
+	avatarID, err := uuid.NewV7()
+	require.NoError(t, err)
 	message := usecase.AvatarDeletionMessage{
 		AvatarID:   avatarID,
 		ObjectKeys: []string{"users/avatar-original", "users/avatar-thumb-100", "users/avatar-thumb-300"},
 	}
 
 	// Act
-	err := publisher.PublishAvatarDeletion(ctx, message)
+	err = publisher.PublishAvatarDeletion(ctx, message)
 
 	// Assert
 	require.NoError(t, err)
@@ -72,37 +74,7 @@ func TestPublisher_PublishAvatarDeletion_Integration(t *testing.T) {
 	}`, string(delivery.Body))
 }
 
-func newIntegrationConfig(t *testing.T) Config {
-	t.Helper()
-
-	url := os.Getenv("TEST_QUEUE_URL")
-	if url == "" {
-		t.Skip("TEST_QUEUE_URL is not set")
-	}
-
-	suffix := uuid.NewString()
-	return Config{
-		URL:                        url,
-		Exchange:                   "goph-profile.integration.avatar." + suffix,
-		AvatarProcessingQueue:      "goph-profile.integration.avatar-processing." + suffix,
-		AvatarDeletionQueue:        "goph-profile.integration.avatar-deletion." + suffix,
-		AvatarProcessingRoutingKey: "avatar.process",
-		AvatarDeletionRoutingKey:   "avatar.delete",
-	}
-}
-
-func newIntegrationPublisher(t *testing.T, ctx context.Context, cfg Config) *Publisher {
-	t.Helper()
-
-	publisher, err := NewPublisher(ctx, cfg)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, publisher.Close())
-		cleanupTopology(t, cfg)
-	})
-	return publisher
-}
-
+// getMessage читает одно сообщение из очереди RabbitMQ для проверки публикации.
 func getMessage(t *testing.T, url string, queueName string) amqp.Delivery {
 	t.Helper()
 
@@ -122,26 +94,4 @@ func getMessage(t *testing.T, url string, queueName string) amqp.Delivery {
 	require.NoError(t, err)
 	require.True(t, ok)
 	return delivery
-}
-
-func cleanupTopology(t *testing.T, cfg Config) {
-	t.Helper()
-
-	conn, err := amqp.Dial(cfg.URL)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, conn.Close())
-	}()
-
-	channel, err := conn.Channel()
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, channel.Close())
-	}()
-
-	_, err = channel.QueueDelete(cfg.AvatarProcessingQueue, false, false, false)
-	require.NoError(t, err)
-	_, err = channel.QueueDelete(cfg.AvatarDeletionQueue, false, false, false)
-	require.NoError(t, err)
-	require.NoError(t, channel.ExchangeDelete(cfg.Exchange, false, false))
 }

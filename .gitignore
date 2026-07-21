@@ -13,3 +13,4 @@ vendor/
 # Sensitive data
 config/client.local.yaml
 config/server.local.yaml
+config/worker.local.yaml

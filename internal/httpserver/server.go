@@ -62,7 +62,7 @@ type HTTPServer struct {
 	logger        *slog.Logger
 }
 
-// NewHTTPServer создает новый HTTPServer.
+// NewHTTPServer создает HTTPServer.
 func NewHTTPServer(
 	addr string,
 	tlsConfig *tls.Config,

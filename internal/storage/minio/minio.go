@@ -67,6 +67,16 @@ func (s *MinIOStorage) ObjectKeyOriginal(userID uuid.UUID, avatarID uuid.UUID) s
 	return fmt.Sprintf("users/%s/avatars/%s/original", userID, avatarID)
 }
 
+// ObjectKeyThumb100 возвращает стабильный ключ миниатюры аватарки размером 100x100.
+func (s *MinIOStorage) ObjectKeyThumb100(userID uuid.UUID, avatarID uuid.UUID) string {
+	return fmt.Sprintf("users/%s/avatars/%s/thumb-100.png", userID, avatarID)
+}
+
+// ObjectKeyThumb300 возвращает стабильный ключ миниатюры аватарки размером 300x300.
+func (s *MinIOStorage) ObjectKeyThumb300(userID uuid.UUID, avatarID uuid.UUID) string {
+	return fmt.Sprintf("users/%s/avatars/%s/thumb-300.png", userID, avatarID)
+}
+
 // Put сохраняет объект по ключу.
 func (s *MinIOStorage) Put(ctx context.Context, objectKey string, content []byte) error {
 	if err := validateObjectKey(objectKey); err != nil {

@@ -1,2 +1,2 @@
-// Package rabbitmq реализует публикацию сообщений в RabbitMQ.
+// Package rabbitmq работает с очередями задач аватарок в RabbitMQ.
 package rabbitmq

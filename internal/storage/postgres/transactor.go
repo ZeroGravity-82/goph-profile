@@ -24,7 +24,7 @@ type Transactor struct {
 	db *sqlx.DB
 }
 
-// NewTransactor создает новый Transactor на основе подключения к БД.
+// NewTransactor создает Transactor на основе подключения к БД.
 func NewTransactor(db *sqlx.DB) (*Transactor, error) {
 	if db == nil {
 		return nil, errors.New("postgres database is not provided")

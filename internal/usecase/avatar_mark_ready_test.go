@@ -13,21 +13,19 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 )
 
-// TestAvatarUseCase_MarkAvatarReady проверяет успешное завершение обработки аватарки.
-func TestAvatarUseCase_MarkAvatarReady(t *testing.T) {
+// TestAvatarWorkerUseCase_MarkAvatarReady проверяет успешное завершение обработки аватарки.
+func TestAvatarWorkerUseCase_MarkAvatarReady(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
 	transactor := &transactorFake{}
-	useCase := mustAvatarUseCaseWithTransactor(
+	useCase := mustAvatarWorkerUseCaseWithTransactor(
 		t,
 		userRepo,
 		avatarRepo,
 		transactor,
-		&fileStoreFake{},
-		&avatarMessagePublisherFake{},
 	)
 	input := validMarkAvatarReadyInput()
 
@@ -53,9 +51,9 @@ func TestAvatarUseCase_MarkAvatarReady(t *testing.T) {
 	assert.Equal(t, testAvatarID, *userRepo.updated[0].CurrentAvatarID)
 }
 
-// TestAvatarUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar проверяет сохранение уже выбранной текущей аватарки
+// TestAvatarWorkerUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar проверяет сохранение уже выбранной текущей аватарки
 // при завершении обработки.
-func TestAvatarUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar(t *testing.T) {
+func TestAvatarWorkerUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
@@ -64,7 +62,7 @@ func TestAvatarUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar(t *testing.T)
 	user.CurrentAvatarID = &currentAvatarID
 	userRepo := &avatarUserRepositoryFake{user: user}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
 	// Act
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())
@@ -76,14 +74,14 @@ func TestAvatarUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar(t *testing.T)
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarReady_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки при завершении
+// TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки при завершении
 // обработки.
-func TestAvatarUseCase_MarkAvatarReady_ReturnsAvatarNotFound(t *testing.T) {
+func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	userRepo := &avatarUserRepositoryFake{}
 	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
 	// Act
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())
@@ -96,15 +94,15 @@ func TestAvatarUseCase_MarkAvatarReady_ReturnsAvatarNotFound(t *testing.T) {
 	assert.Empty(t, avatarRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarReady_ReturnsInvalidMetadata проверяет ошибку невалидных данных при завершении
+// TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsInvalidMetadata проверяет ошибку невалидных данных при завершении
 // обработки.
-func TestAvatarUseCase_MarkAvatarReady_ReturnsInvalidMetadata(t *testing.T) {
+func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsInvalidMetadata(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 	input := validMarkAvatarReadyInput()
 	input.Width = 0
 
@@ -118,15 +116,15 @@ func TestAvatarUseCase_MarkAvatarReady_ReturnsInvalidMetadata(t *testing.T) {
 	assert.Empty(t, avatarRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarReady_ReturnsUserNotFound проверяет ошибку отсутствия пользователя при завершении
+// TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUserNotFound проверяет ошибку отсутствия пользователя при завершении
 // обработки аватарки.
-func TestAvatarUseCase_MarkAvatarReady_ReturnsUserNotFound(t *testing.T) {
+func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
 	// Act
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())
@@ -139,16 +137,16 @@ func TestAvatarUseCase_MarkAvatarReady_ReturnsUserNotFound(t *testing.T) {
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarReady_ReturnsUpdateAvatarError проверяет ошибку сохранения готовой аватарки при
+// TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUpdateAvatarError проверяет ошибку сохранения готовой аватарки при
 // завершении обработки.
-func TestAvatarUseCase_MarkAvatarReady_ReturnsUpdateAvatarError(t *testing.T) {
+func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUpdateAvatarError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	updateErr := errors.New("update avatar error")
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now), updateErr: updateErr}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
 	// Act
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())
@@ -160,16 +158,16 @@ func TestAvatarUseCase_MarkAvatarReady_ReturnsUpdateAvatarError(t *testing.T) {
 	assert.Empty(t, userRepo.updated)
 }
 
-// TestAvatarUseCase_MarkAvatarReady_ReturnsUpdateUserError проверяет ошибку выбора первой текущей аватарки при
+// TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUpdateUserError проверяет ошибку выбора первой текущей аватарки при
 // завершении обработки.
-func TestAvatarUseCase_MarkAvatarReady_ReturnsUpdateUserError(t *testing.T) {
+func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUpdateUserError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	updateErr := errors.New("update user error")
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now), updateErr: updateErr}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
 	// Act
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())

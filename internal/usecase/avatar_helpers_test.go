@@ -44,6 +44,30 @@ func mustAvatarUseCaseWithTransactor(
 	return useCase
 }
 
+func mustAvatarWorkerUseCase(
+	t *testing.T,
+	userRepo avatarUserRepository,
+	avatarRepo avatarRepository,
+) *AvatarWorkerUseCase {
+	t.Helper()
+
+	return mustAvatarWorkerUseCaseWithTransactor(t, userRepo, avatarRepo, &transactorFake{})
+}
+
+func mustAvatarWorkerUseCaseWithTransactor(
+	t *testing.T,
+	userRepo avatarUserRepository,
+	avatarRepo avatarRepository,
+	transactor transactor,
+) *AvatarWorkerUseCase {
+	t.Helper()
+
+	useCase, err := NewAvatarWorkerUseCase(userRepo, avatarRepo, transactor)
+	require.NoError(t, err)
+
+	return useCase
+}
+
 func mustUseCaseUser(t *testing.T, now time.Time) model.User {
 	t.Helper()
 
