@@ -54,7 +54,7 @@ func NewAvatarHandler(
 	return &AvatarHandler{useCase: useCase, fileStorage: fileStorage, logger: logger}, nil
 }
 
-// HandleAvatarProcessing создает миниатюры исходной аватарки и завершает обработку в usecase.
+// HandleAvatarProcessing создает миниатюры и переводит аватарку в готовое состояние.
 func (h *AvatarHandler) HandleAvatarProcessing(
 	ctx context.Context,
 	message usecase.AvatarProcessingMessage,
@@ -86,10 +86,18 @@ func (h *AvatarHandler) HandleAvatarProcessing(
 		ObjectKeyThumb300: thumb300Key,
 	})
 	if err != nil {
+		if staleAvatarProcessingMessage(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to mark avatar ready: %w", err)
 	}
 
 	return nil
+}
+
+// staleAvatarProcessingMessage определяет, что задача обработки уже не соответствует текущему состоянию аватарки.
+func staleAvatarProcessingMessage(err error) bool {
+	return errors.Is(err, usecase.ErrAvatarNotFound) || errors.Is(err, model.ErrInvalidAvatarTransition)
 }
 
 func (h *AvatarHandler) markAvatarFailed(ctx context.Context, avatarID uuid.UUID, cause error) error {
@@ -98,6 +106,9 @@ func (h *AvatarHandler) markAvatarFailed(ctx context.Context, avatarID uuid.UUID
 		slog.Any("err", cause),
 	)
 	if _, err := h.useCase.MarkAvatarFailed(ctx, usecase.MarkAvatarFailedInput{AvatarID: avatarID}); err != nil {
+		if staleAvatarProcessingMessage(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to mark avatar failed: %w", err)
 	}
 	return nil

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -23,7 +24,7 @@ var (
 	testObjectKeyThumb300 = "users/user-id/avatars/avatar-id/thumb-300.png"
 )
 
-// TestAvatarHandler_HandleAvatarProcessing проверяет создание миниатюр и завершение обработки аватарки.
+// TestAvatarHandler_HandleAvatarProcessing проверяет успешную обработку аватарки.
 func TestAvatarHandler_HandleAvatarProcessing(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -54,7 +55,32 @@ func TestAvatarHandler_HandleAvatarProcessing(t *testing.T) {
 	assert.Empty(t, useCase.failedInputs)
 }
 
-// testPNG создает PNG-изображение заданного размера для проверки обработки аватарок воркером.
+// TestAvatarHandler_HandleAvatarProcessing_IgnoresInvalidReadyTransition проверяет повторную доставку
+// обработанной задачи.
+func TestAvatarHandler_HandleAvatarProcessing_IgnoresInvalidReadyTransition(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	fileStorage := &fileStorageFake{content: testPNG(t, 320, 240)}
+	useCase := &avatarWorkerUseCaseFake{readyErr: model.ErrInvalidAvatarTransition}
+	handler := mustAvatarHandler(t, useCase, fileStorage)
+	message := usecase.AvatarProcessingMessage{
+		AvatarID:          testAvatarID,
+		UserID:            testUserID,
+		ObjectKeyOriginal: testObjectKeyOriginal,
+	}
+
+	// Act
+	err := handler.HandleAvatarProcessing(ctx, message)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, []string{testObjectKeyOriginal}, fileStorage.gets)
+	assert.Equal(t, []string{testObjectKeyThumb100, testObjectKeyThumb300}, fileStorage.putKeys())
+	require.Len(t, useCase.readyInputs, 1)
+	assert.Empty(t, useCase.failedInputs)
+}
+
+// testPNG создает PNG-файл заданного размера.
 func testPNG(t *testing.T, width int, height int) []byte {
 	t.Helper()
 
@@ -78,7 +104,7 @@ func mustAvatarHandler(t *testing.T, useCase avatarWorkerUseCase, fileStorage fi
 	return handler
 }
 
-// assertPNGSize проверяет размеры PNG-изображения без декодирования всех пикселей.
+// assertPNGSize проверяет размеры PNG без декодирования всех пикселей.
 func assertPNGSize(t *testing.T, content []byte, width int, height int) {
 	t.Helper()
 
@@ -88,7 +114,7 @@ func assertPNGSize(t *testing.T, content []byte, width int, height int) {
 	assert.Equal(t, height, cfg.Height)
 }
 
-// TestAvatarHandler_HandleAvatarProcessing_MarksAvatarFailed проверяет завершение обработки ошибкой после битого файла.
+// TestAvatarHandler_HandleAvatarProcessing_MarksAvatarFailed проверяет ошибку обработки битого файла.
 func TestAvatarHandler_HandleAvatarProcessing_MarksAvatarFailed(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -111,7 +137,31 @@ func TestAvatarHandler_HandleAvatarProcessing_MarksAvatarFailed(t *testing.T) {
 	assert.Equal(t, []usecase.MarkAvatarFailedInput{{AvatarID: testAvatarID}}, useCase.failedInputs)
 }
 
-// TestAvatarHandler_HandleAvatarDeletion проверяет удаление файлов аватарки и завершение удаления.
+// TestAvatarHandler_HandleAvatarProcessing_IgnoresInvalidFailedTransition проверяет повторную доставку
+// битого файла.
+func TestAvatarHandler_HandleAvatarProcessing_IgnoresInvalidFailedTransition(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	fileStorage := &fileStorageFake{content: []byte("not an image")}
+	useCase := &avatarWorkerUseCaseFake{failedErr: model.ErrInvalidAvatarTransition}
+	handler := mustAvatarHandler(t, useCase, fileStorage)
+	message := usecase.AvatarProcessingMessage{
+		AvatarID:          testAvatarID,
+		UserID:            testUserID,
+		ObjectKeyOriginal: testObjectKeyOriginal,
+	}
+
+	// Act
+	err := handler.HandleAvatarProcessing(ctx, message)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Empty(t, fileStorage.puts)
+	assert.Empty(t, useCase.readyInputs)
+	assert.Equal(t, []usecase.MarkAvatarFailedInput{{AvatarID: testAvatarID}}, useCase.failedInputs)
+}
+
+// TestAvatarHandler_HandleAvatarDeletion проверяет удаление файлов аватарки.
 func TestAvatarHandler_HandleAvatarDeletion(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
