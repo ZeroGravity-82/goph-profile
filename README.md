@@ -669,6 +669,7 @@ make lint
 
 ```bash
 cp .env.test.example .env.test
+# заполните пустые значения в .env.test
 make test-integration
 ```
 
