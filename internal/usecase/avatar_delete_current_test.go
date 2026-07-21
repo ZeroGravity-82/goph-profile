@@ -23,14 +23,23 @@ func TestAvatarUseCase_DeleteCurrentAvatar(t *testing.T) {
 	require.NoError(t, user.SelectCurrentAvatar(avatar, now))
 	userRepo := &avatarUserRepositoryFake{user: user}
 	avatarRepo := &avatarRepositoryFake{avatar: avatar}
+	transactor := &transactorFake{}
 	messagePublisher := &avatarMessagePublisherFake{}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+	useCase := mustAvatarUseCaseWithTransactor(
+		t,
+		userRepo,
+		avatarRepo,
+		transactor,
+		&fileStoreFake{},
+		messagePublisher,
+	)
 
 	// Act
 	err := useCase.DeleteCurrentAvatar(ctx, DeleteCurrentAvatarInput{UserID: testUserID})
 
 	// Assert
 	require.NoError(t, err)
+	assert.Equal(t, 1, transactor.calls)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	require.Len(t, avatarRepo.updated, 1)

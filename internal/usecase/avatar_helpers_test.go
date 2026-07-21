@@ -18,7 +18,27 @@ func mustAvatarUseCase(
 ) *AvatarUseCase {
 	t.Helper()
 
-	useCase, err := NewAvatarUseCase(userRepo, avatarRepo, fileStore, messagePublisher)
+	return mustAvatarUseCaseWithTransactor(
+		t,
+		userRepo,
+		avatarRepo,
+		&transactorFake{},
+		fileStore,
+		messagePublisher,
+	)
+}
+
+func mustAvatarUseCaseWithTransactor(
+	t *testing.T,
+	userRepo avatarUserRepository,
+	avatarRepo avatarRepository,
+	transactor transactor,
+	fileStore fileStorage,
+	messagePublisher avatarMessagePublisher,
+) *AvatarUseCase {
+	t.Helper()
+
+	useCase, err := NewAvatarUseCase(userRepo, avatarRepo, transactor, fileStore, messagePublisher)
 	require.NoError(t, err)
 
 	return useCase

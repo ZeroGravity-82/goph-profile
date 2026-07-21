@@ -20,14 +20,23 @@ func TestAvatarUseCase_DeleteAvatar(t *testing.T) {
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
 	avatarRepo := &avatarRepositoryFake{avatar: mustReadyUseCaseAvatar(t, now)}
+	transactor := &transactorFake{}
 	messagePublisher := &avatarMessagePublisherFake{}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, messagePublisher)
+	useCase := mustAvatarUseCaseWithTransactor(
+		t,
+		userRepo,
+		avatarRepo,
+		transactor,
+		&fileStoreFake{},
+		messagePublisher,
+	)
 
 	// Act
 	err := useCase.DeleteAvatar(ctx, DeleteAvatarInput{UserID: testUserID, AvatarID: testAvatarID})
 
 	// Assert
 	require.NoError(t, err)
+	assert.Equal(t, 1, transactor.calls)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	require.Len(t, avatarRepo.updated, 1)

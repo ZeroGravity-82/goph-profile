@@ -73,6 +73,19 @@ func (r *avatarRepositoryFake) Delete(_ context.Context, id uuid.UUID) error {
 	return r.deleteErr
 }
 
+type transactorFake struct {
+	err   error
+	calls int
+}
+
+func (t *transactorFake) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	t.calls++
+	if t.err != nil {
+		return t.err
+	}
+	return fn(ctx)
+}
+
 type putObjectCall struct {
 	objectKey string
 	content   []byte

@@ -20,7 +20,15 @@ func TestAvatarUseCase_MarkAvatarReady(t *testing.T) {
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
-	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
+	transactor := &transactorFake{}
+	useCase := mustAvatarUseCaseWithTransactor(
+		t,
+		userRepo,
+		avatarRepo,
+		transactor,
+		&fileStoreFake{},
+		&avatarMessagePublisherFake{},
+	)
 	input := validMarkAvatarReadyInput()
 
 	// Act
@@ -28,6 +36,7 @@ func TestAvatarUseCase_MarkAvatarReady(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
+	assert.Equal(t, 1, transactor.calls)
 	assert.Equal(t, testAvatarID, result.ID)
 	assert.Equal(t, testUserID, result.UserID)
 	assert.Equal(t, model.AvatarStatusReady, result.Status)

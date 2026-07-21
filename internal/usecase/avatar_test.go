@@ -20,6 +20,7 @@ var (
 func TestNewAvatarUseCase_RejectsNilDependencies(t *testing.T) {
 	validUserRepo := &avatarUserRepositoryFake{}
 	validAvatarRepo := &avatarRepositoryFake{}
+	validTransactor := &transactorFake{}
 	validFileStore := &fileStoreFake{}
 	validMessagePublisher := &avatarMessagePublisherFake{}
 
@@ -27,6 +28,7 @@ func TestNewAvatarUseCase_RejectsNilDependencies(t *testing.T) {
 		name             string
 		userRepo         avatarUserRepository
 		avatarRepo       avatarRepository
+		transactor       transactor
 		fileStore        fileStorage
 		messagePublisher avatarMessagePublisher
 		wantErr          string
@@ -34,6 +36,7 @@ func TestNewAvatarUseCase_RejectsNilDependencies(t *testing.T) {
 		{
 			name:             "user repository",
 			avatarRepo:       validAvatarRepo,
+			transactor:       validTransactor,
 			fileStore:        validFileStore,
 			messagePublisher: validMessagePublisher,
 			wantErr:          "user repository is not provided",
@@ -41,14 +44,24 @@ func TestNewAvatarUseCase_RejectsNilDependencies(t *testing.T) {
 		{
 			name:             "avatar repository",
 			userRepo:         validUserRepo,
+			transactor:       validTransactor,
 			fileStore:        validFileStore,
 			messagePublisher: validMessagePublisher,
 			wantErr:          "avatar repository is not provided",
 		},
 		{
+			name:             "transactor",
+			userRepo:         validUserRepo,
+			avatarRepo:       validAvatarRepo,
+			fileStore:        validFileStore,
+			messagePublisher: validMessagePublisher,
+			wantErr:          "transactor is not provided",
+		},
+		{
 			name:             "file storage",
 			userRepo:         validUserRepo,
 			avatarRepo:       validAvatarRepo,
+			transactor:       validTransactor,
 			messagePublisher: validMessagePublisher,
 			wantErr:          "file storage is not provided",
 		},
@@ -56,6 +69,7 @@ func TestNewAvatarUseCase_RejectsNilDependencies(t *testing.T) {
 			name:       "message publisher",
 			userRepo:   validUserRepo,
 			avatarRepo: validAvatarRepo,
+			transactor: validTransactor,
 			fileStore:  validFileStore,
 			wantErr:    "avatar message publisher is not provided",
 		},
@@ -67,6 +81,7 @@ func TestNewAvatarUseCase_RejectsNilDependencies(t *testing.T) {
 			useCase, err := NewAvatarUseCase(
 				tt.userRepo,
 				tt.avatarRepo,
+				tt.transactor,
 				tt.fileStore,
 				tt.messagePublisher,
 			)

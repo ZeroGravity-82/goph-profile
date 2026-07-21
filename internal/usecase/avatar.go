@@ -201,6 +201,11 @@ type avatarRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+// transactor выполняет несколько операций хранилища в одной транзакции.
+type transactor interface {
+	WithinTransaction(ctx context.Context, fn func(context.Context) error) error
+}
+
 // fileStorage описывает операции с хранилищем файлов.
 type fileStorage interface {
 	ObjectKey(userID uuid.UUID, avatarID uuid.UUID) string
@@ -232,6 +237,7 @@ type avatarMessagePublisher interface {
 type AvatarUseCase struct {
 	userRepo    avatarUserRepository
 	avatarRepo  avatarRepository
+	transactor  transactor
 	fileStorage fileStorage
 	publisher   avatarMessagePublisher
 }
@@ -240,6 +246,7 @@ type AvatarUseCase struct {
 func NewAvatarUseCase(
 	userRepo avatarUserRepository,
 	avatarRepo avatarRepository,
+	transactor transactor,
 	fileStorage fileStorage,
 	messagePublisher avatarMessagePublisher,
 ) (*AvatarUseCase, error) {
@@ -248,6 +255,9 @@ func NewAvatarUseCase(
 	}
 	if avatarRepo == nil {
 		return nil, errors.New("avatar repository is not provided")
+	}
+	if transactor == nil {
+		return nil, errors.New("transactor is not provided")
 	}
 	if fileStorage == nil {
 		return nil, errors.New("file storage is not provided")
@@ -259,6 +269,7 @@ func NewAvatarUseCase(
 	return &AvatarUseCase{
 		userRepo:    userRepo,
 		avatarRepo:  avatarRepo,
+		transactor:  transactor,
 		fileStorage: fileStorage,
 		publisher:   messagePublisher,
 	}, nil
@@ -410,44 +421,59 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 	if uc.avatarRepo == nil {
 		return errors.New("avatar repository is not provided")
 	}
+	if uc.transactor == nil {
+		return errors.New("transactor is not provided")
+	}
 	if uc.publisher == nil {
 		return errors.New("avatar message publisher is not provided")
 	}
 
-	user, err := uc.userRepo.GetByID(ctx, in.UserID)
-	if err != nil {
-		return fmt.Errorf("get user by id: %w", err)
+	var message AvatarDeletionMessage
+	shouldPublish := false
+	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
+		if err != nil {
+			return fmt.Errorf("get user by id: %w", err)
+		}
+		if user.CurrentAvatarID == nil {
+			return nil
+		}
+
+		avatar, err := uc.avatarRepo.GetByID(txCtx, *user.CurrentAvatarID)
+		if err != nil {
+			return fmt.Errorf("get current avatar by id: %w", err)
+		}
+		if avatar.UserID != user.ID {
+			return model.ErrAvatarForbidden
+		}
+
+		now := time.Now().UTC()
+		if err = avatar.MarkDeleting(now); err != nil {
+			return err
+		}
+		user.ClearCurrentAvatar(avatar.ID, now)
+
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("update deleting avatar: %w", err)
+		}
+		if err = uc.userRepo.Update(txCtx, user); err != nil {
+			return fmt.Errorf("clear current avatar: %w", err)
+		}
+
+		message = AvatarDeletionMessage{
+			AvatarID:   avatar.ID,
+			ObjectKeys: avatarObjectKeys(avatar),
+		}
+		shouldPublish = true
+		return nil
+	}); err != nil {
+		return err
 	}
-	if user.CurrentAvatarID == nil {
+	if !shouldPublish {
 		return nil
 	}
 
-	avatar, err := uc.avatarRepo.GetByID(ctx, *user.CurrentAvatarID)
-	if err != nil {
-		return fmt.Errorf("get current avatar by id: %w", err)
-	}
-	if avatar.UserID != user.ID {
-		return model.ErrAvatarForbidden
-	}
-
-	now := time.Now().UTC()
-	if err = avatar.MarkDeleting(now); err != nil {
-		return err
-	}
-	user.ClearCurrentAvatar(avatar.ID, now)
-
-	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
-		return fmt.Errorf("update deleting avatar: %w", err)
-	}
-	if err = uc.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("clear current avatar: %w", err)
-	}
-
-	message := AvatarDeletionMessage{
-		AvatarID:   avatar.ID,
-		ObjectKeys: avatarObjectKeys(avatar),
-	}
-	if err = uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
+	if err := uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
 		return fmt.Errorf("publish avatar deletion message: %w", err)
 	}
 
@@ -462,43 +488,53 @@ func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput)
 	if uc.avatarRepo == nil {
 		return errors.New("avatar repository is not provided")
 	}
+	if uc.transactor == nil {
+		return errors.New("transactor is not provided")
+	}
 	if uc.publisher == nil {
 		return errors.New("avatar message publisher is not provided")
 	}
 
-	user, err := uc.userRepo.GetByID(ctx, in.UserID)
-	if err != nil {
-		return fmt.Errorf("get user by id: %w", err)
-	}
+	var message AvatarDeletionMessage
+	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
+		if err != nil {
+			return fmt.Errorf("get user by id: %w", err)
+		}
 
-	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
-	if err != nil {
-		return fmt.Errorf("get avatar by id: %w", err)
-	}
-	if avatar.UserID != user.ID {
-		return model.ErrAvatarForbidden
-	}
+		avatar, err := uc.avatarRepo.GetByID(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("get avatar by id: %w", err)
+		}
+		if avatar.UserID != user.ID {
+			return model.ErrAvatarForbidden
+		}
 
-	now := time.Now().UTC()
-	if err = avatar.MarkDeleting(now); err != nil {
+		now := time.Now().UTC()
+		if err = avatar.MarkDeleting(now); err != nil {
+			return err
+		}
+		clearCurrent := user.ClearCurrentAvatar(avatar.ID, now)
+
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("update deleting avatar: %w", err)
+		}
+		if clearCurrent {
+			if err = uc.userRepo.Update(txCtx, user); err != nil {
+				return fmt.Errorf("clear current avatar: %w", err)
+			}
+		}
+
+		message = AvatarDeletionMessage{
+			AvatarID:   avatar.ID,
+			ObjectKeys: avatarObjectKeys(avatar),
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
-	clearCurrent := user.ClearCurrentAvatar(avatar.ID, now)
 
-	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
-		return fmt.Errorf("update deleting avatar: %w", err)
-	}
-	if clearCurrent {
-		if err = uc.userRepo.Update(ctx, user); err != nil {
-			return fmt.Errorf("clear current avatar: %w", err)
-		}
-	}
-
-	message := AvatarDeletionMessage{
-		AvatarID:   avatar.ID,
-		ObjectKeys: avatarObjectKeys(avatar),
-	}
-	if err = uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
+	if err := uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
 		return fmt.Errorf("publish avatar deletion message: %w", err)
 	}
 
@@ -582,41 +618,51 @@ func (uc *AvatarUseCase) MarkAvatarReady(
 	if uc.avatarRepo == nil {
 		return MarkAvatarReadyOutput{}, errors.New("avatar repository is not provided")
 	}
-
-	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
-	if err != nil {
-		return MarkAvatarReadyOutput{}, fmt.Errorf("get avatar by id: %w", err)
+	if uc.transactor == nil {
+		return MarkAvatarReadyOutput{}, errors.New("transactor is not provided")
 	}
 
-	now := time.Now().UTC()
-	if err = avatar.MarkReady(
-		in.Width,
-		in.Height,
-		in.ObjectKeyThumb100,
-		in.ObjectKeyThumb300,
-		now,
-	); err != nil {
+	var avatar model.Avatar
+	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		avatar, err = uc.avatarRepo.GetByID(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("get avatar by id: %w", err)
+		}
+
+		now := time.Now().UTC()
+		if err = avatar.MarkReady(
+			in.Width,
+			in.Height,
+			in.ObjectKeyThumb100,
+			in.ObjectKeyThumb300,
+			now,
+		); err != nil {
+			return err
+		}
+
+		user, err := uc.userRepo.GetByID(txCtx, avatar.UserID)
+		if err != nil {
+			return fmt.Errorf("get user by id: %w", err)
+		}
+		selectAsCurrent := user.CurrentAvatarID == nil
+		if selectAsCurrent {
+			if err = user.SelectCurrentAvatar(avatar, now); err != nil {
+				return err
+			}
+		}
+
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("update ready avatar: %w", err)
+		}
+		if selectAsCurrent {
+			if err = uc.userRepo.Update(txCtx, user); err != nil {
+				return fmt.Errorf("update current avatar: %w", err)
+			}
+		}
+		return nil
+	}); err != nil {
 		return MarkAvatarReadyOutput{}, err
-	}
-
-	user, err := uc.userRepo.GetByID(ctx, avatar.UserID)
-	if err != nil {
-		return MarkAvatarReadyOutput{}, fmt.Errorf("get user by id: %w", err)
-	}
-	selectAsCurrent := user.CurrentAvatarID == nil
-	if selectAsCurrent {
-		if err = user.SelectCurrentAvatar(avatar, now); err != nil {
-			return MarkAvatarReadyOutput{}, err
-		}
-	}
-
-	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
-		return MarkAvatarReadyOutput{}, fmt.Errorf("update ready avatar: %w", err)
-	}
-	if selectAsCurrent {
-		if err = uc.userRepo.Update(ctx, user); err != nil {
-			return MarkAvatarReadyOutput{}, fmt.Errorf("update current avatar: %w", err)
-		}
 	}
 
 	return MarkAvatarReadyOutput{
