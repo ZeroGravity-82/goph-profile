@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"hash/crc32"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -245,12 +247,35 @@ func newGetAvatarRequest(t *testing.T, avatarID string, size string, format stri
 }
 
 func pngContent() []byte {
-	return []byte{
+	return pngContentWithSize(1, 1)
+}
+
+func pngContentWithSize(width int, height int) []byte {
+	content := bytes.Buffer{}
+	_, _ = content.Write([]byte{
 		0x89, 0x50, 0x4e, 0x47,
 		0x0d, 0x0a, 0x1a, 0x0a,
-		0x00, 0x00, 0x00, 0x0d,
-		0x49, 0x48, 0x44, 0x52,
-	}
+	})
+
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:4], uint32(width))
+	binary.BigEndian.PutUint32(ihdr[4:8], uint32(height))
+	ihdr[8] = 8
+	ihdr[9] = 6
+	writePNGChunk(&content, "IHDR", ihdr)
+	writePNGChunk(&content, "IEND", nil)
+
+	return content.Bytes()
+}
+
+func writePNGChunk(content *bytes.Buffer, chunkType string, data []byte) {
+	_ = binary.Write(content, binary.BigEndian, uint32(len(data)))
+	_, _ = content.WriteString(chunkType)
+	_, _ = content.Write(data)
+	checksum := crc32.NewIEEE()
+	_, _ = checksum.Write([]byte(chunkType))
+	_, _ = checksum.Write(data)
+	_ = binary.Write(content, binary.BigEndian, checksum.Sum32())
 }
 
 func mustAvatarURL(t *testing.T, avatarID string) string {

@@ -146,6 +146,24 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeFile(t *testing.T) {
 	assert.Equal(t, int64(maxAvatarFileSizeBytes), body.MaxSize)
 }
 
+// TestAvatarHandler_uploadAvatar_RejectsTooLargeImage проверяет ошибку слишком большого изображения.
+func TestAvatarHandler_uploadAvatar_RejectsTooLargeImage(t *testing.T) {
+	// Arrange
+	avatarUseCase := &avatarUseCaseFake{}
+	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
+	content := pngContentWithSize(maxAvatarImageWidthPixels+1, 100)
+	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", content)
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.uploadAvatar(response, request)
+
+	// Assert
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Empty(t, avatarUseCase.uploadInputs)
+	assertErrorResponse(t, response, "Invalid file format")
+}
+
 // TestAvatarHandler_uploadAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.
 func TestAvatarHandler_uploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange

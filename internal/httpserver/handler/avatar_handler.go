@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -13,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	_ "golang.org/x/image/webp"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
@@ -30,6 +35,9 @@ const (
 	maxAvatarFileNameLengthBytes      = 255
 	maxAvatarFileSizeBytes            = 10 * 1024 * 1024
 	maxFormMultipartOverheadSizeBytes = 1024 * 1024
+	maxAvatarImageWidthPixels         = 4096
+	maxAvatarImageHeightPixels        = 4096
+	maxAvatarImageAreaPixels          = 16_777_216
 )
 
 var (
@@ -153,6 +161,7 @@ func parseUserIDHeader(r *http.Request) (uuid.UUID, error) {
 // - достает файл из поля file;
 // - читает файл с отдельным лимитом размера;
 // - определяет MIME-тип по содержимому;
+// - проверяет размеры изображения;
 // - собирает входные данные сценария загрузки аватарки usecase.UploadAvatarInput.
 func parseAvatarUploadRequest(
 	w http.ResponseWriter,
@@ -193,6 +202,9 @@ func parseAvatarUploadRequest(
 	if mimeType == "" {
 		return usecase.UploadAvatarInput{}, model.ErrInvalidAvatarMetadata
 	}
+	if err = validateAvatarImageDimensions(content); err != nil {
+		return usecase.UploadAvatarInput{}, err
+	}
 
 	return usecase.UploadAvatarInput{
 		UserID:   userID,
@@ -219,6 +231,24 @@ func readAvatarFile(file multipart.File) ([]byte, error) {
 		return nil, errAvatarFileTooLarge
 	}
 	return content, nil
+}
+
+// validateAvatarImageDimensions проверяет размеры изображения по метаданным файла без декодирования всех пикселей.
+func validateAvatarImageDimensions(content []byte) error {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(content))
+	if err != nil {
+		return model.ErrInvalidAvatarMetadata
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return model.ErrInvalidAvatarMetadata
+	}
+	if cfg.Width > maxAvatarImageWidthPixels || cfg.Height > maxAvatarImageHeightPixels {
+		return model.ErrInvalidAvatarMetadata
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > maxAvatarImageAreaPixels {
+		return model.ErrInvalidAvatarMetadata
+	}
+	return nil
 }
 
 // detectAvatarMIMEType определяет поддерживаемый MIME-тип по содержимому файла: JPEG и PNG распознаются стандартной
