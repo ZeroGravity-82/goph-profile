@@ -48,7 +48,6 @@ GophProfile - микросервис для управления аватарк�
 Функциональные задачи:
 
 - web-интерфейс загрузки, просмотра результата и удаления аватарок;
-- Dockerfile для сервера и воркера.
 
 Технический долг:
 
@@ -635,7 +634,13 @@ go run ./cmd/worker -c config/worker.local.yaml
 - MinIO;
 - RabbitMQ.
 
-Dockerfile должен быть multi-stage: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками `server` и `worker`. Web-ресурсы копируются в runtime-образ рядом с `server`; их использует только HTTP-сервер для раздачи SPA и `default-avatar.png`.
+Соберите Docker-образ сервиса:
+
+```bash
+docker build -t goph-profile:local .
+```
+
+Dockerfile использует multi-stage build: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками `server` и `worker`. По умолчанию контейнер запускает `/app/server`; воркер запускается тем же образом с переопределением entrypoint на `/app/worker`.
 
 ## Тестирование
 
