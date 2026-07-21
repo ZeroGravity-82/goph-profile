@@ -634,13 +634,16 @@ docker compose up -d --build
 docker compose up -d postgresql minio rabbitmq
 ```
 
+Создайте локальный конфиг сервера по примеру `config/server.local.example.yaml`. Укажите в нем те же учетные данные,
+что в `.env`, но используйте `localhost` в адресах PostgreSQL, MinIO и RabbitMQ.
+
 Запустите сервер локально:
 
 ```bash
 go run ./cmd/server -c config/server.local.yaml
 ```
 
-Создайте локальный конфиг воркера по примеру `config/worker.local.example.yaml`.
+Создайте локальный конфиг воркера по примеру `config/worker.local.example.yaml` с теми же учетными данными.
 
 Запустите воркер:
 

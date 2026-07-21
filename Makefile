@@ -19,8 +19,8 @@ lint: ## Запустить линтер golangci-lint
 vet: ## Запустить базовые статические проверки go vet
 	go vet ./...
 
-up: ## Запустить контейнеры Docker Compose
-	$(DC) up -d
+up: ## Собрать образ и запустить локальный стек
+	$(DC) up -d --build --wait
 
 down: ## Остановить и удалить контейнеры Docker Compose
 	$(DC) down
