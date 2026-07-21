@@ -208,7 +208,7 @@ type transactor interface {
 
 // fileStorage описывает операции с хранилищем файлов.
 type fileStorage interface {
-	ObjectKey(userID uuid.UUID, avatarID uuid.UUID) string
+	ObjectKeyOriginal(userID uuid.UUID, avatarID uuid.UUID) string
 	Get(ctx context.Context, objectKey string) ([]byte, error)
 	Put(ctx context.Context, objectKey string, content []byte) error
 	Delete(ctx context.Context, objectKey string) error
@@ -281,7 +281,7 @@ func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput)
 	if err != nil {
 		return UploadAvatarOutput{}, fmt.Errorf("failed to create avatar id: %w", err)
 	}
-	objectKeyOriginal := uc.fileStorage.ObjectKey(in.UserID, uuidV7)
+	objectKeyOriginal := uc.fileStorage.ObjectKeyOriginal(in.UserID, uuidV7)
 	avatar, err := model.NewProcessingAvatar(
 		uuidV7,
 		in.UserID,

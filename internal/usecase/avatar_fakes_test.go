@@ -108,7 +108,7 @@ type fileStoreFake struct {
 	deletes        []string
 }
 
-func (s *fileStoreFake) ObjectKey(userID uuid.UUID, avatarID uuid.UUID) string {
+func (s *fileStoreFake) ObjectKeyOriginal(userID uuid.UUID, avatarID uuid.UUID) string {
 	s.objectKeyCalls = append(s.objectKeyCalls, objectKeyCall{userID: userID, avatarID: avatarID})
 	if s.objectKey != "" {
 		return s.objectKey
