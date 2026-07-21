@@ -608,13 +608,33 @@ tls_key
 ./certs/generate-local-certs.sh
 ```
 
-Запустите локальные PostgreSQL, MinIO и RabbitMQ:
+Создайте локальный env-файл и заполните пустые значения:
 
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
 
-Запустите сервер:
+Запустите локальный стек:
+
+```bash
+docker compose up -d --build
+```
+
+Команда собирает Docker-образ и запускает:
+
+- PostgreSQL;
+- MinIO;
+- RabbitMQ;
+- сервер;
+- воркер.
+
+Для ручного запуска без контейнеров приложения поднимите инфраструктуру:
+
+```bash
+docker compose up -d postgresql minio rabbitmq
+```
+
+Запустите сервер локально:
 
 ```bash
 go run ./cmd/server -c config/server.local.yaml
@@ -628,13 +648,7 @@ go run ./cmd/server -c config/server.local.yaml
 go run ./cmd/worker -c config/worker.local.yaml
 ```
 
-Текущая локальная инфраструктура:
-
-- PostgreSQL;
-- MinIO;
-- RabbitMQ.
-
-Соберите Docker-образ сервиса:
+Отдельно Docker-образ сервиса можно собрать без запуска compose:
 
 ```bash
 docker build -t goph-profile:local .
@@ -654,6 +668,7 @@ make lint
 Интеграционные тесты, которым нужны PostgreSQL, MinIO и RabbitMQ, запускаются отдельной командой:
 
 ```bash
+cp .env.test.example .env.test
 make test-integration
 ```
 
@@ -712,12 +727,12 @@ internal/app/worker/         # сборка зависимостей ворке�
 internal/buildinfo/          # версия и дата сборки бинарных файлов
 internal/config/             # конфигурация сервера и воркера
 internal/domain/model/       # доменные модели, типы и ошибки
+internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
 internal/imageproc/          # обработка изображений и создание миниатюр
 internal/logging/            # настройка логирования
 internal/queue/rabbitmq/     # публикация и получение сообщений RabbitMQ
 internal/storage/minio/      # S3-совместимое хранилище файлов аватарок
 internal/storage/postgres/   # реализация хранения данных в PostgreSQL
-internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
 internal/usecase/            # сценарии использования приложения и минимальные интерфейсы их зависимостей
 migrations/                  # SQL-миграции базы данных
 web/static/                  # SPA-ресурсы и default-avatar.png

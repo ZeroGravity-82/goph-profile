@@ -11,6 +11,8 @@ vendor/
 *.out
 
 # Sensitive data
+.env
+.env.test
 config/client.local.yaml
 config/server.local.yaml
 config/worker.local.yaml

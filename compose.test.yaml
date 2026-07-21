@@ -6,13 +6,13 @@ services:
     ports:
       - "15432:5432"
     environment:
-      POSTGRES_DB: gophprofile_test
-      POSTGRES_USER: gophprofile
-      POSTGRES_PASSWORD: userpassword
+      POSTGRES_DB: ${GOPH_PROFILE_TEST_POSTGRES_DB:?}
+      POSTGRES_USER: ${GOPH_PROFILE_TEST_POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${GOPH_PROFILE_TEST_POSTGRES_PASSWORD:?}
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gophprofile -d gophprofile_test"]
+      test: ["CMD-SHELL", "pg_isready -U ${GOPH_PROFILE_TEST_POSTGRES_USER:?} -d ${GOPH_PROFILE_TEST_POSTGRES_DB:?}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -24,8 +24,8 @@ services:
       - "19000:9000"
       - "19001:9001"
     environment:
-      MINIO_ROOT_USER: gophprofile
-      MINIO_ROOT_PASSWORD: userpassword
+      MINIO_ROOT_USER: ${GOPH_PROFILE_TEST_MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${GOPH_PROFILE_TEST_MINIO_ROOT_PASSWORD:?}
     tmpfs:
       - /data
     healthcheck:
@@ -37,11 +37,11 @@ services:
   rabbitmq-test:
     image: rabbitmq:3.13-management
     ports:
-      - "15672:5672"
+      - "15673:5672"
       - "25672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: gophprofile
-      RABBITMQ_DEFAULT_PASS: userpassword
+      RABBITMQ_DEFAULT_USER: ${GOPH_PROFILE_TEST_RABBITMQ_USER:?}
+      RABBITMQ_DEFAULT_PASS: ${GOPH_PROFILE_TEST_RABBITMQ_PASSWORD:?}
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+sbwt none +sbwtdcpu none +sbwtdio none"
     tmpfs:
       - /var/lib/rabbitmq
