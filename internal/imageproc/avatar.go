@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	stdimage "image"
+	_ "image/jpeg"
 	"image/png"
 
 	"golang.org/x/image/draw"

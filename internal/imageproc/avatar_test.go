@@ -2,8 +2,9 @@ package imageproc
 
 import (
 	"bytes"
-	stdimage "image"
+	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"testing"
 
@@ -11,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestBuildAvatarThumbnails проверяет создание PNG-миниатюр аватарки и сохранение исходных размеров.
-func TestBuildAvatarThumbnails(t *testing.T) {
+// TestBuildAvatarThumbnails_DecodesPNG проверяет обработку PNG-файла.
+func TestBuildAvatarThumbnails_DecodesPNG(t *testing.T) {
 	// Arrange
 	content := testPNG(t, 320, 240)
 
@@ -27,23 +28,54 @@ func TestBuildAvatarThumbnails(t *testing.T) {
 	assertPNGSize(t, thumbnails.Thumb300, 300, 300)
 }
 
-// testPNG создает PNG-изображение заданного размера для проверки обработки аватарок.
+// TestBuildAvatarThumbnails_DecodesJPEG проверяет обработку JPEG-файла.
+func TestBuildAvatarThumbnails_DecodesJPEG(t *testing.T) {
+	// Arrange
+	content := testJPEG(t, 320, 240)
+
+	// Act
+	thumbnails, err := BuildAvatarThumbnails(content)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, 320, thumbnails.Width)
+	assert.Equal(t, 240, thumbnails.Height)
+	assertPNGSize(t, thumbnails.Thumb100, 100, 100)
+	assertPNGSize(t, thumbnails.Thumb300, 300, 300)
+}
+
+// testPNG создает PNG-файл заданного размера.
 func testPNG(t *testing.T, width int, height int) []byte {
 	t.Helper()
 
-	img := stdimage.NewRGBA(stdimage.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.RGBA{R: uint8(x), G: uint8(y), B: 180, A: 255})
-		}
-	}
-
+	img := testImage(width, height)
 	var buf bytes.Buffer
 	require.NoError(t, png.Encode(&buf, img))
 	return buf.Bytes()
 }
 
-// assertPNGSize проверяет размеры PNG-изображения без декодирования всех пикселей.
+// testJPEG создает JPEG-файл заданного размера.
+func testJPEG(t *testing.T, width int, height int) []byte {
+	t.Helper()
+
+	img := testImage(width, height)
+	var buf bytes.Buffer
+	require.NoError(t, jpeg.Encode(&buf, img, nil))
+	return buf.Bytes()
+}
+
+// testImage создает тестовое изображение заданного размера.
+func testImage(width int, height int) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(x), G: uint8(y), B: 180, A: 255})
+		}
+	}
+	return img
+}
+
+// assertPNGSize проверяет размеры PNG без декодирования всех пикселей.
 func assertPNGSize(t *testing.T, content []byte, width int, height int) {
 	t.Helper()
 
@@ -53,7 +85,7 @@ func assertPNGSize(t *testing.T, content []byte, width int, height int) {
 	assert.Equal(t, height, cfg.Height)
 }
 
-// TestBuildAvatarThumbnails_ReturnsDecodeError проверяет ошибку декодирования исходного файла.
+// TestBuildAvatarThumbnails_ReturnsDecodeError проверяет ошибку декодирования файла.
 func TestBuildAvatarThumbnails_ReturnsDecodeError(t *testing.T) {
 	// Arrange
 	content := []byte("not an image")
