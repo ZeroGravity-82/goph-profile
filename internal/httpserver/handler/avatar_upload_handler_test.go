@@ -161,7 +161,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeImage(t *testing.T) {
 	// Assert
 	assert.Equal(t, http.StatusBadRequest, response.Code)
 	assert.Empty(t, avatarUseCase.uploadInputs)
-	assertErrorResponse(t, response, "Invalid file format")
+	assertErrorResponse(t, response, "Image dimensions are too large")
 }
 
 // TestAvatarHandler_uploadAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.

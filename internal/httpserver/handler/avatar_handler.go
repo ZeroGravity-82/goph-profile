@@ -41,13 +41,14 @@ const (
 )
 
 var (
-	errAvatarFileTooLarge    = errors.New("avatar file is too large")
-	errAvatarFileNameInvalid = errors.New("avatar file name is invalid")
-	errInvalidAvatarSize     = errors.New("invalid avatar size")
-	errInvalidAvatarFormat   = errors.New("invalid avatar format")
-	errInvalidUserIDHeader   = errors.New("invalid X-User-ID header")
-	errInvalidAvatarID       = errors.New("invalid avatar_id")
-	errInvalidRequestBody    = errors.New("invalid request body")
+	errAvatarFileTooLarge            = errors.New("avatar file is too large")
+	errAvatarFileNameInvalid         = errors.New("avatar file name is invalid")
+	errAvatarImageDimensionsTooLarge = errors.New("avatar image dimensions are too large")
+	errInvalidAvatarSize             = errors.New("invalid avatar size")
+	errInvalidAvatarFormat           = errors.New("invalid avatar format")
+	errInvalidUserIDHeader           = errors.New("invalid X-User-ID header")
+	errInvalidAvatarID               = errors.New("invalid avatar_id")
+	errInvalidRequestBody            = errors.New("invalid request body")
 )
 
 var defaultAvatarPNG = web.DefaultAvatarPNG
@@ -243,10 +244,10 @@ func validateAvatarImageDimensions(content []byte) error {
 		return model.ErrInvalidAvatarMetadata
 	}
 	if cfg.Width > maxAvatarImageWidthPixels || cfg.Height > maxAvatarImageHeightPixels {
-		return model.ErrInvalidAvatarMetadata
+		return errAvatarImageDimensionsTooLarge
 	}
 	if int64(cfg.Width)*int64(cfg.Height) > maxAvatarImageAreaPixels {
-		return model.ErrInvalidAvatarMetadata
+		return errAvatarImageDimensionsTooLarge
 	}
 	return nil
 }
@@ -286,6 +287,10 @@ func (h *AvatarHandler) writeAvatarUploadError(w http.ResponseWriter, r *http.Re
 	}
 	if errors.Is(err, errAvatarFileNameInvalid) {
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid file name", "")
+		return
+	}
+	if errors.Is(err, errAvatarImageDimensionsTooLarge) {
+		writeError(h.logger, w, r, http.StatusBadRequest, "Image dimensions are too large", "")
 		return
 	}
 	if errors.Is(err, model.ErrInvalidAvatarMetadata) {
