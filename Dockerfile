@@ -10,7 +10,6 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY migrations ./migrations
-COPY web ./web
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -25,7 +24,6 @@ WORKDIR /app
 
 COPY --from=builder /out/server /app/server
 COPY --from=builder /out/worker /app/worker
-COPY web/static /app/web/static
 
 USER nonroot:nonroot
 

@@ -17,17 +17,17 @@ const apiPathPrefix = "/api/v1"
 //
 // Доступные ручки:
 //
-//	POST /api/v1/avatars
-//	GET /api/v1/avatar?email={email}
-//	GET /api/v1/users/{user_id}/avatar
-//	GET /api/v1/avatars/{avatar_id}
-//	GET /api/v1/avatars/{avatar_id}/metadata
-//	DELETE /api/v1/avatars/{avatar_id}
-//	GET /api/v1/users/{user_id}/avatars
-//	POST /api/v1/users/resolve
-//	PATCH /api/v1/avatar
+//	POST   /api/v1/users/resolve
+//	GET    /api/v1/avatar?email={email}
+//	PATCH  /api/v1/avatar
 //	DELETE /api/v1/avatar
-//	GET /health
+//	POST   /api/v1/avatars
+//	GET    /api/v1/avatars/{avatar_id}
+//	GET    /api/v1/avatars/{avatar_id}/metadata
+//	DELETE /api/v1/avatars/{avatar_id}
+//	GET    /api/v1/users/{user_id}/avatar
+//	GET    /api/v1/users/{user_id}/avatars
+//	GET    /health
 func NewRouter(
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,

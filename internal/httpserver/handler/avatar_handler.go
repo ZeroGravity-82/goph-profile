@@ -23,13 +23,17 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
-	"github.com/ZeroGravity-82/goph-profile/web"
 )
 
 const formFileField = "file"
 
 // avatarCacheControl разрешает клиентам кешировать выдачу аватарки на сутки.
 const avatarCacheControl = "max-age=86400"
+
+const (
+	defaultAvatarPath    = "/default-avatar.png"
+	xAccelRedirectHeader = "X-Accel-Redirect"
+)
 
 const (
 	maxAvatarFileNameLengthBytes      = 255
@@ -50,8 +54,6 @@ var (
 	errInvalidAvatarID               = errors.New("invalid avatar_id")
 	errInvalidRequestBody            = errors.New("invalid request body")
 )
-
-var defaultAvatarPNG = web.DefaultAvatarPNG
 
 // avatarUseCase описывает сценарии работы с аватарками: загрузка, выбор, удаление, получение списка, выдача аватарки
 // по email/ID пользователя и получение метаданных.
@@ -625,10 +627,16 @@ func (h *AvatarHandler) getCurrentAvatarByEmail(w http.ResponseWriter, r *http.R
 	}
 
 	if output.UseDefaultAvatar {
-		writeAvatarContent(h.logger, w, r, model.MIMEPNG, defaultAvatarPNG)
+		writeDefaultAvatarRedirect(w)
 		return
 	}
 	writeAvatarContent(h.logger, w, r, output.MIMEType, output.Content)
+}
+
+// writeDefaultAvatarRedirect передает Nginx запрос на PNG-заглушку через заголовок X-Accel-Redirect.
+func writeDefaultAvatarRedirect(w http.ResponseWriter) {
+	w.Header().Set(xAccelRedirectHeader, defaultAvatarPath)
+	w.WriteHeader(http.StatusOK)
 }
 
 // getCurrentAvatarByUserID парсит user_id из пути и возвращает текущую аватарку или PNG-заглушку.
@@ -649,13 +657,13 @@ func (h *AvatarHandler) getCurrentAvatarByUserID(w http.ResponseWriter, r *http.
 	}
 
 	if output.UseDefaultAvatar {
-		writeAvatarContent(h.logger, w, r, model.MIMEPNG, defaultAvatarPNG)
+		writeDefaultAvatarRedirect(w)
 		return
 	}
 	writeAvatarContent(h.logger, w, r, output.MIMEType, output.Content)
 }
 
-// writeAvatarContent выставляет одинаковые заголовки кеширования для пользовательской аватарки и PNG-заглушки.
+// writeAvatarContent выставляет заголовки кеширования и отдает пользовательскую аватарку.
 func writeAvatarContent(logger *slog.Logger, w http.ResponseWriter, r *http.Request, mimeType string, content []byte) {
 	if logger == nil {
 		logger = logging.NopLogger()

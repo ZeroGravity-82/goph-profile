@@ -38,8 +38,8 @@ func TestAvatarHandler_getCurrentAvatarByEmail(t *testing.T) {
 	assert.Equal(t, model.Email("user@example.com"), avatarUseCase.currentByEmailInputs[0].Email)
 }
 
-// TestAvatarHandler_getCurrentAvatarByEmail_ReturnsDefaultAvatar проверяет выдачу PNG-заглушки.
-func TestAvatarHandler_getCurrentAvatarByEmail_ReturnsDefaultAvatar(t *testing.T) {
+// TestAvatarHandler_getCurrentAvatarByEmail_DelegatesDefaultAvatarToNginx проверяет передачу запроса на PNG-заглушку.
+func TestAvatarHandler_getCurrentAvatarByEmail_DelegatesDefaultAvatarToNginx(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{
 		currentByEmailOutput: usecase.GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true},
@@ -53,9 +53,10 @@ func TestAvatarHandler_getCurrentAvatarByEmail_ReturnsDefaultAvatar(t *testing.T
 
 	// Assert
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, model.MIMEPNG, response.Header().Get("Content-Type"))
-	assert.Equal(t, avatarCacheControl, response.Header().Get("Cache-Control"))
-	assert.Equal(t, defaultAvatarPNG, response.Body.Bytes())
+	assert.Empty(t, response.Header().Get("Content-Type"))
+	assert.Empty(t, response.Header().Get("Cache-Control"))
+	assert.Equal(t, defaultAvatarPath, response.Header().Get(xAccelRedirectHeader))
+	assert.Empty(t, response.Body.Bytes())
 	require.Len(t, avatarUseCase.currentByEmailInputs, 1)
 }
 
@@ -118,8 +119,8 @@ func TestAvatarHandler_getCurrentAvatarByUserID(t *testing.T) {
 	assert.Equal(t, testUserID, avatarUseCase.currentByUserInputs[0].UserID)
 }
 
-// TestAvatarHandler_getCurrentAvatarByUserID_ReturnsDefaultAvatar проверяет выдачу PNG-заглушки.
-func TestAvatarHandler_getCurrentAvatarByUserID_ReturnsDefaultAvatar(t *testing.T) {
+// TestAvatarHandler_getCurrentAvatarByUserID_DelegatesDefaultAvatarToNginx проверяет передачу запроса на PNG-заглушку.
+func TestAvatarHandler_getCurrentAvatarByUserID_DelegatesDefaultAvatarToNginx(t *testing.T) {
 	// Arrange
 	avatarUseCase := &avatarUseCaseFake{
 		currentByUserOutput: usecase.GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true},
@@ -133,9 +134,10 @@ func TestAvatarHandler_getCurrentAvatarByUserID_ReturnsDefaultAvatar(t *testing.
 
 	// Assert
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, model.MIMEPNG, response.Header().Get("Content-Type"))
-	assert.Equal(t, avatarCacheControl, response.Header().Get("Cache-Control"))
-	assert.Equal(t, defaultAvatarPNG, response.Body.Bytes())
+	assert.Empty(t, response.Header().Get("Content-Type"))
+	assert.Empty(t, response.Header().Get("Cache-Control"))
+	assert.Equal(t, defaultAvatarPath, response.Header().Get(xAccelRedirectHeader))
+	assert.Empty(t, response.Body.Bytes())
 	require.Len(t, avatarUseCase.currentByUserInputs, 1)
 }
 
