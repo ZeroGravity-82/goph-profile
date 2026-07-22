@@ -2,7 +2,7 @@ DC := docker compose
 TEST_ENV_FILE ?= .env.test
 TEST_DC := $(DC) --env-file $(TEST_ENV_FILE) -f compose.test.yaml
 
-.PHONY: help fmt test lint vet up down check-test-env integration-up integration-down test-integration
+.PHONY: help fmt test lint vet up down check-test-env integration-up integration-down test-integration test-e2e
 
 help: ## Показать доступные цели
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -50,3 +50,6 @@ test-integration: integration-up ## Запустить интеграционн�
 	TEST_FILE_STORAGE_BUCKET="goph-profile-test" \
 	TEST_QUEUE_URL="amqp://$${GOPH_PROFILE_TEST_RABBITMQ_USER}:$${GOPH_PROFILE_TEST_RABBITMQ_PASSWORD}@localhost:15673/" \
 	go test -p 1 -tags=integration ./internal/...
+
+test-e2e: integration-up ## Запустить e2e-проверки через тестовое окружение
+	./scripts/e2e.sh '$(TEST_ENV_FILE)'
