@@ -7,6 +7,7 @@ CREATE TABLE app_user (
     updated_at        TIMESTAMPTZ  NOT NULL
 );
 CREATE UNIQUE INDEX app_user_email_unique_idx ON app_user (email);
+CREATE INDEX app_user_current_avatar_id_idx ON app_user (current_avatar_id) WHERE current_avatar_id IS NOT NULL;
 
 CREATE TYPE avatar_status AS ENUM (
     'processing',
