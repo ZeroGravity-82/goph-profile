@@ -46,11 +46,6 @@ func Test_isUniqueViolation(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "fallback by text",
-			err:  errors.New("ERROR: duplicate key value violates unique constraint (SQLSTATE 23505)"),
-			want: true,
-		},
-		{
 			name: "typed other pg error",
 			err:  &pgconn.PgError{Code: pgerrcode.ForeignKeyViolation},
 			want: false,

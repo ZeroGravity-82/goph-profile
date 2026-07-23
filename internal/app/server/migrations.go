@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
 
@@ -37,9 +38,13 @@ func (a *App) runMigrations(ctx context.Context) error {
 		return fmt.Errorf("failed to create postgres session locker: %w", err)
 	}
 
+	// Goose работает с *sql.DB, поэтому создаем совместимую обертку поверх общего pgxpool.
+	migrationDB := stdlib.OpenDBFromPool(a.db)
+	defer migrationDB.Close()
+
 	provider, err := goose.NewProvider(
 		goose.DialectPostgres,
-		a.db.DB,
+		migrationDB,
 		migrationfiles.FS,
 		goose.WithSessionLocker(sessionLocker),
 	)

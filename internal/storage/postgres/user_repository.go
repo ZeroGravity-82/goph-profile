@@ -2,26 +2,25 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/repository"
-	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres/dto"
 )
 
 // UserRepository реализует доступ к данным пользователей в PostgreSQL.
 type UserRepository struct {
-	db *sqlx.DB
+	db *pgxpool.Pool
 }
 
 // NewUserRepository создает UserRepository на основе подключения к БД.
-func NewUserRepository(db *sqlx.DB) (*UserRepository, error) {
+func NewUserRepository(db *pgxpool.Pool) (*UserRepository, error) {
 	if db == nil {
 		return nil, errors.New("postgres database is not provided")
 	}
@@ -50,34 +49,39 @@ FOR UPDATE`
 }
 
 func (r *UserRepository) getByID(ctx context.Context, id uuid.UUID, query string) (model.User, error) {
-	var row dto.User
 	exec := executorFromContext(ctx, r.db)
-	if err := exec.GetContext(ctx, &row, query, id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return model.User{}, repository.ErrUserNotFound
-		}
-		return model.User{}, fmt.Errorf("failed to select user by id: %w", err)
+	user, err := scanUser(exec.QueryRow(ctx, query, id))
+	if err == nil {
+		return user, nil
 	}
-
-	user, err := userFromDTO(row)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.User{}, repository.ErrUserNotFound
+	}
+	if errors.Is(err, model.ErrInvalidEmail) {
 		return model.User{}, fmt.Errorf("failed to map user by id: %w", err)
 	}
-	return user, nil
+	return model.User{}, fmt.Errorf("failed to select user by id: %w", err)
 }
 
-func userFromDTO(userRow dto.User) (model.User, error) {
-	email, err := model.NewEmail(userRow.Email)
+func scanUser(row rowScanner) (model.User, error) {
+	var user model.User
+	var rawEmail string
+	err := row.Scan(
+		&user.ID,
+		&rawEmail,
+		&user.CurrentAvatarID,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
 	if err != nil {
 		return model.User{}, err
 	}
-	return model.User{
-		ID:              userRow.ID,
-		Email:           email,
-		CurrentAvatarID: userRow.CurrentAvatarID,
-		CreatedAt:       userRow.CreatedAt,
-		UpdatedAt:       userRow.UpdatedAt,
-	}, nil
+	email, err := model.NewEmail(rawEmail)
+	if err != nil {
+		return model.User{}, err
+	}
+	user.Email = email
+	return user, nil
 }
 
 // GetByEmail возвращает пользователя по нормализованному email.
@@ -87,20 +91,18 @@ SELECT id, email, current_avatar_id, created_at, updated_at
 FROM app_user
 WHERE email = $1`
 
-	var row dto.User
 	exec := executorFromContext(ctx, r.db)
-	if err := exec.GetContext(ctx, &row, q, string(email)); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return model.User{}, repository.ErrUserNotFound
-		}
-		return model.User{}, fmt.Errorf("failed to select user by email: %w", err)
+	user, err := scanUser(exec.QueryRow(ctx, q, string(email)))
+	if err == nil {
+		return user, nil
 	}
-
-	user, err := userFromDTO(row)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.User{}, repository.ErrUserNotFound
+	}
+	if errors.Is(err, model.ErrInvalidEmail) {
 		return model.User{}, fmt.Errorf("failed to map user by email: %w", err)
 	}
-	return user, nil
+	return model.User{}, fmt.Errorf("failed to select user by email: %w", err)
 }
 
 // Create создает пользователя с нормализованным email.
@@ -119,16 +121,15 @@ func (r *UserRepository) Create(ctx context.Context, email model.Email) (model.U
 INSERT INTO app_user (id, email, current_avatar_id, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5)`
 
-	row := userToDTO(user)
 	exec := executorFromContext(ctx, r.db)
-	_, err = exec.ExecContext(
+	_, err = exec.Exec(
 		ctx,
 		q,
-		row.ID,
-		row.Email,
-		row.CurrentAvatarID,
-		row.CreatedAt,
-		row.UpdatedAt,
+		user.ID,
+		string(user.Email),
+		user.CurrentAvatarID,
+		user.CreatedAt,
+		user.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -137,16 +138,6 @@ VALUES ($1, $2, $3, $4, $5)`
 		return model.User{}, fmt.Errorf("failed to insert user: %w", err)
 	}
 	return user, nil
-}
-
-func userToDTO(user model.User) dto.User {
-	return dto.User{
-		ID:              user.ID,
-		Email:           string(user.Email),
-		CurrentAvatarID: user.CurrentAvatarID,
-		CreatedAt:       user.CreatedAt,
-		UpdatedAt:       user.UpdatedAt,
-	}
 }
 
 // Update сохраняет изменяемые поля пользователя.
@@ -158,15 +149,14 @@ SET email = $2,
     updated_at = $4
 WHERE id = $1`
 
-	row := userToDTO(user)
 	exec := executorFromContext(ctx, r.db)
-	result, err := exec.ExecContext(
+	result, err := exec.Exec(
 		ctx,
 		q,
-		row.ID,
-		row.Email,
-		row.CurrentAvatarID,
-		row.UpdatedAt,
+		user.ID,
+		string(user.Email),
+		user.CurrentAvatarID,
+		user.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -175,10 +165,7 @@ WHERE id = $1`
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get updated user count: %w", err)
-	}
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return repository.ErrUserNotFound
 	}

@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
@@ -19,7 +18,7 @@ import (
 
 // App инициализирует зависимости воркера.
 type App struct {
-	db       *sqlx.DB
+	db       *pgxpool.Pool
 	consumer *rabbitmq.Consumer
 }
 
@@ -29,20 +28,25 @@ func New(cfg config.WorkerConfig, logger *slog.Logger) (*App, error) {
 		logger = logging.NopLogger()
 	}
 
-	db, err := sqlx.Connect("pgx", cfg.DatabaseURI)
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the database: %w", err)
 	}
+	if err = db.Ping(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
 
-	app, err := buildApp(context.Background(), cfg, db, logger)
+	app, err := buildApp(ctx, cfg, db, logger)
 	if err != nil {
-		_ = db.Close()
+		db.Close()
 		return nil, err
 	}
 	return app, nil
 }
 
-func buildApp(ctx context.Context, cfg config.WorkerConfig, db *sqlx.DB, logger *slog.Logger) (*App, error) {
+func buildApp(ctx context.Context, cfg config.WorkerConfig, db *pgxpool.Pool, logger *slog.Logger) (*App, error) {
 	userRepo, err := postgres.NewUserRepository(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user repository: %w", err)
@@ -110,7 +114,7 @@ func (a *App) Close() error {
 		err = errors.Join(err, a.consumer.Close())
 	}
 	if a.db != nil {
-		err = errors.Join(err, a.db.Close())
+		a.db.Close()
 	}
 	return err
 }

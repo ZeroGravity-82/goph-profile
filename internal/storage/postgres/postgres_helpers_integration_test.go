@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +18,7 @@ import (
 	migrationfiles "github.com/ZeroGravity-82/goph-profile/migrations"
 )
 
-func openTestDB(t *testing.T, ctx context.Context) *sqlx.DB {
+func openTestDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
 	dsn := os.Getenv("TEST_DATABASE_URI")
@@ -26,10 +26,10 @@ func openTestDB(t *testing.T, ctx context.Context) *sqlx.DB {
 		t.Skip("TEST_DATABASE_URI is not set")
 	}
 
-	db, err := sqlx.ConnectContext(ctx, "pgx", dsn)
+	db, err := pgxpool.New(ctx, dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		require.NoError(t, db.Close())
+		db.Close()
 	})
 
 	require.NoError(t, runTestMigrations(ctx, db))
@@ -41,8 +41,11 @@ func openTestDB(t *testing.T, ctx context.Context) *sqlx.DB {
 	return db
 }
 
-func runTestMigrations(ctx context.Context, db *sqlx.DB) error {
-	provider, err := goose.NewProvider(goose.DialectPostgres, db.DB, migrationfiles.FS)
+func runTestMigrations(ctx context.Context, db *pgxpool.Pool) error {
+	migrationDB := stdlib.OpenDBFromPool(db)
+	defer migrationDB.Close()
+
+	provider, err := goose.NewProvider(goose.DialectPostgres, migrationDB, migrationfiles.FS)
 	if err != nil {
 		return err
 	}
@@ -50,10 +53,10 @@ func runTestMigrations(ctx context.Context, db *sqlx.DB) error {
 	return err
 }
 
-func truncateTestTables(t *testing.T, ctx context.Context, db *sqlx.DB) {
+func truncateTestTables(t *testing.T, ctx context.Context, db *pgxpool.Pool) {
 	t.Helper()
 
-	_, err := db.ExecContext(ctx, "TRUNCATE TABLE avatar, app_user CASCADE")
+	_, err := db.Exec(ctx, "TRUNCATE TABLE avatar, app_user CASCADE")
 	require.NoError(t, err)
 }
 

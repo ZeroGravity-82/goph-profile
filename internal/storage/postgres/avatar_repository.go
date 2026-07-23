@@ -2,25 +2,24 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/repository"
-	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres/dto"
 )
 
 // AvatarRepository реализует доступ к аватаркам в PostgreSQL.
 type AvatarRepository struct {
-	db *sqlx.DB
+	db *pgxpool.Pool
 }
 
 // NewAvatarRepository создает AvatarRepository на основе подключения к БД.
-func NewAvatarRepository(db *sqlx.DB) (*AvatarRepository, error) {
+func NewAvatarRepository(db *pgxpool.Pool) (*AvatarRepository, error) {
 	if db == nil {
 		return nil, errors.New("postgres database is not provided")
 	}
@@ -51,31 +50,41 @@ FOR UPDATE`
 }
 
 func (r *AvatarRepository) getByID(ctx context.Context, id uuid.UUID, query string) (model.Avatar, error) {
-	var row dto.Avatar
 	exec := executorFromContext(ctx, r.db)
-	if err := exec.GetContext(ctx, &row, query, id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return model.Avatar{}, repository.ErrAvatarNotFound
-		}
-		return model.Avatar{}, fmt.Errorf("failed to select avatar by id: %w", err)
+	avatar, err := scanAvatar(exec.QueryRow(ctx, query, id))
+	if err == nil {
+		return avatar, nil
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Avatar{}, repository.ErrAvatarNotFound
+	}
+	return model.Avatar{}, fmt.Errorf("failed to select avatar by id: %w", err)
+}
 
-	return model.Avatar{
-		ID:                row.ID,
-		UserID:            row.UserID,
-		FileName:          row.FileName,
-		MIMEType:          row.MIMEType,
-		SizeBytes:         row.SizeBytes,
-		Width:             row.Width,
-		Height:            row.Height,
-		ObjectKeyOriginal: row.ObjectKeyOriginal,
-		ObjectKeyThumb100: row.ObjectKeyThumb100,
-		ObjectKeyThumb300: row.ObjectKeyThumb300,
-		Status:            model.AvatarStatus(row.Status),
-		CreatedAt:         row.CreatedAt,
-		UpdatedAt:         row.UpdatedAt,
-		DeletedAt:         row.DeletedAt,
-	}, nil
+func scanAvatar(row rowScanner) (model.Avatar, error) {
+	var avatar model.Avatar
+	var status string
+	err := row.Scan(
+		&avatar.ID,
+		&avatar.UserID,
+		&avatar.FileName,
+		&avatar.MIMEType,
+		&avatar.SizeBytes,
+		&avatar.Width,
+		&avatar.Height,
+		&avatar.ObjectKeyOriginal,
+		&avatar.ObjectKeyThumb100,
+		&avatar.ObjectKeyThumb300,
+		&status,
+		&avatar.CreatedAt,
+		&avatar.UpdatedAt,
+		&avatar.DeletedAt,
+	)
+	if err != nil {
+		return model.Avatar{}, err
+	}
+	avatar.Status = model.AvatarStatus(status)
+	return avatar, nil
 }
 
 // ListByUserID возвращает аватарки пользователя.
@@ -89,30 +98,23 @@ WHERE user_id = $1
   AND status NOT IN ('deleting', 'deleted')
 ORDER BY created_at DESC, id DESC`
 
-	var rows []dto.Avatar
 	exec := executorFromContext(ctx, r.db)
-	if err := exec.SelectContext(ctx, &rows, q, userID); err != nil {
+	rows, err := exec.Query(ctx, q, userID)
+	if err != nil {
 		return nil, fmt.Errorf("failed to select user avatars: %w", err)
 	}
+	defer rows.Close()
 
-	avatars := make([]model.Avatar, 0, len(rows))
-	for _, row := range rows {
-		avatars = append(avatars, model.Avatar{
-			ID:                row.ID,
-			UserID:            row.UserID,
-			FileName:          row.FileName,
-			MIMEType:          row.MIMEType,
-			SizeBytes:         row.SizeBytes,
-			Width:             row.Width,
-			Height:            row.Height,
-			ObjectKeyOriginal: row.ObjectKeyOriginal,
-			ObjectKeyThumb100: row.ObjectKeyThumb100,
-			ObjectKeyThumb300: row.ObjectKeyThumb300,
-			Status:            model.AvatarStatus(row.Status),
-			CreatedAt:         row.CreatedAt,
-			UpdatedAt:         row.UpdatedAt,
-			DeletedAt:         row.DeletedAt,
-		})
+	avatars := make([]model.Avatar, 0)
+	for rows.Next() {
+		avatar, err := scanAvatar(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user avatar: %w", err)
+		}
+		avatars = append(avatars, avatar)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read user avatars: %w", err)
 	}
 	return avatars, nil
 }
@@ -127,7 +129,7 @@ INSERT INTO avatar (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
 
 	exec := executorFromContext(ctx, r.db)
-	_, err := exec.ExecContext(ctx, q, avatarArgs(avatar)...)
+	_, err := exec.Exec(ctx, q, avatarArgs(avatar)...)
 	if err != nil {
 		return fmt.Errorf("failed to insert avatar: %w", err)
 	}
@@ -171,7 +173,7 @@ SET file_name = $2,
 WHERE id = $1`
 
 	exec := executorFromContext(ctx, r.db)
-	result, err := exec.ExecContext(
+	result, err := exec.Exec(
 		ctx,
 		q,
 		avatar.ID,
@@ -191,10 +193,7 @@ WHERE id = $1`
 		return fmt.Errorf("failed to update avatar: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get updated avatar count: %w", err)
-	}
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return repository.ErrAvatarNotFound
 	}
@@ -206,15 +205,12 @@ func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	const q = `DELETE FROM avatar WHERE id = $1`
 
 	exec := executorFromContext(ctx, r.db)
-	result, err := exec.ExecContext(ctx, q, id)
+	result, err := exec.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete avatar: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get deleted avatar count: %w", err)
-	}
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return repository.ErrAvatarNotFound
 	}
