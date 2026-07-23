@@ -11,6 +11,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/imageproc"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -97,7 +98,7 @@ func (h *AvatarHandler) HandleAvatarProcessing(
 
 // staleAvatarProcessingMessage определяет, что задача обработки уже не соответствует текущему состоянию аватарки.
 func staleAvatarProcessingMessage(err error) bool {
-	return errors.Is(err, usecase.ErrAvatarNotFound) || errors.Is(err, model.ErrInvalidAvatarTransition)
+	return errors.Is(err, repository.ErrAvatarNotFound) || errors.Is(err, model.ErrInvalidAvatarTransition)
 }
 
 func (h *AvatarHandler) markAvatarFailed(ctx context.Context, avatarID uuid.UUID, cause error) error {
@@ -123,7 +124,7 @@ func (h *AvatarHandler) HandleAvatarDeletion(ctx context.Context, message usecas
 	}
 
 	if err := h.useCase.MarkAvatarDeleted(ctx, usecase.MarkAvatarDeletedInput{AvatarID: message.AvatarID}); err != nil {
-		if errors.Is(err, usecase.ErrAvatarNotFound) || errors.Is(err, model.ErrInvalidAvatarTransition) {
+		if errors.Is(err, repository.ErrAvatarNotFound) || errors.Is(err, model.ErrInvalidAvatarTransition) {
 			return nil
 		}
 		return fmt.Errorf("failed to mark avatar deleted: %w", err)

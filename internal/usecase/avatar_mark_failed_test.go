@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarWorkerUseCase_MarkAvatarFailed проверяет завершение обработки аватарки ошибкой.
@@ -44,7 +45,7 @@ func TestAvatarWorkerUseCase_MarkAvatarFailed(t *testing.T) {
 func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
+	avatarRepo := &avatarRepositoryFake{getErr: repository.ErrAvatarNotFound}
 	useCase := mustAvatarWorkerUseCase(
 		t,
 		&avatarUserRepositoryFake{},
@@ -55,7 +56,7 @@ func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T
 	result, err := useCase.MarkAvatarFailed(ctx, MarkAvatarFailedInput{AvatarID: testAvatarID})
 
 	// Assert
-	require.ErrorIs(t, err, ErrAvatarNotFound)
+	require.ErrorIs(t, err, repository.ErrAvatarNotFound)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)

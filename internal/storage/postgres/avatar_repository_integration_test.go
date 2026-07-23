@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
-	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarRepository_Create проверяет создание аватарки.
@@ -181,7 +181,7 @@ func TestAvatarRepository_Delete(t *testing.T) {
 	require.NoError(t, err)
 	_, err = avatarRepo.GetByID(ctx, avatar.ID)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrAvatarNotFound))
+	assert.True(t, errors.Is(err, repository.ErrAvatarNotFound))
 }
 
 // TestAvatarRepository_GetByID_NotFound проверяет ошибку при поиске несуществующей аватарки.
@@ -196,7 +196,7 @@ func TestAvatarRepository_GetByID_NotFound(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrAvatarNotFound))
+	assert.True(t, errors.Is(err, repository.ErrAvatarNotFound))
 }
 
 // TestAvatarRepository_Update_NotFound проверяет ошибку при обновлении несуществующей аватарки.
@@ -211,7 +211,7 @@ func TestAvatarRepository_Update_NotFound(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrAvatarNotFound))
+	assert.True(t, errors.Is(err, repository.ErrAvatarNotFound))
 }
 
 // TestAvatarRepository_Delete_NotFound проверяет ошибку при удалении несуществующей аватарки.
@@ -226,5 +226,5 @@ func TestAvatarRepository_Delete_NotFound(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrAvatarNotFound))
+	assert.True(t, errors.Is(err, repository.ErrAvatarNotFound))
 }

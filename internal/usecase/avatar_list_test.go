@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_ListUserAvatars проверяет, что список не содержит удаляемые и чужие аватарки.
@@ -58,7 +59,7 @@ func TestAvatarUseCase_ListUserAvatars(t *testing.T) {
 func TestAvatarUseCase_ListUserAvatars_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
+	userRepo := &avatarUserRepositoryFake{err: repository.ErrUserNotFound}
 	avatarRepo := &avatarRepositoryFake{}
 	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
 
@@ -66,7 +67,7 @@ func TestAvatarUseCase_ListUserAvatars_ReturnsUserNotFound(t *testing.T) {
 	output, err := useCase.ListUserAvatars(ctx, ListUserAvatarsInput{UserID: testUserID})
 
 	// Assert
-	require.ErrorIs(t, err, ErrUserNotFound)
+	require.ErrorIs(t, err, repository.ErrUserNotFound)
 	assert.Zero(t, output)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Empty(t, avatarRepo.userIDs)

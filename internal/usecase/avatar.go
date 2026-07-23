@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // UploadAvatarInput описывает входные данные сценария загрузки аватарки.
@@ -534,7 +535,7 @@ func (uc *AvatarUseCase) GetAvatar(ctx context.Context, in GetAvatarInput) (GetA
 		return GetAvatarOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
 	}
 	if err = avatar.CanBeCurrent(); err != nil {
-		return GetAvatarOutput{}, ErrAvatarNotFound
+		return GetAvatarOutput{}, repository.ErrAvatarNotFound
 	}
 
 	objectKey, mimeType, err := avatarObjectForSize(avatar, in.Size)
@@ -564,12 +565,12 @@ func avatarObjectForSize(avatar model.Avatar, size AvatarSize) (string, string, 
 		return avatar.ObjectKeyOriginal, avatar.MIMEType, nil
 	case AvatarSize100:
 		if avatar.ObjectKeyThumb100 == nil {
-			return "", "", ErrAvatarNotFound
+			return "", "", repository.ErrAvatarNotFound
 		}
 		return *avatar.ObjectKeyThumb100, model.MIMEPNG, nil
 	case AvatarSize300:
 		if avatar.ObjectKeyThumb300 == nil {
-			return "", "", ErrAvatarNotFound
+			return "", "", repository.ErrAvatarNotFound
 		}
 		return *avatar.ObjectKeyThumb300, model.MIMEPNG, nil
 	default:
@@ -620,7 +621,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByEmail(
 
 	user, err := uc.userRepo.GetByEmail(ctx, in.Email)
 	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
 		}
 		return GetCurrentAvatarByEmailOutput{}, fmt.Errorf("failed to get user by email: %w", err)
@@ -648,7 +649,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
 
 	user, err := uc.userRepo.GetByID(ctx, in.UserID)
 	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
 		}
 		return GetCurrentAvatarByUserIDOutput{}, fmt.Errorf("failed to get user by id: %w", err)
@@ -668,7 +669,7 @@ func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
 func (uc *AvatarUseCase) getCurrentAvatar(ctx context.Context, user model.User) (currentAvatarOutput, error) {
 	avatar, err := uc.avatarRepo.GetByID(ctx, *user.CurrentAvatarID)
 	if err != nil {
-		if errors.Is(err, ErrAvatarNotFound) {
+		if errors.Is(err, repository.ErrAvatarNotFound) {
 			return currentAvatarOutput{UseDefaultAvatar: true}, nil
 		}
 		return currentAvatarOutput{}, fmt.Errorf("failed to get current avatar by id: %w", err)

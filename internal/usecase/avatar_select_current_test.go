@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_SelectCurrentAvatar проверяет успешный выбор текущей аватарки.
@@ -65,7 +66,7 @@ func TestAvatarUseCase_SelectCurrentAvatar_IsIdempotent(t *testing.T) {
 func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
+	userRepo := &avatarUserRepositoryFake{err: repository.ErrUserNotFound}
 	avatarRepo := &avatarRepositoryFake{}
 	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
@@ -74,7 +75,7 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
-	require.ErrorIs(t, err, ErrUserNotFound)
+	require.ErrorIs(t, err, repository.ErrUserNotFound)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Empty(t, avatarRepo.ids)
 	assert.Empty(t, userRepo.updated)
@@ -87,7 +88,7 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
-	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
+	avatarRepo := &avatarRepositoryFake{getErr: repository.ErrAvatarNotFound}
 	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
 	input := SelectCurrentAvatarInput{UserID: testUserID, AvatarID: testAvatarID}
 
@@ -95,7 +96,7 @@ func TestAvatarUseCase_SelectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	err := useCase.SelectCurrentAvatar(ctx, input)
 
 	// Assert
-	require.ErrorIs(t, err, ErrAvatarNotFound)
+	require.ErrorIs(t, err, repository.ErrAvatarNotFound)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	assert.Empty(t, userRepo.updated)

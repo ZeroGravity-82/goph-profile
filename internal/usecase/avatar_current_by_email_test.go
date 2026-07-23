@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_GetCurrentAvatarByEmail проверяет получение текущей готовой аватарки по email.
@@ -58,7 +59,7 @@ func TestAvatarUseCase_GetCurrentAvatarByEmail_ReturnsDefaultAvatar(t *testing.T
 		{
 			name:             "returns default avatar when email does not belong to any user",
 			user:             model.User{},
-			userErr:          ErrUserNotFound,
+			userErr:          repository.ErrUserNotFound,
 			avatar:           model.Avatar{},
 			avatarErr:        nil,
 			wantAvatarLookup: false,
@@ -76,7 +77,7 @@ func TestAvatarUseCase_GetCurrentAvatarByEmail_ReturnsDefaultAvatar(t *testing.T
 			user:             currentUser,
 			userErr:          nil,
 			avatar:           model.Avatar{},
-			avatarErr:        ErrAvatarNotFound,
+			avatarErr:        repository.ErrAvatarNotFound,
 			wantAvatarLookup: true,
 		},
 		{

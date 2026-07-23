@@ -11,8 +11,8 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres/dto"
-	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
 // UserRepository реализует доступ к данным пользователей в PostgreSQL.
@@ -54,7 +54,7 @@ func (r *UserRepository) getByID(ctx context.Context, id uuid.UUID, query string
 	exec := executorFromContext(ctx, r.db)
 	if err := exec.GetContext(ctx, &row, query, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.User{}, usecase.ErrUserNotFound
+			return model.User{}, repository.ErrUserNotFound
 		}
 		return model.User{}, fmt.Errorf("failed to select user by id: %w", err)
 	}
@@ -91,7 +91,7 @@ WHERE email = $1`
 	exec := executorFromContext(ctx, r.db)
 	if err := exec.GetContext(ctx, &row, q, string(email)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.User{}, usecase.ErrUserNotFound
+			return model.User{}, repository.ErrUserNotFound
 		}
 		return model.User{}, fmt.Errorf("failed to select user by email: %w", err)
 	}
@@ -132,7 +132,7 @@ VALUES ($1, $2, $3, $4, $5)`
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return model.User{}, usecase.ErrEmailAlreadyTaken
+			return model.User{}, repository.ErrEmailAlreadyTaken
 		}
 		return model.User{}, fmt.Errorf("failed to insert user: %w", err)
 	}
@@ -170,7 +170,7 @@ WHERE id = $1`
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return usecase.ErrEmailAlreadyTaken
+			return repository.ErrEmailAlreadyTaken
 		}
 		return fmt.Errorf("failed to update user: %w", err)
 	}
@@ -180,7 +180,7 @@ WHERE id = $1`
 		return fmt.Errorf("failed to get updated user count: %w", err)
 	}
 	if rowsAffected == 0 {
-		return usecase.ErrUserNotFound
+		return repository.ErrUserNotFound
 	}
 	return nil
 }

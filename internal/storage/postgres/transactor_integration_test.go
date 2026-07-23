@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
-	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestTransactor_WithinTransaction_Commit проверяет фиксацию изменений после успешного выполнения callback.
@@ -86,9 +86,9 @@ func TestTransactor_WithinTransaction_Rollback(t *testing.T) {
 
 	_, err = userRepo.GetByEmail(ctx, email)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrUserNotFound))
+	assert.True(t, errors.Is(err, repository.ErrUserNotFound))
 
 	_, err = avatarRepo.GetByID(ctx, avatar.ID)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrAvatarNotFound))
+	assert.True(t, errors.Is(err, repository.ErrAvatarNotFound))
 }

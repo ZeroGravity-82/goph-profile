@@ -15,6 +15,7 @@ import (
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -167,7 +168,7 @@ func TestAvatarHandler_uploadAvatar_RejectsTooLargeImage(t *testing.T) {
 // TestAvatarHandler_uploadAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.
 func TestAvatarHandler_uploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{uploadErr: usecase.ErrUserNotFound}
+	avatarUseCase := &avatarUseCaseFake{uploadErr: repository.ErrUserNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newUploadAvatarRequest(t, testUserID.String(), "avatar.png", pngContent())
 	response := httptest.NewRecorder()

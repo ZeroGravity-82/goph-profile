@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
-	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarHandler_selectCurrentAvatar проверяет успешный выбор текущей аватарки.
@@ -91,7 +91,7 @@ func TestAvatarHandler_selectCurrentAvatar_RejectsInvalidAvatarID(t *testing.T) 
 // TestAvatarHandler_selectCurrentAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.
 func TestAvatarHandler_selectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: usecase.ErrUserNotFound}
+	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: repository.ErrUserNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
@@ -108,7 +108,7 @@ func TestAvatarHandler_selectCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 // TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствующей аватарки.
 func TestAvatarHandler_selectCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: usecase.ErrAvatarNotFound}
+	avatarUseCase := &avatarUseCaseFake{selectCurrentErr: repository.ErrAvatarNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newSelectCurrentAvatarRequest(t, testUserID.String(), testAvatarID.String())
 	response := httptest.NewRecorder()
@@ -228,7 +228,7 @@ func TestAvatarHandler_deleteCurrentAvatar_RejectsInvalidUserIDHeader(t *testing
 // TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound проверяет ошибку отсутствующего пользователя.
 func TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: usecase.ErrUserNotFound}
+	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: repository.ErrUserNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()
@@ -245,7 +245,7 @@ func TestAvatarHandler_deleteCurrentAvatar_ReturnsUserNotFound(t *testing.T) {
 // TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствующей текущей аватарки.
 func TestAvatarHandler_deleteCurrentAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: usecase.ErrAvatarNotFound}
+	avatarUseCase := &avatarUseCaseFake{deleteCurrentErr: repository.ErrAvatarNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newDeleteCurrentAvatarRequest(t, testUserID.String())
 	response := httptest.NewRecorder()

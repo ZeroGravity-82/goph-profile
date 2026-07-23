@@ -22,6 +22,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -124,7 +125,7 @@ func (h *AvatarHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 
 	output, err := h.avatarUseCase.UploadAvatar(r.Context(), input)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 			return
 		}
@@ -392,11 +393,11 @@ func (h *AvatarHandler) writeSelectCurrentAvatarParseError(w http.ResponseWriter
 }
 
 func (h *AvatarHandler) writeSelectCurrentAvatarUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, usecase.ErrUserNotFound) {
+	if errors.Is(err, repository.ErrUserNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 		return
 	}
-	if errors.Is(err, usecase.ErrAvatarNotFound) {
+	if errors.Is(err, repository.ErrAvatarNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
 		return
 	}
@@ -442,11 +443,11 @@ func parseDeleteCurrentAvatarRequest(r *http.Request) (usecase.DeleteCurrentAvat
 }
 
 func (h *AvatarHandler) writeDeleteCurrentAvatarUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, usecase.ErrUserNotFound) {
+	if errors.Is(err, repository.ErrUserNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 		return
 	}
-	if errors.Is(err, usecase.ErrAvatarNotFound) {
+	if errors.Is(err, repository.ErrAvatarNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
 		return
 	}
@@ -505,11 +506,11 @@ func (h *AvatarHandler) writeDeleteAvatarParseError(w http.ResponseWriter, r *ht
 }
 
 func (h *AvatarHandler) writeDeleteAvatarUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, usecase.ErrUserNotFound) {
+	if errors.Is(err, repository.ErrUserNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 		return
 	}
-	if errors.Is(err, usecase.ErrAvatarNotFound) {
+	if errors.Is(err, repository.ErrAvatarNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
 		return
 	}
@@ -533,7 +534,7 @@ func (h *AvatarHandler) listUserAvatars(w http.ResponseWriter, r *http.Request) 
 		UserID: userID,
 	})
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 			return
 		}
@@ -762,7 +763,7 @@ func avatarMIMETypeFromRequest(r *http.Request) (string, error) {
 }
 
 func (h *AvatarHandler) writeGetAvatarError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, usecase.ErrAvatarNotFound) {
+	if errors.Is(err, repository.ErrAvatarNotFound) {
 		writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
 		return
 	}
@@ -794,7 +795,7 @@ func (h *AvatarHandler) getAvatarMetadata(w http.ResponseWriter, r *http.Request
 		AvatarID: avatarID,
 	})
 	if err != nil {
-		if errors.Is(err, usecase.ErrAvatarNotFound) {
+		if errors.Is(err, repository.ErrAvatarNotFound) {
 			writeError(h.logger, w, r, http.StatusNotFound, "Avatar not found", "")
 			return
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_GetAvatar проверяет получение готовой аватарки нужного размера.
@@ -90,7 +91,7 @@ func TestAvatarUseCase_GetAvatar_ReturnsAvatarNotFound(t *testing.T) {
 		{
 			name:      "avatar record is missing",
 			avatar:    model.Avatar{},
-			avatarErr: ErrAvatarNotFound,
+			avatarErr: repository.ErrAvatarNotFound,
 			size:      AvatarSizeOriginal,
 		},
 		{
@@ -133,7 +134,7 @@ func TestAvatarUseCase_GetAvatar_ReturnsAvatarNotFound(t *testing.T) {
 			})
 
 			// Assert
-			require.ErrorIs(t, err, ErrAvatarNotFound)
+			require.ErrorIs(t, err, repository.ErrAvatarNotFound)
 			assert.Zero(t, result)
 			assert.Empty(t, fileStore.gets)
 		})

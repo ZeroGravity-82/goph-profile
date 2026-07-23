@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_UploadAvatar проверяет успешную загрузку аватарки.
@@ -89,7 +90,7 @@ func TestAvatarUseCase_UploadAvatar_RejectsInvalidMetadata(t *testing.T) {
 func TestAvatarUseCase_UploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
+	userRepo := &avatarUserRepositoryFake{err: repository.ErrUserNotFound}
 	avatarRepo := &avatarRepositoryFake{}
 	fileStore := &fileStoreFake{objectKey: testObjectKeyOriginal}
 	messagePublisher := &avatarMessagePublisherFake{}
@@ -99,7 +100,7 @@ func TestAvatarUseCase_UploadAvatar_ReturnsUserNotFound(t *testing.T) {
 	result, err := useCase.UploadAvatar(ctx, validUploadAvatarInput())
 
 	// Assert
-	require.ErrorIs(t, err, ErrUserNotFound)
+	require.ErrorIs(t, err, repository.ErrUserNotFound)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Empty(t, fileStore.puts)

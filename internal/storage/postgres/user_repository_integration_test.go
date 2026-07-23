@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
-	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestUserRepository_Create проверяет создание пользователя.
@@ -107,7 +107,7 @@ func TestUserRepository_GetByID_NotFound(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrUserNotFound))
+	assert.True(t, errors.Is(err, repository.ErrUserNotFound))
 }
 
 // TestUserRepository_GetByEmail_NotFound проверяет ошибку при поиске несуществующего пользователя по email.
@@ -125,7 +125,7 @@ func TestUserRepository_GetByEmail_NotFound(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrUserNotFound))
+	assert.True(t, errors.Is(err, repository.ErrUserNotFound))
 }
 
 // TestUserRepository_Create_DuplicateEmail проверяет маппинг нарушения уникальности email в ошибку usecase.
@@ -145,7 +145,7 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrEmailAlreadyTaken))
+	assert.True(t, errors.Is(err, repository.ErrEmailAlreadyTaken))
 }
 
 // TestUserRepository_Update_NotFound проверяет ошибку при обновлении несуществующего пользователя.
@@ -162,5 +162,5 @@ func TestUserRepository_Update_NotFound(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, usecase.ErrUserNotFound))
+	assert.True(t, errors.Is(err, repository.ErrUserNotFound))
 }

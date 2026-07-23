@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_GetAvatarMetadata проверяет получение метаданных аватарки.
@@ -58,7 +59,7 @@ func TestAvatarUseCase_GetAvatarMetadata(t *testing.T) {
 func TestAvatarUseCase_GetAvatarMetadata_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
+	avatarRepo := &avatarRepositoryFake{getErr: repository.ErrAvatarNotFound}
 	useCase := mustAvatarUseCase(
 		t,
 		&avatarUserRepositoryFake{},
@@ -71,7 +72,7 @@ func TestAvatarUseCase_GetAvatarMetadata_ReturnsAvatarNotFound(t *testing.T) {
 	result, err := useCase.GetAvatarMetadata(ctx, GetAvatarMetadataInput{AvatarID: testAvatarID})
 
 	// Assert
-	require.ErrorIs(t, err, ErrAvatarNotFound)
+	require.ErrorIs(t, err, repository.ErrAvatarNotFound)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 }

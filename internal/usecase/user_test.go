@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 var testUserID = uuid.MustParse("018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001")
@@ -68,8 +69,8 @@ func TestUserUseCase_ResolveUserByEmail(t *testing.T) {
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 	user, err := model.NewUser(testUserID, "user@example.com", now)
 	require.NoError(t, err)
-	repository := &userRepositoryFake{getUser: user}
-	service, err := NewUserUseCase(repository)
+	repo := &userRepositoryFake{getUser: user}
+	service, err := NewUserUseCase(repo)
 	require.NoError(t, err)
 
 	// Act
@@ -79,8 +80,8 @@ func TestUserUseCase_ResolveUserByEmail(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testUserID, result.ID)
 	assert.Equal(t, model.Email("user@example.com"), result.Email)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.getEmails)
-	assert.Empty(t, repository.createEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.getEmails)
+	assert.Empty(t, repo.createEmails)
 }
 
 // TestUserUseCase_ResolveUserByEmail_CreatesUser проверяет создание пользователя.
@@ -90,11 +91,11 @@ func TestUserUseCase_ResolveUserByEmail_CreatesUser(t *testing.T) {
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 	user, err := model.NewUser(testUserID, "user@example.com", now)
 	require.NoError(t, err)
-	repository := &userRepositoryFake{
-		getErr:     ErrUserNotFound,
+	repo := &userRepositoryFake{
+		getErr:     repository.ErrUserNotFound,
 		createUser: user,
 	}
-	service, err := NewUserUseCase(repository)
+	service, err := NewUserUseCase(repo)
 	require.NoError(t, err)
 
 	// Act
@@ -104,8 +105,8 @@ func TestUserUseCase_ResolveUserByEmail_CreatesUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testUserID, result.ID)
 	assert.Equal(t, model.Email("user@example.com"), result.Email)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.getEmails)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.createEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.getEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.createEmails)
 }
 
 // TestUserUseCase_ResolveUserByEmail_ReadsAfterConflict проверяет чтение после конфликта.
@@ -115,13 +116,13 @@ func TestUserUseCase_ResolveUserByEmail_ReadsAfterConflict(t *testing.T) {
 	now := time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC)
 	user, err := model.NewUser(testUserID, "user@example.com", now)
 	require.NoError(t, err)
-	repository := &userRepositoryFake{
+	repo := &userRepositoryFake{
 		getUsers:   []model.User{{}, user},
-		getErrs:    []error{ErrUserNotFound, nil},
-		createErr:  ErrEmailAlreadyTaken,
+		getErrs:    []error{repository.ErrUserNotFound, nil},
+		createErr:  repository.ErrEmailAlreadyTaken,
 		createUser: user,
 	}
-	service, err := NewUserUseCase(repository)
+	service, err := NewUserUseCase(repo)
 	require.NoError(t, err)
 
 	// Act
@@ -134,17 +135,17 @@ func TestUserUseCase_ResolveUserByEmail_ReadsAfterConflict(t *testing.T) {
 	assert.Equal(
 		t,
 		[]model.Email{"user@example.com", "user@example.com"},
-		repository.getEmails,
+		repo.getEmails,
 	)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.createEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.createEmails)
 }
 
 // TestUserUseCase_ResolveUserByEmail_RejectsInvalidEmail проверяет доменную валидацию email перед репозиторием.
 func TestUserUseCase_ResolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	repository := &userRepositoryFake{}
-	service, err := NewUserUseCase(repository)
+	repo := &userRepositoryFake{}
+	service, err := NewUserUseCase(repo)
 	require.NoError(t, err)
 
 	// Act
@@ -153,8 +154,8 @@ func TestUserUseCase_ResolveUserByEmail_RejectsInvalidEmail(t *testing.T) {
 	// Assert
 	require.ErrorIs(t, err, model.ErrInvalidEmail)
 	assert.Zero(t, result)
-	assert.Empty(t, repository.getEmails)
-	assert.Empty(t, repository.createEmails)
+	assert.Empty(t, repo.getEmails)
+	assert.Empty(t, repo.createEmails)
 }
 
 // TestUserUseCase_ResolveUserByEmail_ReturnsGetError проверяет ошибку чтения.
@@ -162,8 +163,8 @@ func TestUserUseCase_ResolveUserByEmail_ReturnsGetError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	repositoryErr := errors.New("repository error")
-	repository := &userRepositoryFake{getErr: repositoryErr}
-	service, err := NewUserUseCase(repository)
+	repo := &userRepositoryFake{getErr: repositoryErr}
+	service, err := NewUserUseCase(repo)
 	require.NoError(t, err)
 
 	// Act
@@ -172,8 +173,8 @@ func TestUserUseCase_ResolveUserByEmail_ReturnsGetError(t *testing.T) {
 	// Assert
 	require.ErrorIs(t, err, repositoryErr)
 	assert.Zero(t, result)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.getEmails)
-	assert.Empty(t, repository.createEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.getEmails)
+	assert.Empty(t, repo.createEmails)
 }
 
 // TestUserUseCase_ResolveUserByEmail_ReturnsCreateError проверяет ошибку создания.
@@ -181,11 +182,11 @@ func TestUserUseCase_ResolveUserByEmail_ReturnsCreateError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	repositoryErr := errors.New("repository error")
-	repository := &userRepositoryFake{
-		getErr:    ErrUserNotFound,
+	repo := &userRepositoryFake{
+		getErr:    repository.ErrUserNotFound,
 		createErr: repositoryErr,
 	}
-	service, err := NewUserUseCase(repository)
+	service, err := NewUserUseCase(repo)
 	require.NoError(t, err)
 
 	// Act
@@ -194,6 +195,6 @@ func TestUserUseCase_ResolveUserByEmail_ReturnsCreateError(t *testing.T) {
 	// Assert
 	require.ErrorIs(t, err, repositoryErr)
 	assert.Zero(t, result)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.getEmails)
-	assert.Equal(t, []model.Email{"user@example.com"}, repository.createEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.getEmails)
+	assert.Equal(t, []model.Email{"user@example.com"}, repo.createEmails)
 }

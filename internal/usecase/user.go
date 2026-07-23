@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // ResolveUserByEmailOutput описывает результат сценария ResolveUserByEmail.
@@ -38,7 +39,7 @@ func NewUserUseCase(userRepo userRepository) (*UserUseCase, error) {
 // ResolveUserByEmail возвращает пользователя по email или создает его.
 //
 // Конкурентное создание одного email решается через уникальность email в хранилище:
-// если Create возвращает ErrEmailAlreadyTaken, сценарий повторно читает пользователя.
+// если Create возвращает repository.ErrEmailAlreadyTaken, сценарий повторно читает пользователя.
 func (uc *UserUseCase) ResolveUserByEmail(
 	ctx context.Context,
 	email model.Email,
@@ -51,7 +52,7 @@ func (uc *UserUseCase) ResolveUserByEmail(
 	if err == nil {
 		return resolveUserByEmailOutput(user), nil
 	}
-	if !errors.Is(err, ErrUserNotFound) {
+	if !errors.Is(err, repository.ErrUserNotFound) {
 		return ResolveUserByEmailOutput{}, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
@@ -59,7 +60,7 @@ func (uc *UserUseCase) ResolveUserByEmail(
 	if err == nil {
 		return resolveUserByEmailOutput(user), nil
 	}
-	if !errors.Is(err, ErrEmailAlreadyTaken) {
+	if !errors.Is(err, repository.ErrEmailAlreadyTaken) {
 		return ResolveUserByEmailOutput{}, fmt.Errorf("failed to create user by email: %w", err)
 	}
 

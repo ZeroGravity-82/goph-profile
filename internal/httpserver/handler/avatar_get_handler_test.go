@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -117,7 +118,7 @@ func TestAvatarHandler_getAvatar_RejectsInvalidFormat(t *testing.T) {
 // TestAvatarHandler_getAvatar_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки.
 func TestAvatarHandler_getAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{getAvatarErr: usecase.ErrAvatarNotFound}
+	avatarUseCase := &avatarUseCaseFake{getAvatarErr: repository.ErrAvatarNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarRequest(t, testAvatarID.String(), "", "")
 	response := httptest.NewRecorder()

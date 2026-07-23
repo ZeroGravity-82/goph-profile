@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarWorkerUseCase_MarkAvatarReady проверяет успешное завершение обработки аватарки.
@@ -53,8 +54,8 @@ func TestAvatarWorkerUseCase_MarkAvatarReady(t *testing.T) {
 	assert.Equal(t, testAvatarID, *userRepo.updated[0].CurrentAvatarID)
 }
 
-// TestAvatarWorkerUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar проверяет сохранение уже выбранной текущей аватарки
-// при завершении обработки.
+// TestAvatarWorkerUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar проверяет сохранение уже выбранной текущей
+// аватарки при завершении обработки.
 func TestAvatarWorkerUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
@@ -84,14 +85,14 @@ func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsAvatarNotFound(t *testing.T)
 	// Arrange
 	ctx := context.Background()
 	userRepo := &avatarUserRepositoryFake{}
-	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
+	avatarRepo := &avatarRepositoryFake{getErr: repository.ErrAvatarNotFound}
 	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
 	// Act
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())
 
 	// Assert
-	require.ErrorIs(t, err, ErrAvatarNotFound)
+	require.ErrorIs(t, err, repository.ErrAvatarNotFound)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	assert.Empty(t, userRepo.ids)
@@ -129,7 +130,7 @@ func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
-	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
+	userRepo := &avatarUserRepositoryFake{err: repository.ErrUserNotFound}
 	avatarRepo := &avatarRepositoryFake{avatar: mustProcessingUseCaseAvatar(t, now)}
 	useCase := mustAvatarWorkerUseCase(t, userRepo, avatarRepo)
 
@@ -137,7 +138,7 @@ func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsUserNotFound(t *testing.T) {
 	result, err := useCase.MarkAvatarReady(ctx, validMarkAvatarReadyInput())
 
 	// Assert
-	require.ErrorIs(t, err, ErrUserNotFound)
+	require.ErrorIs(t, err, repository.ErrUserNotFound)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Empty(t, avatarRepo.updated)

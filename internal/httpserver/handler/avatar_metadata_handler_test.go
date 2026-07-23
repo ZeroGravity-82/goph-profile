@@ -13,6 +13,7 @@ import (
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -94,7 +95,7 @@ func TestAvatarHandler_getAvatarMetadata_RejectsInvalidAvatarID(t *testing.T) {
 // TestAvatarHandler_getAvatarMetadata_ReturnsAvatarNotFound проверяет ошибку отсутствия аватарки.
 func TestAvatarHandler_getAvatarMetadata_ReturnsAvatarNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{metadataErr: usecase.ErrAvatarNotFound}
+	avatarUseCase := &avatarUseCaseFake{metadataErr: repository.ErrAvatarNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newGetAvatarMetadataRequest(t, testAvatarID.String())
 	response := httptest.NewRecorder()

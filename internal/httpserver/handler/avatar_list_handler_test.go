@@ -13,6 +13,7 @@ import (
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -94,7 +95,7 @@ func TestAvatarHandler_listUserAvatars_RejectsInvalidUserID(t *testing.T) {
 // TestAvatarHandler_listUserAvatars_ReturnsUserNotFound проверяет ошибку отсутствия пользователя.
 func TestAvatarHandler_listUserAvatars_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
-	avatarUseCase := &avatarUseCaseFake{listAvatarsErr: usecase.ErrUserNotFound}
+	avatarUseCase := &avatarUseCaseFake{listAvatarsErr: repository.ErrUserNotFound}
 	handler := mustAvatarHandler(t, avatarUseCase, discardLogger())
 	request := newListUserAvatarsRequest(t, testUserID.String())
 	response := httptest.NewRecorder()

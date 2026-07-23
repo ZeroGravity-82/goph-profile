@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 )
 
 // TestAvatarUseCase_DeleteAvatar проверяет удаление аватарки по ID.
@@ -85,7 +86,7 @@ func TestAvatarUseCase_DeleteAvatar_ClearsCurrentAvatar(t *testing.T) {
 func TestAvatarUseCase_DeleteAvatar_ReturnsUserNotFound(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	userRepo := &avatarUserRepositoryFake{err: ErrUserNotFound}
+	userRepo := &avatarUserRepositoryFake{err: repository.ErrUserNotFound}
 	avatarRepo := &avatarRepositoryFake{}
 	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
 
@@ -93,7 +94,7 @@ func TestAvatarUseCase_DeleteAvatar_ReturnsUserNotFound(t *testing.T) {
 	err := useCase.DeleteAvatar(ctx, DeleteAvatarInput{UserID: testUserID, AvatarID: testAvatarID})
 
 	// Assert
-	require.ErrorIs(t, err, ErrUserNotFound)
+	require.ErrorIs(t, err, repository.ErrUserNotFound)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Empty(t, avatarRepo.ids)
 }
@@ -104,14 +105,14 @@ func TestAvatarUseCase_DeleteAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	userRepo := &avatarUserRepositoryFake{user: mustUseCaseUser(t, now)}
-	avatarRepo := &avatarRepositoryFake{getErr: ErrAvatarNotFound}
+	avatarRepo := &avatarRepositoryFake{getErr: repository.ErrAvatarNotFound}
 	useCase := mustAvatarUseCase(t, userRepo, avatarRepo, &fileStoreFake{}, &avatarMessagePublisherFake{})
 
 	// Act
 	err := useCase.DeleteAvatar(ctx, DeleteAvatarInput{UserID: testUserID, AvatarID: testAvatarID})
 
 	// Assert
-	require.ErrorIs(t, err, ErrAvatarNotFound)
+	require.ErrorIs(t, err, repository.ErrAvatarNotFound)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)

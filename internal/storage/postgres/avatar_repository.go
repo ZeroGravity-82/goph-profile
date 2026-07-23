@@ -10,8 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres/dto"
-	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
 // AvatarRepository реализует доступ к аватаркам в PostgreSQL.
@@ -55,7 +55,7 @@ func (r *AvatarRepository) getByID(ctx context.Context, id uuid.UUID, query stri
 	exec := executorFromContext(ctx, r.db)
 	if err := exec.GetContext(ctx, &row, query, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.Avatar{}, usecase.ErrAvatarNotFound
+			return model.Avatar{}, repository.ErrAvatarNotFound
 		}
 		return model.Avatar{}, fmt.Errorf("failed to select avatar by id: %w", err)
 	}
@@ -196,7 +196,7 @@ WHERE id = $1`
 		return fmt.Errorf("failed to get updated avatar count: %w", err)
 	}
 	if rowsAffected == 0 {
-		return usecase.ErrAvatarNotFound
+		return repository.ErrAvatarNotFound
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("failed to get deleted avatar count: %w", err)
 	}
 	if rowsAffected == 0 {
-		return usecase.ErrAvatarNotFound
+		return repository.ErrAvatarNotFound
 	}
 	return nil
 }

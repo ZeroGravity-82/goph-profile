@@ -27,7 +27,11 @@ func mustUserHandler(t *testing.T, userUseCase userUseCase, logger *slog.Logger)
 	return handler
 }
 
-func mustHealthHandler(t *testing.T, checks map[string]func(context.Context) error, logger *slog.Logger) *HealthHandler {
+func mustHealthHandler(
+	t *testing.T,
+	checks map[string]func(context.Context) error,
+	logger *slog.Logger,
+) *HealthHandler {
 	t.Helper()
 
 	handler, err := NewHealthHandler(checks, logger)
