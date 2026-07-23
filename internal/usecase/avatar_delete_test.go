@@ -38,7 +38,9 @@ func TestAvatarUseCase_DeleteAvatar(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, transactor.calls)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	require.Len(t, avatarRepo.updated, 1)
 	assert.Equal(t, model.AvatarStatusDeleting, avatarRepo.updated[0].Status)
 	require.NotNil(t, avatarRepo.updated[0].DeletedAt)
@@ -72,6 +74,8 @@ func TestAvatarUseCase_DeleteAvatar_ClearsCurrentAvatar(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	require.Len(t, avatarRepo.updated, 1)
 	require.Len(t, userRepo.updated, 1)
 	assert.Nil(t, userRepo.updated[0].CurrentAvatarID)
@@ -110,6 +114,7 @@ func TestAvatarUseCase_DeleteAvatar_ReturnsAvatarNotFound(t *testing.T) {
 	require.ErrorIs(t, err, ErrAvatarNotFound)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	assert.Empty(t, avatarRepo.updated)
 	assert.Empty(t, userRepo.updated)
 }

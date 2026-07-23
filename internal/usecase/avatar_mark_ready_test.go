@@ -42,8 +42,10 @@ func TestAvatarWorkerUseCase_MarkAvatarReady(t *testing.T) {
 	assert.Equal(t, input.Height, result.Height)
 	assert.Equal(t, input.ObjectKeyThumb100, result.ObjectKeyThumb100)
 	assert.Equal(t, input.ObjectKeyThumb300, result.ObjectKeyThumb300)
-	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID, testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
 	require.Len(t, avatarRepo.updated, 1)
 	assert.Equal(t, model.AvatarStatusReady, avatarRepo.updated[0].Status)
 	require.Len(t, userRepo.updated, 1)
@@ -70,6 +72,8 @@ func TestAvatarWorkerUseCase_MarkAvatarReady_DoesNotReplaceCurrentAvatar(t *test
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, model.AvatarStatusReady, result.Status)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	require.Len(t, avatarRepo.updated, 1)
 	assert.Empty(t, userRepo.updated)
 }
@@ -112,7 +116,10 @@ func TestAvatarWorkerUseCase_MarkAvatarReady_ReturnsInvalidMetadata(t *testing.T
 	// Assert
 	require.ErrorIs(t, err, model.ErrInvalidAvatarMetadata)
 	assert.Zero(t, result)
-	assert.Empty(t, userRepo.ids)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
+	assert.Equal(t, []uuid.UUID{testAvatarID, testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	assert.Empty(t, avatarRepo.updated)
 }
 

@@ -14,12 +14,19 @@ type avatarUserRepositoryFake struct {
 	emailErr  error
 	updateErr error
 	ids       []uuid.UUID
+	lockIDs   []uuid.UUID
 	emails    []model.Email
 	updated   []model.User
 }
 
 func (r *avatarUserRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.User, error) {
 	r.ids = append(r.ids, id)
+	return r.user, r.err
+}
+
+func (r *avatarUserRepositoryFake) GetByIDForUpdate(_ context.Context, id uuid.UUID) (model.User, error) {
+	r.ids = append(r.ids, id)
+	r.lockIDs = append(r.lockIDs, id)
 	return r.user, r.err
 }
 
@@ -42,6 +49,7 @@ type avatarRepositoryFake struct {
 	updateErr  error
 	deleteErr  error
 	ids        []uuid.UUID
+	lockIDs    []uuid.UUID
 	userIDs    []uuid.UUID
 	created    []model.Avatar
 	updated    []model.Avatar
@@ -50,6 +58,12 @@ type avatarRepositoryFake struct {
 
 func (r *avatarRepositoryFake) GetByID(_ context.Context, id uuid.UUID) (model.Avatar, error) {
 	r.ids = append(r.ids, id)
+	return r.avatar, r.getErr
+}
+
+func (r *avatarRepositoryFake) GetByIDForUpdate(_ context.Context, id uuid.UUID) (model.Avatar, error) {
+	r.ids = append(r.ids, id)
+	r.lockIDs = append(r.lockIDs, id)
 	return r.avatar, r.getErr
 }
 

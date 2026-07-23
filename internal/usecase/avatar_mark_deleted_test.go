@@ -32,6 +32,7 @@ func TestAvatarWorkerUseCase_MarkAvatarDeleted(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	require.Len(t, avatarRepo.updated, 1)
 	assert.Equal(t, model.AvatarStatusDeleted, avatarRepo.updated[0].Status)
 }
@@ -53,5 +54,6 @@ func TestAvatarWorkerUseCase_MarkAvatarDeleted_ReturnsInvalidTransition(t *testi
 
 	// Assert
 	require.ErrorIs(t, err, model.ErrInvalidAvatarTransition)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	assert.Empty(t, avatarRepo.updated)
 }

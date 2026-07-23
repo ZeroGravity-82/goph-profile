@@ -154,6 +154,7 @@ type currentAvatarOutput struct {
 // avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
 type avatarUserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
+	GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.User, error)
 	GetByEmail(ctx context.Context, email model.Email) (model.User, error)
 	Update(ctx context.Context, user model.User) error
 }
@@ -161,6 +162,7 @@ type avatarUserRepository interface {
 // avatarRepository описывает нужные операции с аватарками.
 type avatarRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (model.Avatar, error)
+	GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.Avatar, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Avatar, error)
 	Create(ctx context.Context, avatar model.Avatar) error
 	Update(ctx context.Context, avatar model.Avatar) error
@@ -333,29 +335,31 @@ func (uc *AvatarUseCase) SelectCurrentAvatar(
 	ctx context.Context,
 	in SelectCurrentAvatarInput,
 ) error {
-	user, err := uc.userRepo.GetByID(ctx, in.UserID)
-	if err != nil {
-		return fmt.Errorf("failed to get user by id: %w", err)
-	}
+	return uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, in.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by id: %w", err)
+		}
 
-	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
-	if err != nil {
-		return fmt.Errorf("failed to get avatar by id: %w", err)
-	}
+		avatar, err := uc.avatarRepo.GetByID(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get avatar by id: %w", err)
+		}
 
-	alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
-	if err = user.SelectCurrentAvatar(avatar, time.Now().UTC()); err != nil {
-		return err
-	}
-	if alreadyCurrent {
+		alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
+		if err = user.SelectCurrentAvatar(avatar, time.Now().UTC()); err != nil {
+			return err
+		}
+		if alreadyCurrent {
+			return nil
+		}
+
+		if err = uc.userRepo.Update(txCtx, user); err != nil {
+			return fmt.Errorf("failed to update current avatar: %w", err)
+		}
+
 		return nil
-	}
-
-	if err = uc.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("failed to update current avatar: %w", err)
-	}
-
-	return nil
+	})
 }
 
 // DeleteCurrentAvatar удаляет текущую аватарку пользователя.
@@ -363,7 +367,7 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 	var message AvatarDeletionMessage
 	shouldPublish := false
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
-		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, in.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to get user by id: %w", err)
 		}
@@ -371,7 +375,7 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 			return nil
 		}
 
-		avatar, err := uc.avatarRepo.GetByID(txCtx, *user.CurrentAvatarID)
+		avatar, err := uc.avatarRepo.GetByIDForUpdate(txCtx, *user.CurrentAvatarID)
 		if err != nil {
 			return fmt.Errorf("failed to get current avatar by id: %w", err)
 		}
@@ -416,12 +420,12 @@ func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurre
 func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput) error {
 	var message AvatarDeletionMessage
 	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
-		user, err := uc.userRepo.GetByID(txCtx, in.UserID)
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, in.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to get user by id: %w", err)
 		}
 
-		avatar, err := uc.avatarRepo.GetByID(txCtx, in.AvatarID)
+		avatar, err := uc.avatarRepo.GetByIDForUpdate(txCtx, in.AvatarID)
 		if err != nil {
 			return fmt.Errorf("failed to get avatar by id: %w", err)
 		}

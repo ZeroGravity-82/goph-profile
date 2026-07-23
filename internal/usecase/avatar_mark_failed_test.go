@@ -35,6 +35,7 @@ func TestAvatarWorkerUseCase_MarkAvatarFailed(t *testing.T) {
 	assert.Equal(t, testUserID, result.UserID)
 	assert.Equal(t, model.AvatarStatusFailed, result.Status)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	require.Len(t, avatarRepo.updated, 1)
 	assert.Equal(t, model.AvatarStatusFailed, avatarRepo.updated[0].Status)
 }
@@ -57,6 +58,7 @@ func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsAvatarNotFound(t *testing.T
 	require.ErrorIs(t, err, ErrAvatarNotFound)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	assert.Empty(t, avatarRepo.updated)
 }
 
@@ -79,6 +81,7 @@ func TestAvatarWorkerUseCase_MarkAvatarFailed_ReturnsInvalidTransition(t *testin
 	require.ErrorIs(t, err, model.ErrInvalidAvatarTransition)
 	assert.Zero(t, result)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
+	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.lockIDs)
 	assert.Empty(t, avatarRepo.updated)
 }
 

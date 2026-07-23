@@ -35,9 +35,25 @@ SELECT id, user_id, file_name, mime_type, size_bytes, width, height, object_key_
 FROM avatar
 WHERE id = $1`
 
+	return r.getByID(ctx, id, q)
+}
+
+// GetByIDForUpdate возвращает аватарку по ID с блокировкой для обновления записи.
+func (r *AvatarRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.Avatar, error) {
+	const q = `
+SELECT id, user_id, file_name, mime_type, size_bytes, width, height, object_key_original, object_key_thumb_100,
+       object_key_thumb_300, status, created_at, updated_at, deleted_at
+FROM avatar
+WHERE id = $1
+FOR UPDATE`
+
+	return r.getByID(ctx, id, q)
+}
+
+func (r *AvatarRepository) getByID(ctx context.Context, id uuid.UUID, query string) (model.Avatar, error) {
 	var row dto.Avatar
 	exec := executorFromContext(ctx, r.db)
-	if err := exec.GetContext(ctx, &row, q, id); err != nil {
+	if err := exec.GetContext(ctx, &row, query, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.Avatar{}, usecase.ErrAvatarNotFound
 		}

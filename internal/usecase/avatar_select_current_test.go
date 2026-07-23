@@ -31,6 +31,7 @@ func TestAvatarUseCase_SelectCurrentAvatar(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.ids)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
 	assert.Equal(t, []uuid.UUID{testAvatarID}, avatarRepo.ids)
 	require.Len(t, userRepo.updated, 1)
 	require.NotNil(t, userRepo.updated[0].CurrentAvatarID)
@@ -55,6 +56,7 @@ func TestAvatarUseCase_SelectCurrentAvatar_IsIdempotent(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{testUserID}, userRepo.lockIDs)
 	assert.Empty(t, userRepo.updated)
 }
 

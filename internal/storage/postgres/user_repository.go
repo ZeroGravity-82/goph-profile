@@ -35,9 +35,24 @@ SELECT id, email, current_avatar_id, created_at, updated_at
 FROM app_user
 WHERE id = $1`
 
+	return r.getByID(ctx, id, q)
+}
+
+// GetByIDForUpdate возвращает пользователя по ID с блокировкой для обновления записи.
+func (r *UserRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.User, error) {
+	const q = `
+SELECT id, email, current_avatar_id, created_at, updated_at
+FROM app_user
+WHERE id = $1
+FOR UPDATE`
+
+	return r.getByID(ctx, id, q)
+}
+
+func (r *UserRepository) getByID(ctx context.Context, id uuid.UUID, query string) (model.User, error) {
 	var row dto.User
 	exec := executorFromContext(ctx, r.db)
-	if err := exec.GetContext(ctx, &row, q, id); err != nil {
+	if err := exec.GetContext(ctx, &row, query, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.User{}, usecase.ErrUserNotFound
 		}

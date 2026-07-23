@@ -93,6 +93,19 @@ func (uc *AvatarWorkerUseCase) MarkAvatarReady(
 			return fmt.Errorf("failed to get avatar by id: %w", err)
 		}
 
+		// Не менять порядок блокировок: сначала app_user, затем avatar. Первое чтение avatar нужно только
+		// для получения user_id; затем avatar перечитывается уже с FOR UPDATE, иначе конкурирующие сценарии
+		// с обратным порядком блокировок могут привести к deadlock.
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, avatar.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by id: %w", err)
+		}
+
+		avatar, err = uc.avatarRepo.GetByIDForUpdate(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get avatar by id: %w", err)
+		}
+
 		now := time.Now().UTC()
 		if err = avatar.MarkReady(
 			in.Width,
@@ -102,11 +115,6 @@ func (uc *AvatarWorkerUseCase) MarkAvatarReady(
 			now,
 		); err != nil {
 			return err
-		}
-
-		user, err := uc.userRepo.GetByID(txCtx, avatar.UserID)
-		if err != nil {
-			return fmt.Errorf("failed to get user by id: %w", err)
 		}
 		selectAsCurrent := user.CurrentAvatarID == nil
 		if selectAsCurrent {
@@ -145,17 +153,24 @@ func (uc *AvatarWorkerUseCase) MarkAvatarFailed(
 	ctx context.Context,
 	in MarkAvatarFailedInput,
 ) (MarkAvatarFailedOutput, error) {
-	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
-	if err != nil {
-		return MarkAvatarFailedOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
-	}
+	var avatar model.Avatar
+	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		avatar, err = uc.avatarRepo.GetByIDForUpdate(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get avatar by id: %w", err)
+		}
 
-	if err = avatar.MarkFailed(time.Now().UTC()); err != nil {
+		if err = avatar.MarkFailed(time.Now().UTC()); err != nil {
+			return err
+		}
+
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("failed to update failed avatar: %w", err)
+		}
+		return nil
+	}); err != nil {
 		return MarkAvatarFailedOutput{}, err
-	}
-
-	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
-		return MarkAvatarFailedOutput{}, fmt.Errorf("failed to update failed avatar: %w", err)
 	}
 
 	return MarkAvatarFailedOutput{
@@ -168,18 +183,20 @@ func (uc *AvatarWorkerUseCase) MarkAvatarFailed(
 
 // MarkAvatarDeleted завершает удаление файлов аватарки.
 func (uc *AvatarWorkerUseCase) MarkAvatarDeleted(ctx context.Context, in MarkAvatarDeletedInput) error {
-	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
-	if err != nil {
-		return fmt.Errorf("failed to get avatar by id: %w", err)
-	}
+	return uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		avatar, err := uc.avatarRepo.GetByIDForUpdate(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get avatar by id: %w", err)
+		}
 
-	if err = avatar.MarkDeleted(time.Now().UTC()); err != nil {
-		return err
-	}
+		if err = avatar.MarkDeleted(time.Now().UTC()); err != nil {
+			return err
+		}
 
-	if err = uc.avatarRepo.Update(ctx, avatar); err != nil {
-		return fmt.Errorf("failed to update deleted avatar: %w", err)
-	}
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("failed to update deleted avatar: %w", err)
+		}
 
-	return nil
+		return nil
+	})
 }
