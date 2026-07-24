@@ -1,0 +1,21 @@
+http_address: localhost:3202
+tls_cert: certs/server.crt
+tls_key: certs/server.key
+database_uri: postgres://change-me-db-user:change-me-db-password@localhost:5432/change-me-db-name?sslmode=disable
+file_storage:
+  endpoint: localhost:9000
+  access_key: change-me-access-key
+  secret_key: change-me-secret-key
+  bucket: goph-profile
+  use_ssl: false
+queue:
+  url: amqp://change-me-rabbitmq-user:change-me-rabbitmq-password@localhost:5672/
+  exchange: goph-profile.avatar
+  avatar_processing_queue: goph-profile.avatar-processing
+  avatar_deletion_queue: goph-profile.avatar-deletion
+  avatar_processing_routing_key: avatar.process
+  avatar_deletion_routing_key: avatar.delete
+logging:
+  format: text
+  level: debug
+  add_source: true

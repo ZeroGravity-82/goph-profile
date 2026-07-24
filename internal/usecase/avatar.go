@@ -1,0 +1,693 @@
+package usecase
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/repository"
+)
+
+// UploadAvatarInput описывает входные данные сценария загрузки аватарки.
+type UploadAvatarInput struct {
+	UserID   uuid.UUID
+	FileName string
+	MIMEType string
+	Content  []byte
+}
+
+// UploadAvatarOutput описывает результат сценария загрузки аватарки.
+type UploadAvatarOutput struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	FileName  string
+	MIMEType  string
+	SizeBytes int64
+	Status    model.AvatarStatus
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// SelectCurrentAvatarInput описывает входные данные сценария выбора текущей аватарки.
+type SelectCurrentAvatarInput struct {
+	UserID   uuid.UUID
+	AvatarID uuid.UUID
+}
+
+// DeleteCurrentAvatarInput описывает входные данные сценария удаления текущей аватарки.
+type DeleteCurrentAvatarInput struct {
+	UserID uuid.UUID
+}
+
+// DeleteAvatarInput описывает входные данные сценария удаления аватарки пользователя.
+type DeleteAvatarInput struct {
+	UserID   uuid.UUID
+	AvatarID uuid.UUID
+}
+
+// ListUserAvatarsInput описывает входные данные сценария получения списка аватарок пользователя.
+type ListUserAvatarsInput struct {
+	UserID uuid.UUID
+}
+
+// ListUserAvatarsItemOutput описывает элемент в результате сценария получения списка аватарок пользователя.
+type ListUserAvatarsItemOutput struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	FileName  string
+	MIMEType  string
+	SizeBytes int64
+	Width     *int
+	Height    *int
+	Status    model.AvatarStatus
+	IsCurrent bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// ListUserAvatarsOutput описывает результат сценария получения списка аватарок пользователя.
+type ListUserAvatarsOutput struct {
+	Avatars []ListUserAvatarsItemOutput
+}
+
+// AvatarSize описывает размер файла аватарки, который нужно выдать клиенту.
+type AvatarSize string
+
+const (
+	// AvatarSizeOriginal означает исходный файл аватарки.
+	AvatarSizeOriginal AvatarSize = "original"
+	// AvatarSize100 означает миниатюру 100x100.
+	AvatarSize100 AvatarSize = "100x100"
+	// AvatarSize300 означает миниатюру 300x300.
+	AvatarSize300 AvatarSize = "300x300"
+)
+
+// GetAvatarInput описывает входные данные сценария получения файла аватарки.
+type GetAvatarInput struct {
+	AvatarID uuid.UUID
+	Size     AvatarSize
+	MIMEType string
+}
+
+// GetAvatarOutput описывает результат сценария получения файла аватарки.
+type GetAvatarOutput struct {
+	Content  []byte
+	MIMEType string
+}
+
+// GetAvatarMetadataInput описывает входные данные сценария получения метаданных аватарки.
+type GetAvatarMetadataInput struct {
+	AvatarID uuid.UUID
+}
+
+// GetAvatarMetadataOutput описывает результат сценария получения метаданных аватарки.
+type GetAvatarMetadataOutput struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	FileName          string
+	MIMEType          string
+	SizeBytes         int64
+	Width             *int
+	Height            *int
+	ObjectKeyOriginal string
+	ObjectKeyThumb100 *string
+	ObjectKeyThumb300 *string
+	Status            model.AvatarStatus
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	DeletedAt         *time.Time
+}
+
+// GetCurrentAvatarByEmailInput описывает входные данные сценария получения текущей аватарки по email.
+type GetCurrentAvatarByEmailInput struct {
+	Email model.Email
+}
+
+// GetCurrentAvatarByEmailOutput описывает результат сценария получения текущей аватарки по email.
+type GetCurrentAvatarByEmailOutput struct {
+	Content          []byte
+	MIMEType         string
+	UseDefaultAvatar bool
+}
+
+// GetCurrentAvatarByUserIDInput описывает входные данные сценария получения текущей аватарки по ID пользователя.
+type GetCurrentAvatarByUserIDInput struct {
+	UserID uuid.UUID
+}
+
+// GetCurrentAvatarByUserIDOutput описывает результат сценария получения текущей аватарки по ID пользователя.
+type GetCurrentAvatarByUserIDOutput struct {
+	Content          []byte
+	MIMEType         string
+	UseDefaultAvatar bool
+}
+
+type currentAvatarOutput struct {
+	Content          []byte
+	MIMEType         string
+	UseDefaultAvatar bool
+}
+
+// avatarUserRepository описывает операции с пользователем, которые нужны сценариям работы с аватарками.
+type avatarUserRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (model.User, error)
+	GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.User, error)
+	GetByEmail(ctx context.Context, email model.Email) (model.User, error)
+	Update(ctx context.Context, user model.User) error
+}
+
+// avatarRepository описывает нужные операции с аватарками.
+type avatarRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (model.Avatar, error)
+	GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.Avatar, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Avatar, error)
+	Create(ctx context.Context, avatar model.Avatar) error
+	Update(ctx context.Context, avatar model.Avatar) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// transactor выполняет несколько операций хранилища в одной транзакции.
+type transactor interface {
+	WithinTransaction(ctx context.Context, fn func(context.Context) error) error
+}
+
+// fileStorage описывает операции с хранилищем файлов.
+type fileStorage interface {
+	ObjectKeyOriginal(userID uuid.UUID, avatarID uuid.UUID) string
+	Get(ctx context.Context, objectKey string) ([]byte, error)
+	Put(ctx context.Context, objectKey string, content []byte) error
+	Delete(ctx context.Context, objectKey string) error
+}
+
+// AvatarProcessingMessage описывает сообщение обработки.
+type AvatarProcessingMessage struct {
+	AvatarID          uuid.UUID
+	UserID            uuid.UUID
+	ObjectKeyOriginal string
+}
+
+// AvatarDeletionMessage описывает сообщение удаления файлов аватарки.
+type AvatarDeletionMessage struct {
+	AvatarID   uuid.UUID
+	ObjectKeys []string
+}
+
+// avatarMessagePublisher описывает публикацию сообщений по аватаркам.
+type avatarMessagePublisher interface {
+	PublishAvatarProcessing(ctx context.Context, message AvatarProcessingMessage) error
+	PublishAvatarDeletion(ctx context.Context, message AvatarDeletionMessage) error
+}
+
+// AvatarUseCase реализует сценарии работы с аватарками.
+type AvatarUseCase struct {
+	userRepo    avatarUserRepository
+	avatarRepo  avatarRepository
+	transactor  transactor
+	fileStorage fileStorage
+	publisher   avatarMessagePublisher
+}
+
+// NewAvatarUseCase создает AvatarUseCase.
+func NewAvatarUseCase(
+	userRepo avatarUserRepository,
+	avatarRepo avatarRepository,
+	transactor transactor,
+	fileStorage fileStorage,
+	messagePublisher avatarMessagePublisher,
+) (*AvatarUseCase, error) {
+	if userRepo == nil {
+		return nil, errors.New("user repository is not provided")
+	}
+	if avatarRepo == nil {
+		return nil, errors.New("avatar repository is not provided")
+	}
+	if transactor == nil {
+		return nil, errors.New("transactor is not provided")
+	}
+	if fileStorage == nil {
+		return nil, errors.New("file storage is not provided")
+	}
+	if messagePublisher == nil {
+		return nil, errors.New("avatar message publisher is not provided")
+	}
+
+	return &AvatarUseCase{
+		userRepo:    userRepo,
+		avatarRepo:  avatarRepo,
+		transactor:  transactor,
+		fileStorage: fileStorage,
+		publisher:   messagePublisher,
+	}, nil
+}
+
+// UploadAvatar загружает аватарку.
+func (uc *AvatarUseCase) UploadAvatar(ctx context.Context, in UploadAvatarInput) (UploadAvatarOutput, error) {
+	uuidV7, err := uuid.NewV7()
+	if err != nil {
+		return UploadAvatarOutput{}, fmt.Errorf("failed to create avatar id: %w", err)
+	}
+	objectKeyOriginal := uc.fileStorage.ObjectKeyOriginal(in.UserID, uuidV7)
+	avatar, err := model.NewProcessingAvatar(
+		uuidV7,
+		in.UserID,
+		in.FileName,
+		in.MIMEType,
+		int64(len(in.Content)),
+		objectKeyOriginal,
+		time.Now().UTC(),
+	)
+	if err != nil {
+		return UploadAvatarOutput{}, err
+	}
+
+	if _, err = uc.userRepo.GetByID(ctx, in.UserID); err != nil {
+		return UploadAvatarOutput{}, fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	if err = uc.fileStorage.Put(ctx, objectKeyOriginal, in.Content); err != nil {
+		return UploadAvatarOutput{}, fmt.Errorf("failed to put original avatar: %w", err)
+	}
+
+	if err = uc.avatarRepo.Create(ctx, avatar); err != nil {
+		deleteErr := uc.fileStorage.Delete(ctx, objectKeyOriginal)
+		if deleteErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to rollback avatar upload: %w; delete object: %w",
+				err,
+				deleteErr,
+			)
+		}
+		return UploadAvatarOutput{}, fmt.Errorf("failed to create avatar: %w", err)
+	}
+
+	message := AvatarProcessingMessage{
+		AvatarID:          avatar.ID,
+		UserID:            avatar.UserID,
+		ObjectKeyOriginal: avatar.ObjectKeyOriginal,
+	}
+	if err = uc.publisher.PublishAvatarProcessing(ctx, message); err != nil {
+		deleteAvatarErr := uc.avatarRepo.Delete(ctx, avatar.ID)
+		deleteObjectErr := uc.fileStorage.Delete(ctx, objectKeyOriginal)
+
+		if deleteAvatarErr != nil && deleteObjectErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to rollback avatar upload: %w; delete avatar: %w; delete object: %w",
+				err,
+				deleteAvatarErr,
+				deleteObjectErr,
+			)
+		}
+		if deleteAvatarErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to rollback avatar upload: %w; delete avatar: %w",
+				err,
+				deleteAvatarErr,
+			)
+		}
+		if deleteObjectErr != nil {
+			return UploadAvatarOutput{}, fmt.Errorf(
+				"failed to rollback avatar upload: %w; delete object: %w",
+				err,
+				deleteObjectErr,
+			)
+		}
+
+		return UploadAvatarOutput{}, fmt.Errorf("failed to publish avatar processing message: %w", err)
+	}
+
+	return UploadAvatarOutput{
+		ID:        avatar.ID,
+		UserID:    avatar.UserID,
+		FileName:  avatar.FileName,
+		MIMEType:  avatar.MIMEType,
+		SizeBytes: avatar.SizeBytes,
+		Status:    avatar.Status,
+		CreatedAt: avatar.CreatedAt,
+		UpdatedAt: avatar.UpdatedAt,
+	}, nil
+}
+
+// SelectCurrentAvatar выбирает готовую аватарку пользователя как текущую.
+func (uc *AvatarUseCase) SelectCurrentAvatar(
+	ctx context.Context,
+	in SelectCurrentAvatarInput,
+) error {
+	return uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, in.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by id: %w", err)
+		}
+
+		avatar, err := uc.avatarRepo.GetByID(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get avatar by id: %w", err)
+		}
+
+		alreadyCurrent := user.CurrentAvatarID != nil && *user.CurrentAvatarID == avatar.ID
+		if err = user.SelectCurrentAvatar(avatar, time.Now().UTC()); err != nil {
+			return err
+		}
+		if alreadyCurrent {
+			return nil
+		}
+
+		if err = uc.userRepo.Update(txCtx, user); err != nil {
+			return fmt.Errorf("failed to update current avatar: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// DeleteCurrentAvatar удаляет текущую аватарку пользователя.
+func (uc *AvatarUseCase) DeleteCurrentAvatar(ctx context.Context, in DeleteCurrentAvatarInput) error {
+	var message AvatarDeletionMessage
+	shouldPublish := false
+	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, in.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by id: %w", err)
+		}
+		if user.CurrentAvatarID == nil {
+			return nil
+		}
+
+		avatar, err := uc.avatarRepo.GetByIDForUpdate(txCtx, *user.CurrentAvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get current avatar by id: %w", err)
+		}
+		if avatar.UserID != user.ID {
+			return model.ErrAvatarForbidden
+		}
+
+		now := time.Now().UTC()
+		if err = avatar.MarkDeleting(now); err != nil {
+			return err
+		}
+		user.ClearCurrentAvatar(avatar.ID, now)
+
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("failed to update deleting avatar: %w", err)
+		}
+		if err = uc.userRepo.Update(txCtx, user); err != nil {
+			return fmt.Errorf("failed to clear current avatar: %w", err)
+		}
+
+		message = AvatarDeletionMessage{
+			AvatarID:   avatar.ID,
+			ObjectKeys: avatarObjectKeys(avatar),
+		}
+		shouldPublish = true
+		return nil
+	}); err != nil {
+		return err
+	}
+	if !shouldPublish {
+		return nil
+	}
+
+	if err := uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
+		return fmt.Errorf("failed to publish avatar deletion message: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAvatar удаляет аватарку пользователя.
+func (uc *AvatarUseCase) DeleteAvatar(ctx context.Context, in DeleteAvatarInput) error {
+	var message AvatarDeletionMessage
+	if err := uc.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		user, err := uc.userRepo.GetByIDForUpdate(txCtx, in.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by id: %w", err)
+		}
+
+		avatar, err := uc.avatarRepo.GetByIDForUpdate(txCtx, in.AvatarID)
+		if err != nil {
+			return fmt.Errorf("failed to get avatar by id: %w", err)
+		}
+		if avatar.UserID != user.ID {
+			return model.ErrAvatarForbidden
+		}
+
+		now := time.Now().UTC()
+		if err = avatar.MarkDeleting(now); err != nil {
+			return err
+		}
+		clearCurrent := user.ClearCurrentAvatar(avatar.ID, now)
+
+		if err = uc.avatarRepo.Update(txCtx, avatar); err != nil {
+			return fmt.Errorf("failed to update deleting avatar: %w", err)
+		}
+		if clearCurrent {
+			if err = uc.userRepo.Update(txCtx, user); err != nil {
+				return fmt.Errorf("failed to clear current avatar: %w", err)
+			}
+		}
+
+		message = AvatarDeletionMessage{
+			AvatarID:   avatar.ID,
+			ObjectKeys: avatarObjectKeys(avatar),
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := uc.publisher.PublishAvatarDeletion(ctx, message); err != nil {
+		return fmt.Errorf("failed to publish avatar deletion message: %w", err)
+	}
+
+	return nil
+}
+
+func avatarObjectKeys(avatar model.Avatar) []string {
+	objectKeys := []string{avatar.ObjectKeyOriginal}
+	if avatar.ObjectKeyThumb100 != nil {
+		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb100)
+	}
+	if avatar.ObjectKeyThumb300 != nil {
+		objectKeys = append(objectKeys, *avatar.ObjectKeyThumb300)
+	}
+	return objectKeys
+}
+
+// ListUserAvatars возвращает список аватарок пользователя.
+func (uc *AvatarUseCase) ListUserAvatars(
+	ctx context.Context,
+	in ListUserAvatarsInput,
+) (ListUserAvatarsOutput, error) {
+	user, err := uc.userRepo.GetByID(ctx, in.UserID)
+	if err != nil {
+		return ListUserAvatarsOutput{}, fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	avatars, err := uc.avatarRepo.ListByUserID(ctx, in.UserID)
+	if err != nil {
+		return ListUserAvatarsOutput{}, fmt.Errorf("failed to list user avatars: %w", err)
+	}
+
+	result := ListUserAvatarsOutput{Avatars: make([]ListUserAvatarsItemOutput, 0, len(avatars))}
+	for _, avatar := range avatars {
+		if avatar.UserID != user.ID || !avatarVisibleInList(avatar) {
+			continue
+		}
+		result.Avatars = append(result.Avatars, listUserAvatarsItemOutput(avatar, user.CurrentAvatarID))
+	}
+
+	return result, nil
+}
+
+func avatarVisibleInList(avatar model.Avatar) bool {
+	return avatar.DeletedAt == nil &&
+		avatar.Status != model.AvatarStatusDeleting &&
+		avatar.Status != model.AvatarStatusDeleted
+}
+
+func listUserAvatarsItemOutput(avatar model.Avatar, currentAvatarID *uuid.UUID) ListUserAvatarsItemOutput {
+	return ListUserAvatarsItemOutput{
+		ID:        avatar.ID,
+		UserID:    avatar.UserID,
+		FileName:  avatar.FileName,
+		MIMEType:  avatar.MIMEType,
+		SizeBytes: avatar.SizeBytes,
+		Width:     avatar.Width,
+		Height:    avatar.Height,
+		Status:    avatar.Status,
+		IsCurrent: currentAvatarID != nil && *currentAvatarID == avatar.ID,
+		CreatedAt: avatar.CreatedAt,
+		UpdatedAt: avatar.UpdatedAt,
+	}
+}
+
+// GetAvatar возвращает файл готовой аватарки.
+func (uc *AvatarUseCase) GetAvatar(ctx context.Context, in GetAvatarInput) (GetAvatarOutput, error) {
+	if in.AvatarID == uuid.Nil {
+		return GetAvatarOutput{}, model.ErrInvalidID
+	}
+
+	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
+	if err != nil {
+		return GetAvatarOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
+	}
+	if err = avatar.CanBeCurrent(); err != nil {
+		return GetAvatarOutput{}, repository.ErrAvatarNotFound
+	}
+
+	objectKey, mimeType, err := avatarObjectForSize(avatar, in.Size)
+	if err != nil {
+		return GetAvatarOutput{}, err
+	}
+	if in.MIMEType != "" && in.MIMEType != mimeType {
+		return GetAvatarOutput{}, model.ErrInvalidAvatarMetadata
+	}
+
+	content, err := uc.fileStorage.Get(ctx, objectKey)
+	if err != nil {
+		return GetAvatarOutput{}, fmt.Errorf("failed to get avatar object: %w", err)
+	}
+
+	return GetAvatarOutput{
+		Content:  content,
+		MIMEType: mimeType,
+	}, nil
+}
+
+// avatarObjectForSize выбирает ключ объекта и фактический MIME-тип файла: оригинал сохраняет исходный MIME-тип,
+// миниатюры отдаются как PNG.
+func avatarObjectForSize(avatar model.Avatar, size AvatarSize) (string, string, error) {
+	switch size {
+	case AvatarSizeOriginal:
+		return avatar.ObjectKeyOriginal, avatar.MIMEType, nil
+	case AvatarSize100:
+		if avatar.ObjectKeyThumb100 == nil {
+			return "", "", repository.ErrAvatarNotFound
+		}
+		return *avatar.ObjectKeyThumb100, model.MIMEPNG, nil
+	case AvatarSize300:
+		if avatar.ObjectKeyThumb300 == nil {
+			return "", "", repository.ErrAvatarNotFound
+		}
+		return *avatar.ObjectKeyThumb300, model.MIMEPNG, nil
+	default:
+		return "", "", model.ErrInvalidAvatarMetadata
+	}
+}
+
+// GetAvatarMetadata возвращает метаданные аватарки.
+func (uc *AvatarUseCase) GetAvatarMetadata(
+	ctx context.Context,
+	in GetAvatarMetadataInput,
+) (GetAvatarMetadataOutput, error) {
+	avatar, err := uc.avatarRepo.GetByID(ctx, in.AvatarID)
+	if err != nil {
+		return GetAvatarMetadataOutput{}, fmt.Errorf("failed to get avatar by id: %w", err)
+	}
+
+	return getAvatarMetadataOutput(avatar), nil
+}
+
+func getAvatarMetadataOutput(avatar model.Avatar) GetAvatarMetadataOutput {
+	return GetAvatarMetadataOutput{
+		ID:                avatar.ID,
+		UserID:            avatar.UserID,
+		FileName:          avatar.FileName,
+		MIMEType:          avatar.MIMEType,
+		SizeBytes:         avatar.SizeBytes,
+		Width:             avatar.Width,
+		Height:            avatar.Height,
+		ObjectKeyOriginal: avatar.ObjectKeyOriginal,
+		ObjectKeyThumb100: avatar.ObjectKeyThumb100,
+		ObjectKeyThumb300: avatar.ObjectKeyThumb300,
+		Status:            avatar.Status,
+		CreatedAt:         avatar.CreatedAt,
+		UpdatedAt:         avatar.UpdatedAt,
+		DeletedAt:         avatar.DeletedAt,
+	}
+}
+
+// GetCurrentAvatarByEmail возвращает текущую готовую аватарку пользователя или признак выдачи заглушки.
+func (uc *AvatarUseCase) GetCurrentAvatarByEmail(
+	ctx context.Context,
+	in GetCurrentAvatarByEmailInput,
+) (GetCurrentAvatarByEmailOutput, error) {
+	if err := in.Email.Validate(); err != nil {
+		return GetCurrentAvatarByEmailOutput{}, err
+	}
+
+	user, err := uc.userRepo.GetByEmail(ctx, in.Email)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
+		}
+		return GetCurrentAvatarByEmailOutput{}, fmt.Errorf("failed to get user by email: %w", err)
+	}
+	if user.CurrentAvatarID == nil {
+		return GetCurrentAvatarByEmailOutput{UseDefaultAvatar: true}, nil
+	}
+
+	output, err := uc.getCurrentAvatar(ctx, user)
+	if err != nil {
+		return GetCurrentAvatarByEmailOutput{}, err
+	}
+
+	return GetCurrentAvatarByEmailOutput(output), nil
+}
+
+// GetCurrentAvatarByUserID возвращает текущую готовую аватарку пользователя или признак выдачи заглушки.
+func (uc *AvatarUseCase) GetCurrentAvatarByUserID(
+	ctx context.Context,
+	in GetCurrentAvatarByUserIDInput,
+) (GetCurrentAvatarByUserIDOutput, error) {
+	if in.UserID == uuid.Nil {
+		return GetCurrentAvatarByUserIDOutput{}, model.ErrInvalidID
+	}
+
+	user, err := uc.userRepo.GetByID(ctx, in.UserID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
+		}
+		return GetCurrentAvatarByUserIDOutput{}, fmt.Errorf("failed to get user by id: %w", err)
+	}
+	if user.CurrentAvatarID == nil {
+		return GetCurrentAvatarByUserIDOutput{UseDefaultAvatar: true}, nil
+	}
+
+	output, err := uc.getCurrentAvatar(ctx, user)
+	if err != nil {
+		return GetCurrentAvatarByUserIDOutput{}, err
+	}
+
+	return GetCurrentAvatarByUserIDOutput(output), nil
+}
+
+func (uc *AvatarUseCase) getCurrentAvatar(ctx context.Context, user model.User) (currentAvatarOutput, error) {
+	avatar, err := uc.avatarRepo.GetByID(ctx, *user.CurrentAvatarID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAvatarNotFound) {
+			return currentAvatarOutput{UseDefaultAvatar: true}, nil
+		}
+		return currentAvatarOutput{}, fmt.Errorf("failed to get current avatar by id: %w", err)
+	}
+	if avatar.UserID != user.ID {
+		return currentAvatarOutput{}, model.ErrAvatarForbidden
+	}
+	if err = avatar.CanBeCurrent(); err != nil {
+		return currentAvatarOutput{UseDefaultAvatar: true}, nil
+	}
+
+	content, err := uc.fileStorage.Get(ctx, avatar.ObjectKeyOriginal)
+	if err != nil {
+		return currentAvatarOutput{}, fmt.Errorf("failed to get original avatar object: %w", err)
+	}
+
+	return currentAvatarOutput{
+		Content:  content,
+		MIMEType: avatar.MIMEType,
+	}, nil
+}

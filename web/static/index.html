@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GophProfile</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="workspace" aria-labelledby="app-title">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GophProfile</p>
+          <h1 id="app-title">Аватарки пользователя</h1>
+        </div>
+        <div class="health" id="healthIndicator" aria-live="polite">
+          <span class="health-dot"></span>
+          <span id="healthText">проверка</span>
+        </div>
+      </header>
+
+      <section class="panel identity-panel" aria-labelledby="identity-title">
+        <div>
+          <h2 id="identity-title">Пользователь</h2>
+          <p class="muted">Введите email, чтобы открыть профиль аватарок.</p>
+        </div>
+        <form class="identity-form" id="identityForm">
+          <label for="emailInput">Email</label>
+          <div class="inline-controls">
+            <input
+              id="emailInput"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              placeholder="user@example.com"
+            >
+            <button class="primary-button" type="submit">Продолжить</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="content-grid" id="profileArea" hidden>
+        <section class="panel current-panel" aria-labelledby="current-avatar-title">
+          <div class="panel-header">
+            <div>
+              <h2 id="current-avatar-title">Текущая аватарка</h2>
+              <p class="muted" id="currentEmail"></p>
+            </div>
+            <button class="ghost-button" id="deleteCurrentButton" type="button">Удалить текущую</button>
+          </div>
+          <div class="current-avatar">
+            <img id="currentAvatarImage" src="/default-avatar.png" alt="Текущая аватарка">
+          </div>
+        </section>
+
+        <section class="panel upload-panel" aria-labelledby="upload-title">
+          <h2 id="upload-title">Загрузка</h2>
+          <form class="upload-form" id="uploadForm">
+            <label class="file-drop" for="avatarFileInput">
+              <span id="fileDropText">Выберите JPEG, PNG или WebP до 10 МиБ</span>
+              <input id="avatarFileInput" name="file" type="file" accept="image/jpeg,image/png,image/webp" required>
+            </label>
+            <button class="primary-button" type="submit">Загрузить</button>
+          </form>
+        </section>
+      </section>
+
+      <section class="panel list-panel" id="avatarListPanel" aria-labelledby="avatar-list-title" hidden>
+        <div class="panel-header">
+          <div>
+            <h2 id="avatar-list-title">Загруженные аватарки</h2>
+            <p class="muted" id="avatarListSummary"></p>
+          </div>
+          <button class="ghost-button" id="refreshButton" type="button">Обновить</button>
+        </div>
+        <div class="avatar-list" id="avatarList"></div>
+      </section>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </main>
+
+  <template id="avatarItemTemplate">
+    <article class="avatar-item">
+      <img class="avatar-thumb" alt="">
+      <div class="avatar-meta">
+        <div class="avatar-title-row">
+          <h3></h3>
+          <span class="status-badge"></span>
+        </div>
+        <p class="avatar-details"></p>
+      </div>
+      <div class="avatar-actions">
+        <button
+          class="icon-button select-avatar"
+          type="button"
+          title="Сделать текущей"
+          aria-label="Сделать текущей"
+        >
+          ✓
+        </button>
+        <button class="icon-button delete-avatar" type="button" title="Удалить" aria-label="Удалить">
+          ×
+        </button>
+      </div>
+    </article>
+  </template>
+
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

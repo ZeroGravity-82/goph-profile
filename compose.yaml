@@ -1,0 +1,129 @@
+services:
+  nginx:
+    image: nginx:1.29-alpine
+    ports:
+      - "3202:3202"
+    volumes:
+      - ./config/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./web/static:/usr/share/nginx/html:ro
+    depends_on:
+      server:
+        condition: service_started
+
+  server:
+    build:
+      context: .
+    image: goph-profile:local
+    user: "${GOPH_PROFILE_DOCKER_UID:-1000}:${GOPH_PROFILE_DOCKER_GID:-1000}"
+    environment:
+      GOPH_PROFILE_HTTP_ADDRESS: 0.0.0.0:3202
+      GOPH_PROFILE_TLS_CERT: /app/certs/server.crt
+      GOPH_PROFILE_TLS_KEY: /app/certs/server.key
+      GOPH_PROFILE_DATABASE_URI: ${GOPH_PROFILE_DATABASE_URI:?}
+      GOPH_PROFILE_FILE_STORAGE_ENDPOINT: minio:9000
+      GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY: ${GOPH_PROFILE_MINIO_ROOT_USER:?}
+      GOPH_PROFILE_FILE_STORAGE_SECRET_KEY: ${GOPH_PROFILE_MINIO_ROOT_PASSWORD:?}
+      GOPH_PROFILE_FILE_STORAGE_BUCKET: goph-profile
+      GOPH_PROFILE_FILE_STORAGE_USE_SSL: "false"
+      GOPH_PROFILE_QUEUE_URL: ${GOPH_PROFILE_QUEUE_URL:?}
+      GOPH_PROFILE_QUEUE_EXCHANGE: goph-profile.avatar
+      GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE: goph-profile.avatar-processing
+      GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE: goph-profile.avatar-deletion
+      GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY: avatar.process
+      GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY: avatar.delete
+      GOPH_PROFILE_LOGGING_FORMAT: json
+      GOPH_PROFILE_LOGGING_LEVEL: debug
+      GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+    volumes:
+      - ./certs:/app/certs:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+    image: goph-profile:local
+    entrypoint: ["/app/worker"]
+    environment:
+      GOPH_PROFILE_DATABASE_URI: ${GOPH_PROFILE_DATABASE_URI:?}
+      GOPH_PROFILE_FILE_STORAGE_ENDPOINT: minio:9000
+      GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY: ${GOPH_PROFILE_MINIO_ROOT_USER:?}
+      GOPH_PROFILE_FILE_STORAGE_SECRET_KEY: ${GOPH_PROFILE_MINIO_ROOT_PASSWORD:?}
+      GOPH_PROFILE_FILE_STORAGE_BUCKET: goph-profile
+      GOPH_PROFILE_FILE_STORAGE_USE_SSL: "false"
+      GOPH_PROFILE_QUEUE_URL: ${GOPH_PROFILE_QUEUE_URL:?}
+      GOPH_PROFILE_QUEUE_EXCHANGE: goph-profile.avatar
+      GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE: goph-profile.avatar-processing
+      GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE: goph-profile.avatar-deletion
+      GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY: avatar.process
+      GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY: avatar.delete
+      GOPH_PROFILE_LOGGING_FORMAT: json
+      GOPH_PROFILE_LOGGING_LEVEL: debug
+      GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  postgresql:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${GOPH_PROFILE_POSTGRES_DB:?}
+      POSTGRES_USER: ${GOPH_PROFILE_POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${GOPH_PROFILE_POSTGRES_PASSWORD:?}
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GOPH_PROFILE_POSTGRES_USER:?} -d ${GOPH_PROFILE_POSTGRES_DB:?}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    ports:
+      - '9000:9000' # Порт для API (S3)
+      - '9001:9001' # Порт для веб-консоли управления
+    environment:
+      MINIO_ROOT_USER: ${GOPH_PROFILE_MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${GOPH_PROFILE_MINIO_ROOT_PASSWORD:?}
+    volumes:
+      - minio-data:/data:rw
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${GOPH_PROFILE_RABBITMQ_USER:?}
+      RABBITMQ_DEFAULT_PASS: ${GOPH_PROFILE_RABBITMQ_PASSWORD:?}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+sbwt none +sbwtdcpu none +sbwtdio none"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  postgresql-data:
+  minio-data:
+  rabbitmq-data:

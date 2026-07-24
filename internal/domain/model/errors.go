@@ -1,0 +1,20 @@
+package model
+
+import "errors"
+
+var (
+	// ErrInvalidID возвращается при пустом доменном идентификаторе.
+	ErrInvalidID = errors.New("invalid id")
+	// ErrInvalidEmail возвращается при некорректном email.
+	ErrInvalidEmail = errors.New("invalid email")
+	// ErrInvalidAvatarMetadata возвращается при некорректных метаданных.
+	ErrInvalidAvatarMetadata = errors.New("invalid avatar metadata")
+	// ErrInvalidAvatarTransition возвращается при запрещенном переходе статуса.
+	ErrInvalidAvatarTransition = errors.New("invalid avatar transition")
+	// ErrAvatarForbidden возвращается при операции над чужой аватаркой.
+	ErrAvatarForbidden = errors.New("avatar belongs to another user")
+	// ErrAvatarNotReady возвращается при неготовой аватарке.
+	ErrAvatarNotReady = errors.New("avatar is not ready")
+	// ErrAvatarDeleted возвращается при операции над удаленной аватаркой.
+	ErrAvatarDeleted = errors.New("avatar is deleted")
+)

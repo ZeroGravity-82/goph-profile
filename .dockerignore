@@ -1,0 +1,16 @@
+.git
+.idea
+.tmp
+
+*.out
+
+config/*.local.yaml
+
+certs/*.crt
+certs/*.key
+certs/*.csr
+certs/*.srl
+
+Dockerfile
+compose.yaml
+compose.test.yaml
