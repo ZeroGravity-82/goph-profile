@@ -14,6 +14,8 @@ GophProfile - микросервис для управления аватарк�
 - MinIO/S3 для исходных изображений аватарок и миниатюр;
 - RabbitMQ для задач обработки и удаления аватарок;
 - воркер фоновой обработки изображений и удаления файлов;
+- OpenTelemetry Collector для приема логов сервера и воркера;
+- OpenSearch и OpenSearch Dashboards для хранения и просмотра логов;
 - базовые web-ресурсы для пользовательского интерфейса.
 
 ## Технологический стек
@@ -26,6 +28,8 @@ GophProfile - микросервис для управления аватарк�
 - Docker и Docker Compose;
 - Nginx;
 - `slog` для логирования;
+- OpenTelemetry Collector;
+- OpenSearch и OpenSearch Dashboards;
 - `golangci-lint` для статического анализа;
 - `go test`, `testify` и Docker Compose для тестов.
 
@@ -44,6 +48,7 @@ GophProfile - микросервис для управления аватарк�
 - воркер фоновой обработки изображений и удаления файлов;
 - web-интерфейс загрузки, просмотра результата, выбора и удаления аватарок;
 - создание миниатюр `100x100` и `300x300` в воркере;
+- отправка логов сервера и воркера через OpenTelemetry Collector в OpenSearch;
 - Docker Compose для локального и интеграционного окружения;
 - unit-тесты и интеграционные тесты для ключевых слоев.
 
@@ -601,6 +606,11 @@ tls_key
 
 Для локального запуска эти значения будут указывать на `certs/server.crt` и `certs/server.key`.
 
+## Наблюдаемость
+
+Сервер и воркер пишут структурированные логи через `slog`. Логи отправляются по OTLP в OpenTelemetry Collector,
+а он сохраняет логи в OpenSearch. Для локального просмотра логов используется OpenSearch Dashboards.
+
 ## Локальный запуск
 
 Сгенерируйте локальные TLS-сертификаты, если их еще нет:
@@ -741,6 +751,7 @@ internal/domain/model/       # доменные модели, типы и оши
 internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
 internal/imageproc/          # обработка изображений и создание миниатюр
 internal/logging/            # настройка логирования
+internal/observability/      # настройка телеметрии приложения
 internal/queue/rabbitmq/     # публикация и получение сообщений RabbitMQ
 internal/storage/minio/      # S3-совместимое хранилище файлов аватарок
 internal/storage/postgres/   # реализация хранения данных в PostgreSQL
