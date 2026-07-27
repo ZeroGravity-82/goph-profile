@@ -35,6 +35,10 @@ services:
       GOPH_PROFILE_LOGGING_FORMAT: json
       GOPH_PROFILE_LOGGING_LEVEL: debug
       GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+      OTEL_SERVICE_NAME: goph-profile-server
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: true
     volumes:
       - ./certs:/app/certs:ro
     depends_on:
@@ -44,7 +48,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-
+      otel-collector:
+        condition: service_started
   worker:
     build:
       context: .
@@ -66,6 +71,10 @@ services:
       GOPH_PROFILE_LOGGING_FORMAT: json
       GOPH_PROFILE_LOGGING_LEVEL: debug
       GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+      OTEL_SERVICE_NAME: goph-profile-worker
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: true
     depends_on:
       postgresql:
         condition: service_healthy
@@ -73,6 +82,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
 
   postgresql:
     image: postgres:17
@@ -123,7 +134,55 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.143.0
+    ports:
+      - "4317:4317"
+    command:
+      - "--config=/etc/otel-collector-config.yml"
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  opensearch:
+    image: opensearchproject/opensearch:3.4.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3.9 -c "import urllib.request; urllib.request.urlopen(''http://localhost:9200/_cluster/health'', timeout=2)"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3.4.0
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgresql-data:
   minio-data:
   rabbitmq-data:
+  opensearch-data:

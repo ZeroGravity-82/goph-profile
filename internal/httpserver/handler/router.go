@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 )
 
 const apiPathPrefix = "/api/v1"

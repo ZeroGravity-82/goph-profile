@@ -9,10 +9,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	workerApp "github.com/ZeroGravity-82/goph-profile/internal/app/worker"
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
+	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 )
+
+const serviceName = "goph-profile-worker"
 
 func main() {
 	cfg, err := config.LoadWorker()
@@ -26,17 +30,26 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	logger, err := newLogger(cfg.Logging)
+	logger, shutdownLogger, err := observability.NewLogger(context.Background(), cfg.Logging, serviceName)
 	if err != nil {
 		// Логгер еще не сконфигурирован.
 		log.Fatalf("logger config error: %v", err)
 	}
 
+	exitCode := 0
 	if err := run(cfg, logger); err != nil {
 		logger.Error("worker terminated with error", slog.Any("err", err))
-		os.Exit(1)
+		exitCode = 1
+	} else {
+		logger.Info("worker stopped (graceful)")
 	}
-	logger.Info("worker stopped (graceful)")
+
+	if err := shutdownLoggerProvider(shutdownLogger); err != nil {
+		logger.Error("failed to shutdown logger provider", slog.Any("err", err))
+	}
+	if exitCode != 0 {
+		os.Exit(exitCode)
+	}
 }
 
 func run(cfg config.WorkerConfig, logger *slog.Logger) error {
@@ -54,4 +67,11 @@ func run(cfg config.WorkerConfig, logger *slog.Logger) error {
 	defer stop()
 
 	return application.Run(ctx)
+}
+
+func shutdownLoggerProvider(shutdown func(context.Context) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return shutdown(ctx)
 }
