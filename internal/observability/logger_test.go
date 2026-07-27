@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"testing"
@@ -10,6 +11,45 @@ import (
 
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
 )
+
+// TestLevelHandler_FiltersByLevel проверяет, что levelHandler не пропускает записи ниже настроенного уровня.
+func TestLevelHandler_FiltersByLevel(t *testing.T) {
+	// Arrange
+	logBuffer := &bytes.Buffer{}
+	logger := slog.New(levelHandler{
+		handler: slog.NewTextHandler(logBuffer, &slog.HandlerOptions{Level: slog.LevelDebug}),
+		level:   slog.LevelWarn,
+	})
+
+	// Act
+	logger.Info("hidden")
+	logger.Warn("visible")
+
+	// Assert
+	logOutput := logBuffer.String()
+	assert.NotContains(t, logOutput, "hidden")
+	assert.Contains(t, logOutput, "visible")
+}
+
+// TestLevelHandler_WithAttrsAndGroup проверяет сохранение атрибутов и группы при оборачивании slog.Handler.
+func TestLevelHandler_WithAttrsAndGroup(t *testing.T) {
+	// Arrange
+	logBuffer := &bytes.Buffer{}
+	handler := levelHandler{
+		handler: slog.NewTextHandler(logBuffer, &slog.HandlerOptions{Level: slog.LevelDebug}),
+		level:   slog.LevelDebug,
+	}
+	logger := slog.New(handler.WithAttrs([]slog.Attr{slog.String("component", "test")}).WithGroup("payload"))
+
+	// Act
+	logger.Info("grouped", slog.String("id", "42"))
+
+	// Assert
+	logOutput := logBuffer.String()
+	assert.Contains(t, logOutput, "grouped")
+	assert.Contains(t, logOutput, "component=test")
+	assert.Contains(t, logOutput, "payload.id=42")
+}
 
 // Test_parseLogLevel проверяет поддерживаемые уровни логирования.
 func Test_parseLogLevel(t *testing.T) {

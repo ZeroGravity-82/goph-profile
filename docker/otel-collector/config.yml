@@ -16,6 +16,11 @@ processors:
         action: upsert
 
 exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+
   opensearch/logs:
     http:
       endpoint: http://opensearch:9200
@@ -40,3 +45,10 @@ service:
         - resource/add-job
         - batch
       exporters: [opensearch/logs]
+
+    metrics:
+      receivers: [otlp]
+      processors:
+        - resource/add-job
+        - batch
+      exporters: [prometheus]

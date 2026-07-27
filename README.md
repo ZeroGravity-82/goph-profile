@@ -14,8 +14,9 @@ GophProfile - микросервис для управления аватарк�
 - MinIO/S3 для исходных изображений аватарок и миниатюр;
 - RabbitMQ для задач обработки и удаления аватарок;
 - воркер фоновой обработки изображений и удаления файлов;
-- OpenTelemetry Collector для приема логов сервера и воркера;
+- OpenTelemetry Collector для приема логов и метрик сервера и воркера;
 - OpenSearch и OpenSearch Dashboards для хранения и просмотра логов;
+- Prometheus и Grafana для хранения и просмотра метрик;
 - базовые web-ресурсы для пользовательского интерфейса.
 
 ## Технологический стек
@@ -30,6 +31,7 @@ GophProfile - микросервис для управления аватарк�
 - `slog` для логирования;
 - OpenTelemetry Collector;
 - OpenSearch и OpenSearch Dashboards;
+- Prometheus и Grafana;
 - `golangci-lint` для статического анализа;
 - `go test`, `testify` и Docker Compose для тестов.
 
@@ -49,6 +51,7 @@ GophProfile - микросервис для управления аватарк�
 - web-интерфейс загрузки, просмотра результата, выбора и удаления аватарок;
 - создание миниатюр `100x100` и `300x300` в воркере;
 - отправка логов сервера и воркера через OpenTelemetry Collector в OpenSearch;
+- сбор метрик сервера, воркера, рантайма Go, RabbitMQ, MinIO и хоста в Prometheus;
 - Docker Compose для локального и интеграционного окружения;
 - unit-тесты и интеграционные тесты для ключевых слоев.
 
@@ -608,8 +611,14 @@ tls_key
 
 ## Наблюдаемость
 
-Сервер и воркер пишут структурированные логи через `slog`. Логи отправляются по OTLP в OpenTelemetry Collector,
+Сервер и воркер пишут структурированные логи через `slog`. Логи отправляются по OTLP/gRPC в OpenTelemetry Collector,
 а он сохраняет логи в OpenSearch. Для локального просмотра логов используется OpenSearch Dashboards.
+
+Сервер и воркер отправляют метрики по OTLP/gRPC в OpenTelemetry Collector, а Prometheus оттуда их забирает.
+Сервер пишет метрики пользовательских сценариев и HTTP-запросов. Воркер пишет метрики асинхронной обработки
+аватарок и удаления файлов. Оба процесса также отправляют метрики рантайма Go: память, сборку мусора и количество
+горутин.
+Инфраструктурные метрики очередей, объектного хранилища и хоста отдают непосредственно RabbitMQ, MinIO и Node Exporter.
 
 ## Локальный запуск
 
@@ -633,16 +642,20 @@ docker compose up -d --build
 
 Команда собирает Docker-образ и запускает:
 
+- Nginx;
 - PostgreSQL;
 - MinIO;
 - RabbitMQ;
+- OpenTelemetry Collector;
+- OpenSearch и OpenSearch Dashboards;
+- Prometheus и Grafana;
 - сервер;
 - воркер.
 
 Для ручного запуска без контейнеров приложения поднимите инфраструктуру:
 
 ```bash
-docker compose up -d postgresql minio rabbitmq
+docker compose up -d postgresql minio rabbitmq opensearch otel-collector prometheus grafana opensearch-dashboards
 ```
 
 Создайте локальный конфиг сервера по примеру `config/server.local.example.yaml`. Укажите в нем те же учетные данные,
@@ -665,7 +678,7 @@ go run ./cmd/worker -c config/worker.local.yaml
 Отдельно Docker-образ сервиса можно собрать без запуска compose:
 
 ```bash
-docker build -t goph-profile:local .
+docker build -f docker/Dockerfile -t goph-profile:local .
 ```
 
 Dockerfile использует multi-stage build: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками `server` и `worker`. По умолчанию контейнер запускает `/app/server`; воркер запускается тем же образом с переопределением entrypoint на `/app/worker`.
@@ -741,8 +754,9 @@ make integration-down
 ```text
 cmd/server/                  # точка входа HTTP-сервера
 cmd/worker/                  # точка входа воркера
-config/                      # примеры конфигурации без секретов и локальная конфигурация Nginx
+config/                      # примеры конфигурации без секретов
 certs/                       # TLS-сертификаты для локального запуска и разработки
+docker/                      # Dockerfile и конфигурация локальной инфраструктуры
 internal/app/server/         # сборка зависимостей сервера
 internal/app/worker/         # сборка зависимостей воркера
 internal/buildinfo/          # версия и дата сборки бинарных файлов

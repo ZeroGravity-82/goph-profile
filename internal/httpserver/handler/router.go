@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 )
 
 const apiPathPrefix = "/api/v1"
@@ -38,12 +39,17 @@ func NewRouter(
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
+	httpMetrics, err := observability.NewHTTPRequestMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP metrics: %w", err)
+	}
 
 	r := chi.NewRouter()
 	r.Use(
 		middleware.StripSlashes,
 		middleware.RealIP,
 		withLogging(logger),
+		withMetrics(httpMetrics),
 		withGzip(logger),
 	)
 	avatarHandler, err := NewAvatarHandler(avatarUseCase, logger)

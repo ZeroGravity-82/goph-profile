@@ -22,6 +22,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
@@ -88,6 +89,7 @@ type avatarUseCase interface {
 // AvatarHandler обрабатывает HTTP-запросы для аватарок.
 type AvatarHandler struct {
 	avatarUseCase avatarUseCase
+	metrics       *observability.AvatarUseCaseMetrics
 	logger        *slog.Logger
 }
 
@@ -102,44 +104,94 @@ func NewAvatarHandler(
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
+	metrics, err := observability.NewAvatarUseCaseMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create avatar use case metrics: %w", err)
+	}
 
 	return &AvatarHandler{
 		avatarUseCase: avatarUseCase,
+		metrics:       metrics,
 		logger:        logger,
 	}, nil
 }
 
+// avatarUploadMetric накапливает результат загрузки аватарки, который записывается в метрики при выходе из хендлера.
+type avatarUploadMetric struct {
+	status    string
+	reason    string
+	mimeType  string
+	sizeBytes int64
+}
+
+func newAvatarUploadMetric() avatarUploadMetric {
+	return avatarUploadMetric{
+		status: "error",
+		reason: "unknown",
+	}
+}
+
+func (m *avatarUploadMetric) fail(reason string) {
+	m.reason = reason
+}
+
+func (m *avatarUploadMetric) setInput(input usecase.UploadAvatarInput) {
+	m.mimeType = input.MIMEType
+	m.sizeBytes = int64(len(input.Content))
+}
+
+func (m *avatarUploadMetric) success() {
+	m.status = "success"
+	m.reason = "created"
+}
+
+func (h *AvatarHandler) recordAvatarUploadMetric(ctx context.Context, metric avatarUploadMetric) {
+	h.metrics.RecordAvatarUpload(ctx, metric.status, metric.reason, metric.mimeType, metric.sizeBytes)
+}
+
 // uploadAvatar парсит multipart-запрос, проверяет X-User-ID и передает файл в сценарий загрузки аватарки.
 func (h *AvatarHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
+	metric := newAvatarUploadMetric()
+	defer func() {
+		h.recordAvatarUploadMetric(r.Context(), metric)
+	}()
+
 	userID, err := parseUserIDHeader(r)
 	if err != nil {
+		metric.fail("invalid_user_id")
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid X-User-ID header", "")
 		return
 	}
 
 	input, err := parseAvatarUploadRequest(w, r, userID)
 	if err != nil {
+		metric.fail(avatarUploadMetricReason(err))
 		h.writeAvatarUploadError(w, r, err)
 		return
 	}
+	metric.setInput(input)
 
 	output, err := h.avatarUseCase.UploadAvatar(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
+			metric.fail("user_not_found")
 			writeError(h.logger, w, r, http.StatusNotFound, "User not found", "")
 			return
 		}
+		metric.fail(avatarUploadMetricReason(err))
 		h.writeAvatarUploadError(w, r, err)
 		return
 	}
 
 	avatarURL, err := avatarURLForID(output.ID)
 	if err != nil {
+		metric.fail("response")
 		logError(h.logger, r, "failed to build avatar URL", err)
 		writeError(h.logger, w, r, http.StatusInternalServerError, "Internal server error", "")
 		return
 	}
 
+	metric.success()
 	writeJSON(h.logger, w, r, http.StatusCreated, dto.UploadAvatarResponse{
 		ID:        output.ID.String(),
 		UserID:    output.UserID.String(),
@@ -147,6 +199,21 @@ func (h *AvatarHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		Status:    string(output.Status),
 		CreatedAt: output.CreatedAt,
 	})
+}
+
+func avatarUploadMetricReason(err error) string {
+	switch {
+	case errors.Is(err, errAvatarFileTooLarge):
+		return "file_too_large"
+	case errors.Is(err, errAvatarFileNameInvalid):
+		return "invalid_file_name"
+	case errors.Is(err, errAvatarImageDimensionsTooLarge):
+		return "image_too_large"
+	case errors.Is(err, model.ErrInvalidAvatarMetadata):
+		return "invalid_metadata"
+	default:
+		return "internal"
+	}
 }
 
 func parseUserIDHeader(r *http.Request) (uuid.UUID, error) {
@@ -315,20 +382,79 @@ func avatarURLForID(avatarID uuid.UUID) (string, error) {
 	return url.JoinPath(apiPathPrefix, "avatars", avatarID.String())
 }
 
+// avatarUseCaseActionMetric накапливает результат пользовательского сценария, который записывается в метрики при выходе из хендлера.
+type avatarUseCaseActionMetric struct {
+	action string
+	status string
+	reason string
+}
+
+func newAvatarUseCaseActionMetric(action string) avatarUseCaseActionMetric {
+	return avatarUseCaseActionMetric{
+		action: action,
+		status: "error",
+		reason: "unknown",
+	}
+}
+
+func (m *avatarUseCaseActionMetric) fail(reason string) {
+	m.reason = reason
+}
+
+func (m *avatarUseCaseActionMetric) success(reason string) {
+	m.status = "success"
+	m.reason = reason
+}
+
+func (h *AvatarHandler) recordAvatarUseCaseActionMetric(ctx context.Context, metric avatarUseCaseActionMetric) {
+	h.metrics.RecordAvatarUseCaseAction(ctx, metric.action, metric.status, metric.reason)
+}
+
 // selectCurrentAvatar парсит X-User-ID и avatar_id из JSON-тела, затем передает их в сценарий выбора аватарки.
 func (h *AvatarHandler) selectCurrentAvatar(w http.ResponseWriter, r *http.Request) {
+	metric := newAvatarUseCaseActionMetric("select_current")
+	defer func() {
+		h.recordAvatarUseCaseActionMetric(r.Context(), metric)
+	}()
+
 	input, err := parseSelectCurrentAvatarRequest(r)
 	if err != nil {
+		metric.fail(selectCurrentAvatarMetricReason(err))
 		h.writeSelectCurrentAvatarParseError(w, r, err)
 		return
 	}
 
 	if err = h.avatarUseCase.SelectCurrentAvatar(r.Context(), input); err != nil {
+		metric.fail(selectCurrentAvatarMetricReason(err))
 		h.writeSelectCurrentAvatarUseCaseError(w, r, err)
 		return
 	}
 
+	metric.success("selected")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func selectCurrentAvatarMetricReason(err error) string {
+	switch {
+	case errors.Is(err, errInvalidUserIDHeader):
+		return "invalid_user_id"
+	case errors.Is(err, errInvalidRequestBody):
+		return "invalid_request_body"
+	case errors.Is(err, errInvalidAvatarID):
+		return "invalid_avatar_id"
+	case errors.Is(err, repository.ErrUserNotFound):
+		return "user_not_found"
+	case errors.Is(err, repository.ErrAvatarNotFound):
+		return "avatar_not_found"
+	case errors.Is(err, model.ErrAvatarForbidden):
+		return "forbidden"
+	case errors.Is(err, model.ErrAvatarNotReady):
+		return "avatar_not_ready"
+	case errors.Is(err, model.ErrAvatarDeleted):
+		return "avatar_deleted"
+	default:
+		return "internal"
+	}
 }
 
 func parseSelectCurrentAvatarRequest(r *http.Request) (usecase.SelectCurrentAvatarInput, error) {
@@ -419,17 +545,25 @@ func (h *AvatarHandler) writeSelectCurrentAvatarUseCaseError(w http.ResponseWrit
 
 // deleteCurrentAvatar парсит X-User-ID и передает пользователя в сценарий удаления текущей аватарки.
 func (h *AvatarHandler) deleteCurrentAvatar(w http.ResponseWriter, r *http.Request) {
+	metric := newAvatarUseCaseActionMetric("delete_current")
+	defer func() {
+		h.recordAvatarUseCaseActionMetric(r.Context(), metric)
+	}()
+
 	input, err := parseDeleteCurrentAvatarRequest(r)
 	if err != nil {
+		metric.fail("invalid_user_id")
 		writeError(h.logger, w, r, http.StatusBadRequest, "Invalid X-User-ID header", "")
 		return
 	}
 
 	if err = h.avatarUseCase.DeleteCurrentAvatar(r.Context(), input); err != nil {
+		metric.fail(deleteAvatarMetricReason(err))
 		h.writeDeleteCurrentAvatarUseCaseError(w, r, err)
 		return
 	}
 
+	metric.success("deleted")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -461,18 +595,43 @@ func (h *AvatarHandler) writeDeleteCurrentAvatarUseCaseError(w http.ResponseWrit
 
 // deleteAvatar парсит X-User-ID и avatar_id из пути, затем передает их в сценарий удаления конкретной аватарки.
 func (h *AvatarHandler) deleteAvatar(w http.ResponseWriter, r *http.Request) {
+	metric := newAvatarUseCaseActionMetric("delete_by_id")
+	defer func() {
+		h.recordAvatarUseCaseActionMetric(r.Context(), metric)
+	}()
+
 	input, err := parseDeleteAvatarRequest(r)
 	if err != nil {
+		metric.fail(deleteAvatarMetricReason(err))
 		h.writeDeleteAvatarParseError(w, r, err)
 		return
 	}
 
 	if err = h.avatarUseCase.DeleteAvatar(r.Context(), input); err != nil {
+		metric.fail(deleteAvatarMetricReason(err))
 		h.writeDeleteAvatarUseCaseError(w, r, err)
 		return
 	}
 
+	metric.success("deleted")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func deleteAvatarMetricReason(err error) string {
+	switch {
+	case errors.Is(err, errInvalidUserIDHeader):
+		return "invalid_user_id"
+	case errors.Is(err, errInvalidAvatarID):
+		return "invalid_avatar_id"
+	case errors.Is(err, repository.ErrUserNotFound):
+		return "user_not_found"
+	case errors.Is(err, repository.ErrAvatarNotFound):
+		return "avatar_not_found"
+	case errors.Is(err, model.ErrAvatarForbidden):
+		return "forbidden"
+	default:
+		return "internal"
+	}
 }
 
 func parseDeleteAvatarRequest(r *http.Request) (usecase.DeleteAvatarInput, error) {

@@ -16,7 +16,10 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 )
 
-const serviceName = "goph-profile-worker"
+const (
+	serviceName              = "goph-profile-worker"
+	telemetryShutdownTimeout = 5 * time.Second
+)
 
 func main() {
 	cfg, err := config.LoadWorker()
@@ -35,6 +38,11 @@ func main() {
 		// Логгер еще не сконфигурирован.
 		log.Fatalf("logger config error: %v", err)
 	}
+	shutdownMeter, err := observability.SetupGlobalMeterProvider(context.Background(), serviceName)
+	if err != nil {
+		_ = shutdownTelemetryProvider(shutdownLogger)
+		log.Fatalf("meter config error: %v", err)
+	}
 
 	exitCode := 0
 	if err := run(cfg, logger); err != nil {
@@ -44,7 +52,10 @@ func main() {
 		logger.Info("worker stopped (graceful)")
 	}
 
-	if err := shutdownLoggerProvider(shutdownLogger); err != nil {
+	if err := shutdownTelemetryProvider(shutdownMeter); err != nil {
+		logger.Error("failed to shutdown meter provider", slog.Any("err", err))
+	}
+	if err := shutdownTelemetryProvider(shutdownLogger); err != nil {
 		logger.Error("failed to shutdown logger provider", slog.Any("err", err))
 	}
 	if exitCode != 0 {
@@ -69,8 +80,8 @@ func run(cfg config.WorkerConfig, logger *slog.Logger) error {
 	return application.Run(ctx)
 }
 
-func shutdownLoggerProvider(shutdown func(context.Context) error) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func shutdownTelemetryProvider(shutdown func(context.Context) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), telemetryShutdownTimeout)
 	defer cancel()
 
 	return shutdown(ctx)
