@@ -382,7 +382,8 @@ func avatarURLForID(avatarID uuid.UUID) (string, error) {
 	return url.JoinPath(apiPathPrefix, "avatars", avatarID.String())
 }
 
-// avatarUseCaseActionMetric накапливает результат пользовательского сценария, который записывается в метрики при выходе из хендлера.
+// avatarUseCaseActionMetric накапливает результат пользовательского сценария, который записывается в метрики при
+// выходе из хендлера.
 type avatarUseCaseActionMetric struct {
 	action string
 	status string

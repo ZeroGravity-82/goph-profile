@@ -43,6 +43,12 @@ func main() {
 		_ = shutdownTelemetryProvider(shutdownLogger)
 		log.Fatalf("meter config error: %v", err)
 	}
+	shutdownTracer, err := observability.SetupGlobalTracerProvider(context.Background(), serviceName)
+	if err != nil {
+		_ = shutdownTelemetryProvider(shutdownMeter)
+		_ = shutdownTelemetryProvider(shutdownLogger)
+		log.Fatalf("tracer config error: %v", err)
+	}
 
 	exitCode := 0
 	if err := run(cfg, logger); err != nil {
@@ -52,6 +58,9 @@ func main() {
 		logger.Info("service stopped (graceful)")
 	}
 
+	if err := shutdownTelemetryProvider(shutdownTracer); err != nil {
+		logger.Error("failed to shutdown tracer provider", slog.Any("err", err))
+	}
 	if err := shutdownTelemetryProvider(shutdownMeter); err != nil {
 		logger.Error("failed to shutdown meter provider", slog.Any("err", err))
 	}

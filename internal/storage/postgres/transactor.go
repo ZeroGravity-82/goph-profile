@@ -45,9 +45,14 @@ func (t *Transactor) WithinTransaction(ctx context.Context, fn func(context.Cont
 		return fn(ctx)
 	}
 
+	ctx, span := startSpan(ctx, "postgres.transaction", "TRANSACTION", "")
+	defer span.End()
+
 	tx, err := t.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		err = fmt.Errorf("failed to begin transaction: %w", err)
+		recordSpanError(span, err)
+		return err
 	}
 
 	committed := false
@@ -58,11 +63,14 @@ func (t *Transactor) WithinTransaction(ctx context.Context, fn func(context.Cont
 	}()
 
 	if err = fn(context.WithValue(ctx, txContextKey, tx)); err != nil {
+		recordSpanError(span, err)
 		return err
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		err = fmt.Errorf("failed to commit transaction: %w", err)
+		recordSpanError(span, err)
+		return err
 	}
 	committed = true
 	return nil

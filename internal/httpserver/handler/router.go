@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/observability"
@@ -79,5 +80,6 @@ func NewRouter(
 	})
 	r.Get("/health", healthHandler.getHealth)
 
-	return r, nil
+	// otelhttp создает span трассировки для каждого входящего HTTP-запроса и передает дальше исходный chi-router.
+	return otelhttp.NewHandler(r, "goph-profile.http"), nil
 }

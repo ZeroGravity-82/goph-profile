@@ -191,19 +191,37 @@ func (c *Consumer) consumeProcessing(
 // Невалидное сообщение отклоняется через Reject без повторной доставки. Ошибка обработчика считается временной
 // ошибкой выполнения и подтверждается через Nack с возвратом сообщения в очередь.
 func (c *Consumer) handleProcessingDelivery(ctx context.Context, delivery amqp.Delivery) error {
+	ctx, span := startConsumeSpanWithExtractedTraceContext(ctx, delivery, "rabbitmq.consume.avatar_processing")
+	defer span.end()
+
 	message, err := decodeAvatarProcessingMessage(delivery.Body)
 	if err != nil {
+		span.recordError(err)
 		c.logger.WarnContext(ctx, "invalid avatar processing message", slog.Any("err", err))
-		return delivery.Reject(false)
+		if rejectErr := delivery.Reject(false); rejectErr != nil {
+			span.recordError(rejectErr)
+			return rejectErr
+		}
+		return nil
 	}
+	span.setAvatarID(message.AvatarID.String())
 	if err = c.handler.HandleAvatarProcessing(ctx, message); err != nil {
+		span.recordError(err)
 		c.logger.ErrorContext(ctx, "avatar processing message failed",
 			slog.String("avatar_id", message.AvatarID.String()),
 			slog.Any("err", err),
 		)
-		return delivery.Nack(false, true)
+		if nackErr := delivery.Nack(false, true); nackErr != nil {
+			span.recordError(nackErr)
+			return nackErr
+		}
+		return nil
 	}
-	return delivery.Ack(false)
+	if ackErr := delivery.Ack(false); ackErr != nil {
+		span.recordError(ackErr)
+		return ackErr
+	}
+	return nil
 }
 
 // decodeAvatarProcessingMessage парсит JSON-сообщение RabbitMQ в задачу обработки аватарки.
@@ -256,19 +274,37 @@ func (c *Consumer) consumeDeletion(ctx context.Context, deliveryCh <-chan amqp.D
 // Невалидное сообщение отклоняется через Reject без повторной доставки. Ошибка обработчика считается временной
 // ошибкой выполнения и подтверждается через Nack с возвратом сообщения в очередь.
 func (c *Consumer) handleDeletionDelivery(ctx context.Context, delivery amqp.Delivery) error {
+	ctx, span := startConsumeSpanWithExtractedTraceContext(ctx, delivery, "rabbitmq.consume.avatar_deletion")
+	defer span.end()
+
 	message, err := decodeAvatarDeletionMessage(delivery.Body)
 	if err != nil {
+		span.recordError(err)
 		c.logger.WarnContext(ctx, "invalid avatar deletion message", slog.Any("err", err))
-		return delivery.Reject(false)
+		if rejectErr := delivery.Reject(false); rejectErr != nil {
+			span.recordError(rejectErr)
+			return rejectErr
+		}
+		return nil
 	}
+	span.setAvatarID(message.AvatarID.String())
 	if err = c.handler.HandleAvatarDeletion(ctx, message); err != nil {
+		span.recordError(err)
 		c.logger.ErrorContext(ctx, "avatar deletion message failed",
 			slog.String("avatar_id", message.AvatarID.String()),
 			slog.Any("err", err),
 		)
-		return delivery.Nack(false, true)
+		if nackErr := delivery.Nack(false, true); nackErr != nil {
+			span.recordError(nackErr)
+			return nackErr
+		}
+		return nil
 	}
-	return delivery.Ack(false)
+	if ackErr := delivery.Ack(false); ackErr != nil {
+		span.recordError(ackErr)
+		return ackErr
+	}
+	return nil
 }
 
 // decodeAvatarDeletionMessage парсит JSON-сообщение RabbitMQ в задачу удаления файлов аватарки.

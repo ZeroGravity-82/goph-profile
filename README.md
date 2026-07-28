@@ -14,9 +14,10 @@ GophProfile - микросервис для управления аватарк�
 - MinIO/S3 для исходных изображений аватарок и миниатюр;
 - RabbitMQ для задач обработки и удаления аватарок;
 - воркер фоновой обработки изображений и удаления файлов;
-- OpenTelemetry Collector для приема логов и метрик сервера и воркера;
+- OpenTelemetry Collector для приема логов, метрик и трасс сервера и воркера;
 - OpenSearch и OpenSearch Dashboards для хранения и просмотра логов;
 - Prometheus и Grafana для хранения и просмотра метрик;
+- Jaeger для просмотра трасс;
 - базовые web-ресурсы для пользовательского интерфейса.
 
 ## Технологический стек
@@ -32,6 +33,7 @@ GophProfile - микросервис для управления аватарк�
 - OpenTelemetry Collector;
 - OpenSearch и OpenSearch Dashboards;
 - Prometheus и Grafana;
+- Jaeger;
 - `golangci-lint` для статического анализа;
 - `go test`, `testify` и Docker Compose для тестов.
 
@@ -52,6 +54,7 @@ GophProfile - микросервис для управления аватарк�
 - создание миниатюр `100x100` и `300x300` в воркере;
 - отправка логов сервера и воркера через OpenTelemetry Collector в OpenSearch;
 - сбор метрик сервера, воркера, рантайма Go, RabbitMQ, MinIO и хоста в Prometheus;
+- отправка трасс сервера и воркера через OpenTelemetry Collector в Jaeger;
 - Docker Compose для локального и интеграционного окружения;
 - unit-тесты и интеграционные тесты для ключевых слоев.
 
@@ -622,6 +625,10 @@ tls_key
 Grafana автоматически поднимает дашборды из `docker/grafana/dashboards` для сервера, воркера, рантайма Go, RabbitMQ, MinIO
 и хоста.
 
+Сервер и воркер отправляют трассы по OTLP/gRPC в OpenTelemetry Collector, а он передает их в Jaeger.
+Трассировка охватывает HTTP-запросы, публикацию и чтение сообщений RabbitMQ, операции PostgreSQL и операции MinIO/S3.
+Контекст трассировки передается от сервера к воркеру через заголовки сообщений RabbitMQ.
+
 ## Локальный запуск
 
 Сгенерируйте локальные TLS-сертификаты, если их еще нет:
@@ -651,13 +658,14 @@ docker compose up -d --build
 - OpenTelemetry Collector;
 - OpenSearch и OpenSearch Dashboards;
 - Prometheus и Grafana;
+- Jaeger;
 - сервер;
 - воркер.
 
 Для ручного запуска без контейнеров приложения поднимите инфраструктуру:
 
 ```bash
-docker compose up -d postgresql minio rabbitmq opensearch otel-collector prometheus grafana opensearch-dashboards
+docker compose up -d postgresql minio rabbitmq opensearch jaeger otel-collector prometheus grafana opensearch-dashboards
 ```
 
 Создайте локальный конфиг сервера по примеру `config/server.local.example.yaml`. Укажите в нем те же учетные данные,

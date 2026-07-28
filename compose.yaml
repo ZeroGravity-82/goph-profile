@@ -158,6 +158,16 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
+      jaeger:
+        condition: service_started
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.73.0
+    ports:
+      - "16686:16686"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
     restart: unless-stopped
 
   prometheus:
