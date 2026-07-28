@@ -648,7 +648,7 @@ cp .env.example .env
 Запустите локальный стек:
 
 ```bash
-docker compose up -d --build
+make up
 ```
 
 Команда собирает Docker-образ и запускает:
@@ -665,10 +665,10 @@ docker compose up -d --build
 - сервер;
 - воркер.
 
-Для ручного запуска без контейнеров приложения поднимите инфраструктуру:
+Для локальной разработки сервер и воркер удобнее запускать через `go run`. Перед этим отдельно поднимите инфраструктуру:
 
 ```bash
-docker compose up -d postgresql postgres-exporter minio rabbitmq opensearch jaeger otel-collector prometheus grafana opensearch-dashboards
+make infra-up
 ```
 
 Создайте локальный конфиг сервера по примеру `config/server.local.example.yaml`. Укажите в нем те же учетные данные,

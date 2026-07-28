@@ -1,8 +1,19 @@
 DC := docker compose
 TEST_ENV_FILE ?= .env.test
 TEST_DC := $(DC) --env-file $(TEST_ENV_FILE) -f compose.test.yaml
+LOCAL_INFRA_SERVICES := \
+	postgresql \
+	postgres-exporter \
+	minio \
+	rabbitmq \
+	opensearch \
+	jaeger \
+	otel-collector \
+	prometheus \
+	grafana \
+	opensearch-dashboards
 
-.PHONY: help fmt test lint vet up down check-test-env integration-up integration-down test-integration test-e2e
+.PHONY: help fmt test lint vet up infra-up down check-test-env integration-up integration-down test-integration test-e2e
 
 help: ## Показать доступные цели
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -21,6 +32,9 @@ vet: ## Запустить базовые статические проверк�
 
 up: ## Собрать образ и запустить локальный стек
 	$(DC) up -d --build --wait
+
+infra-up: ## Запустить локальную инфраструктуру без сервера и воркера
+	$(DC) up -d --wait $(LOCAL_INFRA_SERVICES)
 
 down: ## Остановить и удалить контейнеры Docker Compose
 	$(DC) down
