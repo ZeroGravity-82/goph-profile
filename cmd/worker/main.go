@@ -22,6 +22,8 @@ const (
 )
 
 func main() {
+	ctx := context.Background()
+
 	cfg, err := config.LoadWorker()
 	if err != nil {
 		if errors.Is(err, config.ErrHelp) {
@@ -33,17 +35,17 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	logger, shutdownLogger, err := observability.NewLogger(context.Background(), cfg.Logging, serviceName)
+	logger, shutdownLogger, err := observability.NewLogger(ctx, cfg.Logging, serviceName)
 	if err != nil {
 		// Логгер еще не сконфигурирован.
 		log.Fatalf("logger config error: %v", err)
 	}
-	shutdownMeter, err := observability.SetupGlobalMeterProvider(context.Background(), serviceName)
+	shutdownMeter, err := observability.SetupGlobalMeterProvider(ctx, serviceName)
 	if err != nil {
 		_ = shutdownTelemetryProvider(shutdownLogger)
 		log.Fatalf("meter config error: %v", err)
 	}
-	shutdownTracer, err := observability.SetupGlobalTracerProvider(context.Background(), serviceName)
+	shutdownTracer, err := observability.SetupGlobalTracerProvider(ctx, serviceName)
 	if err != nil {
 		_ = shutdownTelemetryProvider(shutdownMeter)
 		_ = shutdownTelemetryProvider(shutdownLogger)
@@ -52,20 +54,20 @@ func main() {
 
 	exitCode := 0
 	if err := run(cfg, logger); err != nil {
-		logger.Error("worker terminated with error", slog.Any("err", err))
+		logger.ErrorContext(ctx, "worker terminated with error", slog.Any("err", err))
 		exitCode = 1
 	} else {
-		logger.Info("worker stopped (graceful)")
+		logger.InfoContext(ctx, "worker stopped (graceful)")
 	}
 
 	if err := shutdownTelemetryProvider(shutdownTracer); err != nil {
-		logger.Error("failed to shutdown tracer provider", slog.Any("err", err))
+		logger.ErrorContext(ctx, "failed to shutdown tracer provider", slog.Any("err", err))
 	}
 	if err := shutdownTelemetryProvider(shutdownMeter); err != nil {
-		logger.Error("failed to shutdown meter provider", slog.Any("err", err))
+		logger.ErrorContext(ctx, "failed to shutdown meter provider", slog.Any("err", err))
 	}
 	if err := shutdownTelemetryProvider(shutdownLogger); err != nil {
-		logger.Error("failed to shutdown logger provider", slog.Any("err", err))
+		logger.ErrorContext(ctx, "failed to shutdown logger provider", slog.Any("err", err))
 	}
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -73,18 +75,18 @@ func main() {
 }
 
 func run(cfg config.WorkerConfig, logger *slog.Logger) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	application, err := workerApp.New(cfg, logger)
 	if err != nil {
 		return fmt.Errorf("app init error: %w", err)
 	}
 	defer func() {
 		if err := application.Close(); err != nil {
-			logger.Error("failed to close application", slog.Any("err", err))
+			logger.ErrorContext(ctx, "failed to close application", slog.Any("err", err))
 		}
 	}()
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	return application.Run(ctx)
 }

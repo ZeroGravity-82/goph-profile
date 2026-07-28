@@ -58,13 +58,13 @@ func (a *App) runMigrations(ctx context.Context) error {
 	}
 
 	for _, res := range results {
-		a.logger.Info("applied migration",
+		a.logger.InfoContext(ctx, "applied migration",
 			slog.Int64("version", res.Source.Version),
 			slog.String("source", res.Source.Path),
 			slog.Duration("duration", res.Duration),
 		)
 	}
-	a.logger.Info("postgres migrations complete", slog.Int("count", len(results)))
+	a.logger.InfoContext(ctx, "postgres migrations complete", slog.Int("count", len(results)))
 
 	return nil
 }
