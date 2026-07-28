@@ -16,7 +16,7 @@ import (
 // TestHTTPServer_Run_ReturnsListenError проверяет ошибку запуска HTTP-сервера.
 func TestHTTPServer_Run_ReturnsListenError(t *testing.T) {
 	// Arrange
-	listener, err := net.Listen("tcp", "127.0.0.1:8080")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer func() { _ = listener.Close() }()
 
