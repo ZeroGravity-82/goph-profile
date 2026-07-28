@@ -40,7 +40,7 @@ func (a *App) runMigrations(ctx context.Context) error {
 
 	// Goose работает с *sql.DB, поэтому создаем совместимую обертку поверх общего pgxpool.
 	migrationDB := stdlib.OpenDBFromPool(a.db)
-	defer migrationDB.Close()
+	defer func() { _ = migrationDB.Close() }()
 
 	provider, err := goose.NewProvider(
 		goose.DialectPostgres,
