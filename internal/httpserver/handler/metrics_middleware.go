@@ -10,6 +10,8 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 )
 
+const unknownHTTPRoute = "unknown"
+
 // withMetrics записывает HTTP-метрики после обработки запроса.
 func withMetrics(metrics *observability.HTTPRequestMetrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -45,11 +47,11 @@ func withMetrics(metrics *observability.HTTPRequestMetrics) func(http.Handler) h
 func httpRoutePattern(r *http.Request) string {
 	routeContext := chi.RouteContext(r.Context())
 	if routeContext == nil {
-		return "unknown"
+		return unknownHTTPRoute
 	}
 	route := routeContext.RoutePattern()
 	if route == "" {
-		return "unknown"
+		return unknownHTTPRoute
 	}
 	return route
 }

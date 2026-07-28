@@ -51,6 +51,7 @@ func NewRouter(
 		middleware.RealIP,
 		withLogging(logger),
 		withMetrics(httpMetrics),
+		withHTTPRouteTracing,
 		withGzip(logger),
 	)
 	avatarHandler, err := NewAvatarHandler(avatarUseCase, logger)
@@ -80,6 +81,7 @@ func NewRouter(
 	})
 	r.Get("/health", healthHandler.getHealth)
 
-	// otelhttp создает span трассировки для каждого входящего HTTP-запроса и передает дальше исходный chi-router.
+	// otelhttp создает server span трассировки для каждого входящего HTTP-запроса.
+	// withHTTPRouteTracing уточняет имя span и http.route после того, как chi выбрал маршрут.
 	return otelhttp.NewHandler(r, "goph-profile.http"), nil
 }
