@@ -34,12 +34,12 @@
       },
       "targets": [
         {
-          "expr": "minio_cluster_capacity_usable_total_bytes",
+          "expr": "minio_cluster_health_capacity_usable_total_bytes",
           "legendFormat": "usable total",
           "refId": "A"
         },
         {
-          "expr": "minio_cluster_capacity_usable_free_bytes",
+          "expr": "minio_cluster_health_capacity_usable_free_bytes",
           "legendFormat": "usable free",
           "refId": "B"
         }
@@ -73,7 +73,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (bucket) (minio_bucket_usage_total_bytes)",
+          "expr": "sum by (bucket) (minio_cluster_usage_buckets_total_bytes)",
           "legendFormat": "{{bucket}}",
           "refId": "A"
         }
@@ -107,8 +107,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (api) (rate(minio_s3_requests_total[5m]))",
-          "legendFormat": "{{api}}",
+          "expr": "sum by (name) (rate(minio_api_requests_total[5m]))",
+          "legendFormat": "{{name}}",
           "refId": "A"
         }
       ],
@@ -135,12 +135,17 @@
       },
       "targets": [
         {
-          "expr": "sum by (api) (rate(minio_s3_requests_errors_total[5m]))",
-          "legendFormat": "{{api}}",
+          "expr": "rate(minio_api_requests_traffic_received_bytes[5m])",
+          "legendFormat": "received",
           "refId": "A"
+        },
+        {
+          "expr": "rate(minio_api_requests_traffic_sent_bytes[5m])",
+          "legendFormat": "sent",
+          "refId": "B"
         }
       ],
-      "title": "S3 error rate",
+      "title": "API traffic rate",
       "type": "timeseries"
     }
   ],
