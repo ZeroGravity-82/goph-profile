@@ -613,52 +613,6 @@ tls_key
 
 Для локального запуска эти значения будут указывать на `certs/server.crt` и `certs/server.key`.
 
-## Наблюдаемость
-
-Сервер и воркер пишут структурированные логи через `slog`. Логи отправляются по OTLP/gRPC в OpenTelemetry Collector,
-а он сохраняет логи в OpenSearch. Для локального просмотра логов используется OpenSearch Dashboards.
-
-Сервер и воркер отправляют метрики по OTLP/gRPC в OpenTelemetry Collector, а Prometheus оттуда их забирает.
-Сервер пишет метрики пользовательских сценариев и HTTP-запросов. Воркер пишет метрики асинхронной обработки
-аватарок и удаления файлов. Оба процесса также отправляют метрики рантайма Go: память, сборку мусора и количество
-горутин.
-Инфраструктурные метрики СУБД, очередей, объектного хранилища и хоста отдают непосредственно PostgreSQL Exporter,
-RabbitMQ, MinIO и Node Exporter.
-Grafana автоматически поднимает дашборды из `docker/grafana/dashboards` для сервера, воркера, рантайма Go, PostgreSQL,
-RabbitMQ, MinIO и хоста.
-
-Сервер и воркер отправляют трассы по OTLP/gRPC в OpenTelemetry Collector, а он передает их в Jaeger.
-Трассировка охватывает HTTP-запросы, публикацию и чтение сообщений RabbitMQ, операции PostgreSQL и операции MinIO/S3.
-Контекст трассировки передается от сервера к воркеру через заголовки сообщений RabbitMQ.
-
-Локальные UI для анализа телеметрии:
-
-- Grafana: <http://localhost:3000> — дашборды метрик, просмотр логов через OpenSearch datasource и трасс через Jaeger datasource;
-- Prometheus: <http://localhost:9090> — PromQL-запросы и проверка собранных метрик;
-- Jaeger: <http://localhost:16686> — поиск и анализ трасс;
-- OpenSearch Dashboards: <http://localhost:5601> — просмотр и поиск логов.
-
-### Как проверить наблюдаемость
-
-После запуска локального стека через `make up` выполните небольшой пользовательский сценарий. Он создает HTTP-запросы,
-логи сервера, метрики API, сообщение RabbitMQ, обработку воркером, операции PostgreSQL и операции MinIO/S3.
-Скрипт использует `curl` и `jq`.
-
-```bash
-./scripts/check-observability.sh
-```
-
-После этого проверьте телеметрию:
-
-- в Grafana откройте дашборды `GophProfile Server`, `GophProfile Worker`, `GophProfile Go Runtime`, `GophProfile PostgreSQL`,
-  `GophProfile RabbitMQ`, `GophProfile MinIO` и `GophProfile Host`;
-- в Prometheus выполните запросы `http_server_requests_total`, `avatar_api_actions_total`, `avatar_worker_jobs_total`,
-  `up{job="postgres"}`, `up{job="rabbitmq"}`, `up{job="minio"}` и `up{job="node"}`;
-- в Jaeger выберите сервис `goph-profile-server` или `goph-profile-worker` и найдите трассы с операциями
-  `POST /api/v1/avatars`, `rabbitmq.publish`, `rabbitmq.consume.avatar_processing`, `postgres.avatar.create` и
-  `minio.put_object`;
-- в OpenSearch Dashboards или в Grafana Explore через datasource `OpenSearch` проверьте логи в индексе `otel-logs-*`.
-
 ## Локальный запуск
 
 Сгенерируйте локальные TLS-сертификаты, если их еще нет:
@@ -787,9 +741,53 @@ e2e-проверки запускают сервер и воркер на тес
 make test-e2e
 ```
 
-## Структура папок
+## Наблюдаемость
 
-Ожидаемая структура после реализации:
+Сервер и воркер пишут структурированные логи через `slog`. Логи отправляются по OTLP/gRPC в OpenTelemetry Collector,
+а он сохраняет логи в OpenSearch. Для локального просмотра логов используется OpenSearch Dashboards.
+
+Сервер и воркер отправляют метрики по OTLP/gRPC в OpenTelemetry Collector, а Prometheus оттуда их забирает.
+Сервер пишет метрики пользовательских сценариев и HTTP-запросов. Воркер пишет метрики асинхронной обработки
+аватарок и удаления файлов. Оба процесса также отправляют метрики рантайма Go: память, сборку мусора и количество
+горутин.
+Инфраструктурные метрики СУБД, очередей, объектного хранилища и хоста отдают непосредственно PostgreSQL Exporter,
+RabbitMQ, MinIO и Node Exporter.
+Grafana автоматически поднимает дашборды из `docker/grafana/dashboards` для сервера, воркера, рантайма Go, PostgreSQL,
+RabbitMQ, MinIO и хоста.
+
+Сервер и воркер отправляют трассы по OTLP/gRPC в OpenTelemetry Collector, а он передает их в Jaeger.
+Трассировка охватывает HTTP-запросы, публикацию и чтение сообщений RabbitMQ, операции PostgreSQL и операции MinIO/S3.
+Контекст трассировки передается от сервера к воркеру через заголовки сообщений RabbitMQ.
+
+Локальные UI для анализа телеметрии:
+
+- Grafana: <http://localhost:3000> — дашборды метрик, просмотр логов через OpenSearch datasource и трасс через Jaeger datasource;
+- Prometheus: <http://localhost:9090> — PromQL-запросы и проверка собранных метрик;
+- Jaeger: <http://localhost:16686> — поиск и анализ трасс;
+- OpenSearch Dashboards: <http://localhost:5601> — просмотр и поиск логов.
+
+### Как проверить наблюдаемость
+
+После запуска локального стека через `make up` выполните небольшой пользовательский сценарий. Он создает HTTP-запросы,
+логи сервера, метрики API, сообщение RabbitMQ, обработку воркером, операции PostgreSQL и операции MinIO/S3.
+Скрипт использует `curl` и `jq`.
+
+```bash
+./scripts/check-observability.sh
+```
+
+После этого проверьте телеметрию:
+
+- в Grafana откройте дашборды `GophProfile Server`, `GophProfile Worker`, `GophProfile Go Runtime`, `GophProfile PostgreSQL`,
+  `GophProfile RabbitMQ`, `GophProfile MinIO` и `GophProfile Host`;
+- в Prometheus выполните запросы `http_server_requests_total`, `avatar_api_actions_total`, `avatar_worker_jobs_total`,
+  `up{job="postgres"}`, `up{job="rabbitmq"}`, `up{job="minio"}` и `up{job="node"}`;
+- в Jaeger выберите сервис `goph-profile-server` или `goph-profile-worker` и найдите трассы с операциями
+  `POST /api/v1/avatars`, `rabbitmq.publish`, `rabbitmq.consume.avatar_processing`, `postgres.avatar.create` и
+  `minio.put_object`;
+- в OpenSearch Dashboards или в Grafana Explore через datasource `OpenSearch` проверьте логи в индексе `otel-logs-*`.
+
+## Структура папок
 
 ```text
 cmd/server/                  # точка входа HTTP-сервера
