@@ -66,4 +66,4 @@ test-integration: integration-up ## Запустить интеграционн�
 	go test -p 1 -tags=integration ./internal/...
 
 test-e2e: integration-up ## Запустить e2e-проверки через тестовое окружение
-	./scripts/e2e.sh '$(TEST_ENV_FILE)'
+	./scripts/test-e2e.sh '$(TEST_ENV_FILE)'
