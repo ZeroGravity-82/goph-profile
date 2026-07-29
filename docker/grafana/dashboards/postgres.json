@@ -205,6 +205,77 @@
       ],
       "title": "Deadlocks",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(increase(pg_stat_database_xact_commit{datname=\"gophprofile\"}[$__range]))",
+          "legendFormat": "committed",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(pg_stat_database_xact_rollback{datname=\"gophprofile\"}[$__range]))",
+          "legendFormat": "rolled back",
+          "refId": "B"
+        }
+      ],
+      "title": "Transactions in range",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(increase(pg_stat_database_tup_inserted{datname=\"gophprofile\"}[$__range]))",
+          "legendFormat": "inserted",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(pg_stat_database_tup_updated{datname=\"gophprofile\"}[$__range]))",
+          "legendFormat": "updated",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(pg_stat_database_tup_deleted{datname=\"gophprofile\"}[$__range]))",
+          "legendFormat": "deleted",
+          "refId": "C"
+        }
+      ],
+      "title": "Rows changed in range",
+      "type": "stat"
     }
   ],
   "refresh": "10s",

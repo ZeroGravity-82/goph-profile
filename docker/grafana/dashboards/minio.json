@@ -147,6 +147,34 @@
       ],
       "title": "API traffic rate",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(increase(minio_api_requests_total[$__range]))",
+          "legendFormat": "requests",
+          "refId": "A"
+        }
+      ],
+      "title": "API requests in range",
+      "type": "stat"
     }
   ],
   "refresh": "10s",
