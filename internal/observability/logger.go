@@ -2,8 +2,11 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"strings"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -14,8 +17,8 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
 )
 
-// levelHandler добавляет фильтрацию по уровню логирования к хендлеру OpenTelemetry.
-// Без этой обертки otelslog примет записи ниже настроенного уровня логирования, и они уйдут в OTEL Collector.
+// levelHandler добавляет фильтрацию по уровню логирования для нижележащего хендлера.
+// Без этой обертки cfg.Level не применялся бы единообразно к stdout и OpenTelemetry-хендлерам.
 type levelHandler struct {
 	handler slog.Handler
 	level   slog.Level
@@ -43,13 +46,60 @@ func (h levelHandler) WithGroup(name string) slog.Handler {
 	}
 }
 
-// NewLogger создает slog-логгер для отправки записей в OTEL Collector.
+// fanoutHandler передает одну запись логирования нескольким нижележащим хендлерам.
+type fanoutHandler struct {
+	handlers []slog.Handler
+}
+
+func (h fanoutHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, handler := range h.handlers {
+		if handler.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h fanoutHandler) Handle(ctx context.Context, record slog.Record) error {
+	var err error
+	for _, handler := range h.handlers {
+		// У каждого нижележащего хендлера может быть свой порог уровня логирования.
+		if !handler.Enabled(ctx, record.Level) {
+			continue
+		}
+		err = errors.Join(err, handler.Handle(ctx, record.Clone()))
+	}
+	return err
+}
+
+func (h fanoutHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	handlers := make([]slog.Handler, 0, len(h.handlers))
+	for _, handler := range h.handlers {
+		handlers = append(handlers, handler.WithAttrs(attrs))
+	}
+	return fanoutHandler{handlers: handlers}
+}
+
+func (h fanoutHandler) WithGroup(name string) slog.Handler {
+	handlers := make([]slog.Handler, 0, len(h.handlers))
+	for _, handler := range h.handlers {
+		handlers = append(handlers, handler.WithGroup(name))
+	}
+	return fanoutHandler{handlers: handlers}
+}
+
+// NewLogger создает slog-логгер для записи в stdout и отправки записей в OTEL Collector.
 func NewLogger(
 	ctx context.Context,
 	cfg config.Logging,
 	serviceName string,
 ) (*slog.Logger, func(context.Context) error, error) {
 	level, err := parseLogLevel(cfg.Level)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stdoutHandler, err := newStdoutLogHandler(os.Stdout, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,12 +112,16 @@ func NewLogger(
 	// Например, это может делать код сторонней библиотеки.
 	globalLog.SetLoggerProvider(loggerProvider)
 
+	otelHandler := otelslog.NewHandler(
+		logInstrumentationName,
+		otelslog.WithLoggerProvider(loggerProvider),
+		otelslog.WithSource(cfg.AddSource),
+	)
 	logger := slog.New(levelHandler{
-		handler: otelslog.NewHandler(
-			logInstrumentationName,
-			otelslog.WithLoggerProvider(loggerProvider),
-			otelslog.WithSource(cfg.AddSource),
-		),
+		handler: fanoutHandler{handlers: []slog.Handler{
+			stdoutHandler,
+			otelHandler,
+		}},
 		level: level,
 	})
 	slog.SetDefault(logger)
@@ -88,6 +142,20 @@ func parseLogLevel(v string) (slog.Level, error) {
 		return slog.LevelError, nil
 	default:
 		return 0, fmt.Errorf("unsupported log level: %q", v)
+	}
+}
+
+// newStdoutLogHandler создает stdout-хендлер в формате, выбранном в конфигурации.
+func newStdoutLogHandler(w io.Writer, cfg config.Logging) (slog.Handler, error) {
+	options := &slog.HandlerOptions{AddSource: cfg.AddSource, Level: slog.LevelDebug}
+
+	switch strings.ToLower(cfg.Format) {
+	case "json":
+		return slog.NewJSONHandler(w, options), nil
+	case "text":
+		return slog.NewTextHandler(w, options), nil
+	default:
+		return nil, fmt.Errorf("unsupported log format: %q", cfg.Format)
 	}
 }
 
