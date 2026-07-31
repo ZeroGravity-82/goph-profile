@@ -124,7 +124,6 @@ func NewLogger(
 		}},
 		level: level,
 	})
-	slog.SetDefault(logger)
 
 	return logger, loggerProvider.Shutdown, nil
 }
