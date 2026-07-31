@@ -63,7 +63,7 @@ func NewAvatarHandler(
 		useCase:     useCase,
 		fileStorage: fileStorage,
 		metrics:     metrics,
-		logger:      logger,
+		logger:      logger.With("component", "worker.avatar_handler"),
 	}, nil
 }
 

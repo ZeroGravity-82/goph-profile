@@ -6,14 +6,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 )
 
 func withGzip(logger *slog.Logger) func(http.Handler) http.Handler {
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
+	logger = logger.With("component", "httpserver.gzip_middleware")
 
 	compressResponse := middleware.Compress(gzip.DefaultCompression, "application/json")
 

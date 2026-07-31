@@ -101,7 +101,7 @@ func newConsumerWithConnection(
 		deletionChannel:   deletionChannel,
 		cfg:               cfg,
 		handler:           handler,
-		logger:            logger,
+		logger:            logger.With("component", "rabbitmq.consumer"),
 	}, nil
 }
 

@@ -51,6 +51,10 @@ func New(cfg config.ServerConfig, logger *slog.Logger) (*App, error) {
 }
 
 func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, logger *slog.Logger) (*App, error) {
+	if logger == nil {
+		logger = logging.NopLogger()
+	}
+
 	tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load tls certificate: %w", err)
@@ -131,7 +135,12 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 	}
 
 	closePublisherOnError = false
-	return &App{db: db, publisher: publisher, httpSrv: httpSrv, logger: logger}, nil
+	return &App{
+		db:        db,
+		publisher: publisher,
+		httpSrv:   httpSrv,
+		logger:    logger.With("component", "server.app"),
+	}, nil
 }
 
 func httpTLSConfig(tlsCert tls.Certificate) *tls.Config {

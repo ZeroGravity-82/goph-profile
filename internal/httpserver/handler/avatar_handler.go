@@ -112,7 +112,7 @@ func NewAvatarHandler(
 	return &AvatarHandler{
 		avatarUseCase: avatarUseCase,
 		metrics:       metrics,
-		logger:        logger,
+		logger:        logger.With("component", "httpserver.avatar_handler"),
 	}, nil
 }
 

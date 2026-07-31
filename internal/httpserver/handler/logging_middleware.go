@@ -23,7 +23,9 @@ func withLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 		logger = logging.NopLogger()
 	}
 
-	return middleware.RequestLogger(slogLogFormatter{logger: logger})
+	return middleware.RequestLogger(slogLogFormatter{
+		logger: logger.With("component", "httpserver.logging_middleware"),
+	})
 }
 
 func (f slogLogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry {

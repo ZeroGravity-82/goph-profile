@@ -117,6 +117,7 @@ func NewHTTPServer(
 
 // Run запускает HTTP-сервер и блокируется, пока не отменен контекст или сервер не остановится с ошибкой.
 func (s *HTTPServer) Run(ctx context.Context) error {
+	logger := s.logger.With("component", "httpserver")
 	router, err := handler.NewRouter(
 		s.avatarUseCase,
 		s.userUseCase,
@@ -135,7 +136,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		s.logger.InfoContext(ctx, "starting http server", slog.String("addr", s.addr))
+		logger.InfoContext(ctx, "starting http server", slog.String("addr", s.addr))
 		errCh <- srv.ListenAndServeTLS("", "")
 	}()
 
@@ -146,13 +147,13 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 
 		err := srv.Shutdown(shutdownCtx)
 		if err == nil {
-			s.logger.InfoContext(shutdownCtx, "http server stopped with graceful shutdown")
+			logger.InfoContext(shutdownCtx, "http server stopped with graceful shutdown")
 			return nil
 		}
 		return fmt.Errorf("failed to stop http server: %w", err)
 	case err := <-errCh:
 		if err == nil || errors.Is(err, http.ErrServerClosed) {
-			s.logger.InfoContext(ctx, "http server closed")
+			logger.InfoContext(ctx, "http server closed")
 			return nil
 		}
 		return fmt.Errorf("failed to run http server: %w", err)
