@@ -79,7 +79,7 @@ func (s *MinIOStorage) ObjectKeyThumb300(userID uuid.UUID, avatarID uuid.UUID) s
 
 // Put сохраняет объект по ключу.
 func (s *MinIOStorage) Put(ctx context.Context, objectKey string, content []byte) error {
-	ctx, span := startSpan(ctx, "minio.put_object", "PUT", s.bucket)
+	ctx, span := startSpanWithObject(ctx, "minio.put_object", "PUT", s.bucket, objectKey)
 	defer span.End()
 
 	if err := validateObjectKey(objectKey); err != nil {
@@ -132,7 +132,7 @@ func (s *MinIOStorage) Ping(ctx context.Context) error {
 
 // Get читает объект по ключу.
 func (s *MinIOStorage) Get(ctx context.Context, objectKey string) ([]byte, error) {
-	ctx, span := startSpan(ctx, "minio.get_object", "GET", s.bucket)
+	ctx, span := startSpanWithObject(ctx, "minio.get_object", "GET", s.bucket, objectKey)
 	defer span.End()
 
 	if err := validateObjectKey(objectKey); err != nil {
@@ -161,7 +161,7 @@ func (s *MinIOStorage) Get(ctx context.Context, objectKey string) ([]byte, error
 
 // Delete удаляет объект по ключу.
 func (s *MinIOStorage) Delete(ctx context.Context, objectKey string) error {
-	ctx, span := startSpan(ctx, "minio.delete_object", "DELETE", s.bucket)
+	ctx, span := startSpanWithObject(ctx, "minio.delete_object", "DELETE", s.bucket, objectKey)
 	defer span.End()
 
 	if err := validateObjectKey(objectKey); err != nil {

@@ -11,8 +11,18 @@ import (
 
 const traceInstrumentationName = "goph-profile.minio"
 
-// startSpan создает span трассировки для операции с MinIO и добавляет общие атрибуты объектного хранилища.
-func startSpan(ctx context.Context, name string, operation string, bucket string) (context.Context, trace.Span) {
+// startSpanWithObject создает span трассировки для операции MinIO с объектом, добавляет общие атрибуты объектного
+// хранилища и атрибут ключа объекта.
+func startSpanWithObject(ctx context.Context, name, operation, bucket string, objectKey string) (context.Context, trace.Span) {
+	start, span := startSpan(ctx, name, operation, bucket)
+	span.SetAttributes(
+		attribute.String("storage.object.key", objectKey),
+	)
+	return start, span
+}
+
+// startSpan создает span трассировки для операции MinIO без объекта и добавляет общие атрибуты объектного хранилища.
+func startSpan(ctx context.Context, name, operation, bucket string) (context.Context, trace.Span) {
 	return otel.Tracer(traceInstrumentationName).Start(
 		ctx,
 		name,
