@@ -211,25 +211,9 @@ func (p *Publisher) publishJSON(ctx context.Context, routingKey string, messageI
 	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
 	defer cancel()
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	headers := amqp.Table{}
 	otel.GetTextMapPropagator().Inject(ctx, amqpTableCarrier(headers))
-	confirmation, err := p.channel.PublishWithDeferredConfirmWithContext(
-		ctx,
-		p.cfg.Exchange,
-		routingKey,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType:  "application/json",
-			DeliveryMode: amqp.Persistent,
-			MessageId:    messageID,
-			Timestamp:    time.Now().UTC(),
-			Headers:      headers,
-			Body:         body,
-		})
+	confirmation, err := p.publishWithDeferredConfirmWithContext(ctx, routingKey, messageID, headers, body)
 	if err != nil {
 		err = fmt.Errorf("failed to publish rabbitmq message: %w", err)
 		span.recordError(err)
@@ -253,6 +237,32 @@ func (p *Publisher) publishJSON(ctx context.Context, routingKey string, messageI
 		return err
 	}
 	return nil
+}
+
+func (p *Publisher) publishWithDeferredConfirmWithContext(
+	ctx context.Context,
+	routingKey string,
+	messageID string,
+	headers amqp.Table,
+	body []byte,
+) (*amqp.DeferredConfirmation, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.channel.PublishWithDeferredConfirmWithContext(
+		ctx,
+		p.cfg.Exchange,
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			MessageId:    messageID,
+			Timestamp:    time.Now().UTC(),
+			Headers:      headers,
+			Body:         body,
+		})
 }
 
 // Ping проверяет, что текущее подключение и канал RabbitMQ открыты.
