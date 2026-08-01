@@ -79,7 +79,11 @@ func (s *MinIOStorage) ObjectKeyThumb300(userID uuid.UUID, avatarID uuid.UUID) s
 
 // Put сохраняет объект по ключу.
 func (s *MinIOStorage) Put(ctx context.Context, objectKey string, content []byte) error {
+	ctx, span := startSpanWithObject(ctx, "minio.put_object", "PUT", s.bucket, objectKey)
+	defer span.End()
+
 	if err := validateObjectKey(objectKey); err != nil {
+		recordSpanError(span, err)
 		return err
 	}
 
@@ -93,7 +97,9 @@ func (s *MinIOStorage) Put(ctx context.Context, objectKey string, content []byte
 		minioV7.PutObjectOptions{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to put minio object: %w", err)
+		err = fmt.Errorf("failed to put minio object: %w", err)
+		recordSpanError(span, err)
+		return err
 	}
 	return nil
 }
@@ -107,25 +113,38 @@ func validateObjectKey(objectKey string) error {
 
 // Ping проверяет доступность S3-хранилища и bucket с файлами аватарок.
 func (s *MinIOStorage) Ping(ctx context.Context) error {
+	ctx, span := startSpan(ctx, "minio.ping", "HEAD_BUCKET", s.bucket)
+	defer span.End()
+
 	exists, err := s.client.BucketExists(ctx, s.bucket)
 	if err != nil {
-		return fmt.Errorf("failed to check minio bucket: %w", err)
+		err = fmt.Errorf("failed to check minio bucket: %w", err)
+		recordSpanError(span, err)
+		return err
 	}
 	if !exists {
-		return errors.New("minio bucket does not exist")
+		err = errors.New("minio bucket does not exist")
+		recordSpanError(span, err)
+		return err
 	}
 	return nil
 }
 
 // Get читает объект по ключу.
 func (s *MinIOStorage) Get(ctx context.Context, objectKey string) ([]byte, error) {
+	ctx, span := startSpanWithObject(ctx, "minio.get_object", "GET", s.bucket, objectKey)
+	defer span.End()
+
 	if err := validateObjectKey(objectKey); err != nil {
+		recordSpanError(span, err)
 		return nil, err
 	}
 
 	object, err := s.client.GetObject(ctx, s.bucket, objectKey, minioV7.GetObjectOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get minio object: %w", err)
+		err = fmt.Errorf("failed to get minio object: %w", err)
+		recordSpanError(span, err)
+		return nil, err
 	}
 	defer func() {
 		_ = object.Close()
@@ -133,19 +152,27 @@ func (s *MinIOStorage) Get(ctx context.Context, objectKey string) ([]byte, error
 
 	content, err := io.ReadAll(object)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read minio object: %w", err)
+		err = fmt.Errorf("failed to read minio object: %w", err)
+		recordSpanError(span, err)
+		return nil, err
 	}
 	return content, nil
 }
 
 // Delete удаляет объект по ключу.
 func (s *MinIOStorage) Delete(ctx context.Context, objectKey string) error {
+	ctx, span := startSpanWithObject(ctx, "minio.delete_object", "DELETE", s.bucket, objectKey)
+	defer span.End()
+
 	if err := validateObjectKey(objectKey); err != nil {
+		recordSpanError(span, err)
 		return err
 	}
 
 	if err := s.client.RemoveObject(ctx, s.bucket, objectKey, minioV7.RemoveObjectOptions{}); err != nil {
-		return fmt.Errorf("failed to delete minio object: %w", err)
+		err = fmt.Errorf("failed to delete minio object: %w", err)
+		recordSpanError(span, err)
+		return err
 	}
 	return nil
 }

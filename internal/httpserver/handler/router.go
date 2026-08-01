@@ -6,9 +6,12 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 )
 
 const apiPathPrefix = "/api/v1"
@@ -37,12 +40,18 @@ func NewRouter(
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
+	httpMetrics, err := observability.NewHTTPRequestMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP metrics: %w", err)
+	}
 
 	r := chi.NewRouter()
 	r.Use(
 		middleware.StripSlashes,
 		middleware.RealIP,
 		withLogging(logger),
+		withMetrics(httpMetrics),
+		withHTTPRouteTracing,
 		withGzip(logger),
 	)
 	avatarHandler, err := NewAvatarHandler(avatarUseCase, logger)
@@ -72,5 +81,7 @@ func NewRouter(
 	})
 	r.Get("/health", healthHandler.getHealth)
 
-	return r, nil
+	// otelhttp создает server span трассировки для каждого входящего HTTP-запроса.
+	// withHTTPRouteTracing уточняет имя span и http.route после того, как chi выбрал маршрут.
+	return otelhttp.NewHandler(r, "goph-profile.http"), nil
 }

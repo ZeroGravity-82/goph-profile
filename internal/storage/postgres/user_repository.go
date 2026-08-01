@@ -29,23 +29,39 @@ func NewUserRepository(db *pgxpool.Pool) (*UserRepository, error) {
 
 // GetByID возвращает пользователя по ID.
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (model.User, error) {
+	ctx, span := startSpan(ctx, "postgres.user.get_by_id", "SELECT", "app_user")
+	defer span.End()
+
 	const q = `
 SELECT id, email, current_avatar_id, created_at, updated_at
 FROM app_user
 WHERE id = $1`
 
-	return r.getByID(ctx, id, q)
+	user, err := r.getByID(ctx, id, q)
+	if err != nil {
+		recordSpanError(span, err)
+		return model.User{}, err
+	}
+	return user, nil
 }
 
 // GetByIDForUpdate возвращает пользователя по ID с блокировкой для обновления записи.
 func (r *UserRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (model.User, error) {
+	ctx, span := startSpan(ctx, "postgres.user.get_by_id_for_update", "SELECT FOR UPDATE", "app_user")
+	defer span.End()
+
 	const q = `
 SELECT id, email, current_avatar_id, created_at, updated_at
 FROM app_user
 WHERE id = $1
 FOR UPDATE`
 
-	return r.getByID(ctx, id, q)
+	user, err := r.getByID(ctx, id, q)
+	if err != nil {
+		recordSpanError(span, err)
+		return model.User{}, err
+	}
+	return user, nil
 }
 
 func (r *UserRepository) getByID(ctx context.Context, id uuid.UUID, query string) (model.User, error) {
@@ -86,6 +102,9 @@ func scanUser(row rowScanner) (model.User, error) {
 
 // GetByEmail возвращает пользователя по нормализованному email.
 func (r *UserRepository) GetByEmail(ctx context.Context, email model.Email) (model.User, error) {
+	ctx, span := startSpan(ctx, "postgres.user.get_by_email", "SELECT", "app_user")
+	defer span.End()
+
 	const q = `
 SELECT id, email, current_avatar_id, created_at, updated_at
 FROM app_user
@@ -97,12 +116,17 @@ WHERE email = $1`
 		return user, nil
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
+		recordSpanError(span, repository.ErrUserNotFound)
 		return model.User{}, repository.ErrUserNotFound
 	}
 	if errors.Is(err, model.ErrInvalidEmail) {
-		return model.User{}, fmt.Errorf("failed to map user by email: %w", err)
+		err = fmt.Errorf("failed to map user by email: %w", err)
+		recordSpanError(span, err)
+		return model.User{}, err
 	}
-	return model.User{}, fmt.Errorf("failed to select user by email: %w", err)
+	err = fmt.Errorf("failed to select user by email: %w", err)
+	recordSpanError(span, err)
+	return model.User{}, err
 }
 
 // Create создает пользователя с нормализованным email.
@@ -116,6 +140,9 @@ func (r *UserRepository) Create(ctx context.Context, email model.Email) (model.U
 	if err != nil {
 		return model.User{}, err
 	}
+
+	ctx, span := startSpan(ctx, "postgres.user.create", "INSERT", "app_user")
+	defer span.End()
 
 	const q = `
 INSERT INTO app_user (id, email, current_avatar_id, created_at, updated_at)
@@ -133,15 +160,21 @@ VALUES ($1, $2, $3, $4, $5)`
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
+			recordSpanError(span, repository.ErrEmailAlreadyTaken)
 			return model.User{}, repository.ErrEmailAlreadyTaken
 		}
-		return model.User{}, fmt.Errorf("failed to insert user: %w", err)
+		err = fmt.Errorf("failed to insert user: %w", err)
+		recordSpanError(span, err)
+		return model.User{}, err
 	}
 	return user, nil
 }
 
 // Update сохраняет изменяемые поля пользователя.
 func (r *UserRepository) Update(ctx context.Context, user model.User) error {
+	ctx, span := startSpan(ctx, "postgres.user.update", "UPDATE", "app_user")
+	defer span.End()
+
 	const q = `
 UPDATE app_user
 SET email = $2,
@@ -160,13 +193,17 @@ WHERE id = $1`
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
+			recordSpanError(span, repository.ErrEmailAlreadyTaken)
 			return repository.ErrEmailAlreadyTaken
 		}
-		return fmt.Errorf("failed to update user: %w", err)
+		err = fmt.Errorf("failed to update user: %w", err)
+		recordSpanError(span, err)
+		return err
 	}
 
 	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
+		recordSpanError(span, repository.ErrUserNotFound)
 		return repository.ErrUserNotFound
 	}
 	return nil

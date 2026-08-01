@@ -47,6 +47,10 @@ func New(cfg config.WorkerConfig, logger *slog.Logger) (*App, error) {
 }
 
 func buildApp(ctx context.Context, cfg config.WorkerConfig, db *pgxpool.Pool, logger *slog.Logger) (*App, error) {
+	if logger == nil {
+		logger = logging.NopLogger()
+	}
+
 	userRepo, err := postgres.NewUserRepository(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user repository: %w", err)

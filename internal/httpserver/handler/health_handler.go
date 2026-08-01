@@ -33,7 +33,10 @@ func NewHealthHandler(checks map[string]func(context.Context) error, logger *slo
 		logger = logging.NopLogger()
 	}
 
-	return &HealthHandler{checks: checks, logger: logger}, nil
+	return &HealthHandler{
+		checks: checks,
+		logger: logger.With("component", "httpserver.health_handler"),
+	}, nil
 }
 
 // getHealth выполняет именованные проверки внешних зависимостей и возвращает общий статус сервиса.

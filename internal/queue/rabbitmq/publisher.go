@@ -10,6 +10,8 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
@@ -192,20 +194,62 @@ func avatarDeletionMessageID(message usecase.AvatarDeletionMessage) string {
 	return "avatar-deletion:" + message.AvatarID.String()
 }
 
-// publishJSON публикует JSON-сообщение и ждет подтверждения RabbitMQ.
+// publishJSON публикует JSON-сообщение, передает контекст трассировки через заголовки AMQP и ждет подтверждения
+// RabbitMQ.
 func (p *Publisher) publishJSON(ctx context.Context, routingKey string, messageID string, payload any) error {
+	ctx, span := startSpan(ctx, "rabbitmq.publish", "publish", p.cfg.Exchange, routingKey, trace.SpanKindProducer)
+	span.setMessageID(messageID)
+	defer span.end()
+
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal rabbitmq message: %w", err)
+		err = fmt.Errorf("failed to marshal rabbitmq message: %w", err)
+		span.recordError(err)
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
 	defer cancel()
 
+	headers := amqp.Table{}
+	otel.GetTextMapPropagator().Inject(ctx, amqpTableCarrier(headers))
+	confirmation, err := p.publishWithDeferredConfirmWithContext(ctx, routingKey, messageID, headers, body)
+	if err != nil {
+		err = fmt.Errorf("failed to publish rabbitmq message: %w", err)
+		span.recordError(err)
+		return err
+	}
+	if confirmation == nil {
+		err = errors.New("rabbitmq publish confirmation is not available")
+		span.recordError(err)
+		return err
+	}
+
+	ack, err := confirmation.WaitContext(ctx)
+	if err != nil {
+		err = fmt.Errorf("failed to wait rabbitmq publish confirmation: %w", err)
+		span.recordError(err)
+		return err
+	}
+	if !ack {
+		err = errors.New("rabbitmq publish was not acknowledged")
+		span.recordError(err)
+		return err
+	}
+	return nil
+}
+
+func (p *Publisher) publishWithDeferredConfirmWithContext(
+	ctx context.Context,
+	routingKey string,
+	messageID string,
+	headers amqp.Table,
+	body []byte,
+) (*amqp.DeferredConfirmation, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	confirmation, err := p.channel.PublishWithDeferredConfirmWithContext(
+	return p.channel.PublishWithDeferredConfirmWithContext(
 		ctx,
 		p.cfg.Exchange,
 		routingKey,
@@ -216,30 +260,21 @@ func (p *Publisher) publishJSON(ctx context.Context, routingKey string, messageI
 			DeliveryMode: amqp.Persistent,
 			MessageId:    messageID,
 			Timestamp:    time.Now().UTC(),
+			Headers:      headers,
 			Body:         body,
 		})
-	if err != nil {
-		return fmt.Errorf("failed to publish rabbitmq message: %w", err)
-	}
-	if confirmation == nil {
-		return errors.New("rabbitmq publish confirmation is not available")
-	}
-
-	ack, err := confirmation.WaitContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to wait rabbitmq publish confirmation: %w", err)
-	}
-	if !ack {
-		return errors.New("rabbitmq publish was not acknowledged")
-	}
-	return nil
 }
 
 // Ping проверяет, что текущее подключение и канал RabbitMQ открыты.
 func (p *Publisher) Ping(ctx context.Context) error {
+	ctx, span := startSpan(ctx, "rabbitmq.ping", "ping", p.cfg.Exchange, "", trace.SpanKindClient)
+	defer span.end()
+
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("failed to ping rabbitmq: %w", ctx.Err())
+		err := fmt.Errorf("failed to ping rabbitmq: %w", ctx.Err())
+		span.recordError(err)
+		return err
 	default:
 	}
 
@@ -247,10 +282,14 @@ func (p *Publisher) Ping(ctx context.Context) error {
 	defer p.mu.Unlock()
 
 	if p.conn == nil || p.conn.IsClosed() {
-		return errors.New("rabbitmq connection is closed")
+		err := errors.New("rabbitmq connection is closed")
+		span.recordError(err)
+		return err
 	}
 	if p.channel == nil || p.channel.IsClosed() {
-		return errors.New("rabbitmq channel is closed")
+		err := errors.New("rabbitmq channel is closed")
+		span.recordError(err)
+		return err
 	}
 	return nil
 }

@@ -1,0 +1,42 @@
+apiVersion: 1
+
+# Grafana хранит provisioned datasource в SQLite volume, поэтому перед созданием удаляем старые записи.
+deleteDatasources:
+  - name: OpenSearch
+    orgId: 1
+  - name: Prometheus
+    orgId: 1
+  - name: Jaeger
+    orgId: 1
+
+datasources:
+  - name: OpenSearch
+    uid: opensearch
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: http://opensearch:9200
+    database: otel-logs-*
+    editable: true
+    jsonData:
+      flavor: opensearch
+      database: otel-logs-*
+      logLevelField: severity_text
+      logMessageField: body
+      timeField: "@timestamp"
+      version: "3.4.0"
+
+  - name: Prometheus
+    # UID фиксируется, чтобы JSON-дашборды могли ссылаться на datasource без зависимости от внутреннего ID Grafana.
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  - name: Jaeger
+    uid: jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true

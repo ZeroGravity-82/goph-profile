@@ -4,7 +4,7 @@ services:
     ports:
       - "3202:3202"
     volumes:
-      - ./config/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
       - ./web/static:/usr/share/nginx/html:ro
     depends_on:
@@ -14,6 +14,7 @@ services:
   server:
     build:
       context: .
+      dockerfile: docker/Dockerfile
     image: goph-profile:local
     user: "${GOPH_PROFILE_DOCKER_UID:-1000}:${GOPH_PROFILE_DOCKER_GID:-1000}"
     environment:
@@ -35,6 +36,10 @@ services:
       GOPH_PROFILE_LOGGING_FORMAT: json
       GOPH_PROFILE_LOGGING_LEVEL: debug
       GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+      OTEL_SERVICE_NAME: goph-profile-server
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: true
     volumes:
       - ./certs:/app/certs:ro
     depends_on:
@@ -44,10 +49,12 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-
+      otel-collector:
+        condition: service_started
   worker:
     build:
       context: .
+      dockerfile: docker/Dockerfile
     image: goph-profile:local
     entrypoint: ["/app/worker"]
     environment:
@@ -66,6 +73,10 @@ services:
       GOPH_PROFILE_LOGGING_FORMAT: json
       GOPH_PROFILE_LOGGING_LEVEL: debug
       GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+      OTEL_SERVICE_NAME: goph-profile-worker
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: true
     depends_on:
       postgresql:
         condition: service_healthy
@@ -73,6 +84,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
 
   postgresql:
     image: postgres:17
@@ -90,6 +103,17 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.0
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: ${GOPH_PROFILE_DATABASE_URI:?}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    restart: unless-stopped
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
@@ -99,6 +123,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${GOPH_PROFILE_MINIO_ROOT_USER:?}
       MINIO_ROOT_PASSWORD: ${GOPH_PROFILE_MINIO_ROOT_PASSWORD:?}
+      MINIO_PROMETHEUS_AUTH_TYPE: public # Ручка с метриками доступна без авторизации
     volumes:
       - minio-data:/data:rw
     healthcheck:
@@ -112,18 +137,128 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+      - "15692:15692" # Порт метрик Prometheus
     environment:
       RABBITMQ_DEFAULT_USER: ${GOPH_PROFILE_RABBITMQ_USER:?}
       RABBITMQ_DEFAULT_PASS: ${GOPH_PROFILE_RABBITMQ_PASSWORD:?}
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+sbwt none +sbwtdcpu none +sbwtdio none"
     volumes:
+      - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.143.0
+    ports:
+      - "4317:4317"
+      - "8889:8889"
+    command:
+      - "--config=/etc/otel-collector-config.yml"
+    volumes:
+      - ./docker/otel-collector/config.yml:/etc/otel-collector-config.yml:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.73.0
+    ports:
+      - "16686:16686"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      otel-collector:
+        condition: service_started
+      postgres-exporter:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      node-exporter:
+        condition: service_started
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    ports:
+      - "3000:3000"
+    environment:
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-opensearch-datasource
+    volumes:
+      - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./docker/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  opensearch:
+    image: opensearchproject/opensearch:3.4.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3.9 -c "import urllib.request; urllib.request.urlopen(''http://localhost:9200/_cluster/health'', timeout=2)"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3.4.0
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgresql-data:
   minio-data:
   rabbitmq-data:
+  opensearch-data:
+  prometheus-data:
+  grafana-data:

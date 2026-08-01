@@ -40,7 +40,7 @@ func NewUserHandler(
 
 	return &UserHandler{
 		userUseCase: userUseCase,
-		logger:      logger,
+		logger:      logger.With("component", "httpserver.user_handler"),
 	}, nil
 }
 

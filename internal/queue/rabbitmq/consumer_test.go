@@ -47,6 +47,53 @@ func TestDecodeAvatarProcessingMessage_RequiresObjectKey(t *testing.T) {
 	assert.Zero(t, message)
 }
 
+// TestDecodeAvatarProcessingMessage_RejectsInvalidJSON проверяет ошибку парсинга JSON.
+func TestDecodeAvatarProcessingMessage_RejectsInvalidJSON(t *testing.T) {
+	// Arrange
+	body := []byte(`{`)
+
+	// Act
+	message, err := decodeAvatarProcessingMessage(body)
+
+	// Assert
+	require.ErrorContains(t, err, "failed to decode avatar processing message")
+	assert.Zero(t, message)
+}
+
+// TestDecodeAvatarProcessingMessage_RejectsInvalidAvatarID проверяет ошибку парсинга avatar_id.
+func TestDecodeAvatarProcessingMessage_RejectsInvalidAvatarID(t *testing.T) {
+	// Arrange
+	body := []byte(`{
+		"avatar_id":"not-a-uuid",
+		"user_id":"018f2f5d-7cc4-7c52-9f2f-3d3f94f8a001",
+		"object_key_original":"users/user-id/avatars/avatar-id/original"
+	}`)
+
+	// Act
+	message, err := decodeAvatarProcessingMessage(body)
+
+	// Assert
+	require.ErrorContains(t, err, "failed to parse avatar_id")
+	assert.Zero(t, message)
+}
+
+// TestDecodeAvatarProcessingMessage_RejectsInvalidUserID проверяет ошибку парсинга user_id.
+func TestDecodeAvatarProcessingMessage_RejectsInvalidUserID(t *testing.T) {
+	// Arrange
+	body := []byte(`{
+		"avatar_id":"018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003",
+		"user_id":"not-a-uuid",
+		"object_key_original":"users/user-id/avatars/avatar-id/original"
+	}`)
+
+	// Act
+	message, err := decodeAvatarProcessingMessage(body)
+
+	// Assert
+	require.ErrorContains(t, err, "failed to parse user_id")
+	assert.Zero(t, message)
+}
+
 // TestDecodeAvatarDeletionMessage проверяет преобразование JSON-сообщения удаления аватарки в usecase-задачу.
 func TestDecodeAvatarDeletionMessage(t *testing.T) {
 	// Arrange
@@ -79,5 +126,44 @@ func TestDecodeAvatarDeletionMessage_RequiresObjectKeys(t *testing.T) {
 
 	// Assert
 	require.EqualError(t, err, "object_keys are not provided")
+	assert.Zero(t, message)
+}
+
+// TestDecodeAvatarDeletionMessage_RejectsInvalidJSON проверяет ошибку парсинга JSON.
+func TestDecodeAvatarDeletionMessage_RejectsInvalidJSON(t *testing.T) {
+	// Arrange
+	body := []byte(`{`)
+
+	// Act
+	message, err := decodeAvatarDeletionMessage(body)
+
+	// Assert
+	require.ErrorContains(t, err, "failed to decode avatar deletion message")
+	assert.Zero(t, message)
+}
+
+// TestDecodeAvatarDeletionMessage_RejectsInvalidAvatarID проверяет ошибку парсинга avatar_id.
+func TestDecodeAvatarDeletionMessage_RejectsInvalidAvatarID(t *testing.T) {
+	// Arrange
+	body := []byte(`{"avatar_id":"not-a-uuid","object_keys":["users/user-id/avatars/avatar-id/original"]}`)
+
+	// Act
+	message, err := decodeAvatarDeletionMessage(body)
+
+	// Assert
+	require.ErrorContains(t, err, "failed to parse avatar_id")
+	assert.Zero(t, message)
+}
+
+// TestDecodeAvatarDeletionMessage_RequiresNonEmptyObjectKey проверяет обязательность каждого ключа объекта.
+func TestDecodeAvatarDeletionMessage_RequiresNonEmptyObjectKey(t *testing.T) {
+	// Arrange
+	body := []byte(`{"avatar_id":"018f2f5d-7cc4-7c52-9f2f-3d3f94f8a003","object_keys":[""]}`)
+
+	// Act
+	message, err := decodeAvatarDeletionMessage(body)
+
+	// Assert
+	require.EqualError(t, err, "object key is not provided")
 	assert.Zero(t, message)
 }

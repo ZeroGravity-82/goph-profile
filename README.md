@@ -14,6 +14,11 @@ GophProfile - микросервис для управления аватарк�
 - MinIO/S3 для исходных изображений аватарок и миниатюр;
 - RabbitMQ для задач обработки и удаления аватарок;
 - воркер фоновой обработки изображений и удаления файлов;
+- PostgreSQL Exporter для инфраструктурных метрик PostgreSQL;
+- OpenTelemetry Collector для приема логов, метрик и трасс сервера и воркера;
+- OpenSearch и OpenSearch Dashboards для хранения и просмотра логов;
+- Prometheus и Grafana для хранения и просмотра метрик;
+- Jaeger для просмотра трасс;
 - базовые web-ресурсы для пользовательского интерфейса.
 
 ## Технологический стек
@@ -26,6 +31,10 @@ GophProfile - микросервис для управления аватарк�
 - Docker и Docker Compose;
 - Nginx;
 - `slog` для логирования;
+- OpenTelemetry Collector;
+- OpenSearch и OpenSearch Dashboards;
+- Prometheus и Grafana;
+- Jaeger;
 - `golangci-lint` для статического анализа;
 - `go test`, `testify` и Docker Compose для тестов.
 
@@ -44,6 +53,9 @@ GophProfile - микросервис для управления аватарк�
 - воркер фоновой обработки изображений и удаления файлов;
 - web-интерфейс загрузки, просмотра результата, выбора и удаления аватарок;
 - создание миниатюр `100x100` и `300x300` в воркере;
+- отправка логов сервера и воркера через OpenTelemetry Collector в OpenSearch;
+- сбор метрик сервера, воркера, рантайма Go, PostgreSQL, RabbitMQ, MinIO и хоста в Prometheus;
+- отправка трасс сервера и воркера через OpenTelemetry Collector в Jaeger;
 - Docker Compose для локального и интеграционного окружения;
 - unit-тесты и интеграционные тесты для ключевых слоев.
 
@@ -618,21 +630,27 @@ cp .env.example .env
 Запустите локальный стек:
 
 ```bash
-docker compose up -d --build
+make up
 ```
 
 Команда собирает Docker-образ и запускает:
 
+- Nginx;
 - PostgreSQL;
+- PostgreSQL Exporter;
 - MinIO;
 - RabbitMQ;
+- OpenTelemetry Collector;
+- OpenSearch и OpenSearch Dashboards;
+- Prometheus и Grafana;
+- Jaeger;
 - сервер;
 - воркер.
 
-Для ручного запуска без контейнеров приложения поднимите инфраструктуру:
+Для локальной разработки сервер и воркер удобнее запускать через `go run`. Перед этим отдельно поднимите инфраструктуру:
 
 ```bash
-docker compose up -d postgresql minio rabbitmq
+make infra-up
 ```
 
 Создайте локальный конфиг сервера по примеру `config/server.local.example.yaml`. Укажите в нем те же учетные данные,
@@ -655,37 +673,51 @@ go run ./cmd/worker -c config/worker.local.yaml
 Отдельно Docker-образ сервиса можно собрать без запуска compose:
 
 ```bash
-docker build -t goph-profile:local .
+docker build -f docker/Dockerfile -t goph-profile:local .
 ```
 
 Dockerfile использует multi-stage build: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками `server` и `worker`. По умолчанию контейнер запускает `/app/server`; воркер запускается тем же образом с переопределением entrypoint на `/app/worker`.
 
 ## Тестирование
 
-Минимальные проверки после реализации:
+Unit-тесты и интеграционные тесты размещаются рядом с тестируемыми пакетами.
+
+Запуск unit-тестов:
 
 ```bash
 make test
+```
+
+Расчет покрытия unit-тестами:
+
+Общий процент покрытия unit-тестами считается без интеграционных тестов и e2e-проверок.
+Для расчета не нужно поднимать тестовые PostgreSQL, MinIO и RabbitMQ.
+
+```bash
+go test ./... -coverprofile=coverage.out
+go tool cover -func=coverage.out | tail -n 1
+```
+
+Запуск линтера:
+
+```bash
 make lint
 ```
 
-Интеграционные тесты, которым нужны PostgreSQL, MinIO и RabbitMQ, запускаются отдельной командой:
+Запуск базовых статических проверок `go vet`:
 
 ```bash
-cp .env.test.example .env.test
-# заполните пустые значения в .env.test
-make test-integration
+make vet
 ```
 
-E2E-проверки запускают сервер и воркер на тестовых зависимостях и проходят базовый сценарий загрузки аватарки:
-
-```bash
-make test-e2e
-```
+Для изолированного тестового окружения используется `compose.test.yaml`. Тестовые PostgreSQL, MinIO и RabbitMQ работают
+на отдельных портах и используют `tmpfs`, чтобы не сохранять данные между запусками.
 
 Запустить тестовое окружение без запуска тестов:
 
 ```bash
+cp .env.test.example .env.test
+# заполните пустые значения в .env.test
 make integration-up
 ```
 
@@ -695,44 +727,75 @@ make integration-up
 make integration-down
 ```
 
-Для изолированного тестового окружения используется `compose.test.yaml`. Тестовые PostgreSQL, MinIO и RabbitMQ работают на отдельных портах и используют `tmpfs`, чтобы не сохранять данные между запусками.
+Интеграционные тесты, которым нужны PostgreSQL, MinIO и RabbitMQ, включаются тегом сборки `integration` и запускаются
+отдельной командой:
 
-Целевое покрытие тестами для MVP - больше 50%. Способ расчета покрытия нужно уточнить после появления структуры пакетов.
+```bash
+make test-integration
+```
 
-Приоритет покрытия:
+e2e-проверки запускают сервер и воркер на тестовых зависимостях и проходят базовый сценарий загрузки аватарки.
+Для запуска также нужен заполненный `.env.test`:
 
-1. usecase-сценарии;
-2. HTTP-хендлеры: валидация и маппинг ошибок;
-3. репозитории PostgreSQL;
-4. адаптеры S3 и RabbitMQ;
-5. обработка изображений и создание миниатюр.
+```bash
+make test-e2e
+```
 
-## Чек-лист перед ревью
+## Наблюдаемость
 
-Перед отправкой проекта на ревью должны быть выполнены все пункты:
+Сервер и воркер пишут структурированные логи через `slog`. Каждая запись выводится в stdout в формате `logging.format`
+(`text` или `json`) и параллельно отправляется по OTLP/gRPC в OpenTelemetry Collector, который сохраняет логи в
+OpenSearch. Для локального просмотра логов используется OpenSearch Dashboards.
 
-- все API-ручки реализованы и работают корректно;
-- web-интерфейс позволяет загружать, просматривать и удалять аватарки;
-- асинхронная обработка через RabbitMQ работает;
-- обработка сообщений идемпотентна;
-- файлы сохраняются в MinIO/S3, а метаданные - в PostgreSQL;
-- покрытие unit-тестами больше 50%;
-- `golangci-lint run` проходит без ошибок;
-- архитектура следует принципам Clean Architecture;
-- ошибки обрабатываются корректно и не раскрывают внутренние детали инфраструктуры;
-- Dockerfile сделан как оптимизированный multi-stage build;
-- Docker Compose для локальной разработки работает;
-- Docker-образы собираются и запускаются без ошибок.
+Сервер и воркер отправляют метрики по OTLP/gRPC в OpenTelemetry Collector, а Prometheus оттуда их забирает.
+Сервер пишет метрики пользовательских сценариев и HTTP-запросов. Воркер пишет метрики асинхронной обработки
+аватарок и удаления файлов. Оба процесса также отправляют метрики рантайма Go: память, сборку мусора и количество
+горутин.
+Инфраструктурные метрики СУБД, очередей, объектного хранилища и хоста отдают непосредственно PostgreSQL Exporter,
+RabbitMQ, MinIO и Node Exporter.
+Grafana автоматически поднимает дашборды из `docker/grafana/dashboards` для сервера, воркера, рантайма Go, PostgreSQL,
+RabbitMQ, MinIO и хоста.
+
+Сервер и воркер отправляют трассы по OTLP/gRPC в OpenTelemetry Collector, а он передает их в Jaeger.
+Трассировка охватывает HTTP-запросы, публикацию и чтение сообщений RabbitMQ, операции PostgreSQL и операции MinIO/S3.
+Контекст трассировки передается от сервера к воркеру через заголовки сообщений RabbitMQ.
+
+Локальные UI для анализа телеметрии:
+
+- Grafana: <http://localhost:3000> — дашборды метрик, просмотр логов через OpenSearch datasource и трасс через Jaeger datasource;
+- Prometheus: <http://localhost:9090> — PromQL-запросы и проверка собранных метрик;
+- Jaeger: <http://localhost:16686> — поиск и анализ трасс;
+- OpenSearch Dashboards: <http://localhost:5601> — просмотр и поиск логов.
+
+### Как проверить наблюдаемость
+
+После запуска локального стека через `make up` выполните небольшой пользовательский сценарий. Он создает HTTP-запросы,
+логи сервера, метрики API, сообщение RabbitMQ, обработку воркером, операции PostgreSQL и операции MinIO/S3.
+Скрипт использует `curl` и `jq`.
+
+```bash
+./scripts/check-observability.sh
+```
+
+После этого проверьте телеметрию:
+
+- в Grafana откройте дашборды `GophProfile Server`, `GophProfile Worker`, `GophProfile Go Runtime`, `GophProfile PostgreSQL`,
+  `GophProfile RabbitMQ`, `GophProfile MinIO` и `GophProfile Host`;
+- в Prometheus выполните запросы `http_server_requests_total`, `avatar_api_actions_total`, `avatar_worker_jobs_total`,
+  `up{job="postgres"}`, `up{job="rabbitmq"}`, `up{job="minio"}` и `up{job="node"}`;
+- в Jaeger выберите сервис `goph-profile-server` или `goph-profile-worker` и найдите трассы с операциями
+  `POST /api/v1/avatars`, `rabbitmq.publish`, `rabbitmq.consume.avatar_processing`, `postgres.avatar.create` и
+  `minio.put_object`;
+- в OpenSearch Dashboards или в Grafana Explore через datasource `OpenSearch` проверьте логи в индексе `otel-logs-*`.
 
 ## Структура папок
-
-Ожидаемая структура после реализации:
 
 ```text
 cmd/server/                  # точка входа HTTP-сервера
 cmd/worker/                  # точка входа воркера
-config/                      # примеры конфигурации без секретов и локальная конфигурация Nginx
+config/                      # примеры конфигурации без секретов
 certs/                       # TLS-сертификаты для локального запуска и разработки
+docker/                      # Dockerfile и конфигурация локальной инфраструктуры
 internal/app/server/         # сборка зависимостей сервера
 internal/app/worker/         # сборка зависимостей воркера
 internal/buildinfo/          # версия и дата сборки бинарных файлов
@@ -741,6 +804,7 @@ internal/domain/model/       # доменные модели, типы и оши
 internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
 internal/imageproc/          # обработка изображений и создание миниатюр
 internal/logging/            # настройка логирования
+internal/observability/      # настройка телеметрии приложения
 internal/queue/rabbitmq/     # публикация и получение сообщений RabbitMQ
 internal/storage/minio/      # S3-совместимое хранилище файлов аватарок
 internal/storage/postgres/   # реализация хранения данных в PostgreSQL
