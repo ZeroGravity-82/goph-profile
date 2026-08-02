@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -14,23 +15,47 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
+const (
+	avatarProcessingConsumerTag = "goph-profile-avatar-processing"
+	avatarDeletionConsumerTag   = "goph-profile-avatar-deletion"
+	consumerShutdownTimeout     = 20 * time.Second
+	consumerCloseTimeout        = 5 * time.Second
+)
+
+var errConsumerShutdownTimeout = errors.New("rabbitmq consumer shutdown timeout")
+
 // AvatarMessageHandler описывает обработчик задач аватарок из RabbitMQ.
 type AvatarMessageHandler interface {
 	HandleAvatarProcessing(ctx context.Context, message usecase.AvatarProcessingMessage) error
 	HandleAvatarDeletion(ctx context.Context, message usecase.AvatarDeletionMessage) error
 }
 
+// consumerChannel описывает операции RabbitMQ-канала, необходимые для получения и корректной остановки доставок.
+type consumerChannel interface {
+	Consume(
+		queue string,
+		consumer string,
+		autoAck bool,
+		exclusive bool,
+		noLocal bool,
+		noWait bool,
+		args amqp.Table,
+	) (<-chan amqp.Delivery, error)
+	Cancel(consumer string, noWait bool) error
+}
+
 // Consumer читает задачи аватарок из RabbitMQ.
 type Consumer struct {
 	conn              *amqp.Connection
-	processingChannel *amqp.Channel
-	deletionChannel   *amqp.Channel
+	processingChannel consumerChannel
+	deletionChannel   consumerChannel
 	cfg               Config
 	handler           AvatarMessageHandler
 	logger            *slog.Logger
+	shutdownTimeout   time.Duration
 }
 
-// NewConsumer создает подключение к RabbitMQ, обменник, очереди и каналы чтения.
+// NewConsumer создает подключение к RabbitMQ, объявляет топологию и открывает каналы чтения.
 func NewConsumer(
 	ctx context.Context,
 	cfg Config,
@@ -66,7 +91,7 @@ func NewConsumer(
 	return consumer, nil
 }
 
-// newConsumerWithConnection создает обменник, очереди и отдельные каналы чтения для каждой очереди.
+// newConsumerWithConnection объявляет топологию RabbitMQ и открывает отдельный канал чтения для каждой очереди.
 func newConsumerWithConnection(
 	conn *amqp.Connection,
 	cfg Config,
@@ -85,11 +110,11 @@ func newConsumerWithConnection(
 		return nil, fmt.Errorf("failed to close rabbitmq setup channel: %w", err)
 	}
 
-	processingChannel, err := consumerChannel(conn)
+	processingChannel, err := newConsumerChannel(conn)
 	if err != nil {
 		return nil, err
 	}
-	deletionChannel, err := consumerChannel(conn)
+	deletionChannel, err := newConsumerChannel(conn)
 	if err != nil {
 		_ = processingChannel.Close()
 		return nil, err
@@ -102,11 +127,12 @@ func newConsumerWithConnection(
 		cfg:               cfg,
 		handler:           handler,
 		logger:            logger.With("component", "rabbitmq.consumer"),
+		shutdownTimeout:   consumerShutdownTimeout,
 	}, nil
 }
 
-// consumerChannel открывает канал RabbitMQ и ограничивает консьюмер одним неподтвержденным сообщением.
-func consumerChannel(conn *amqp.Connection) (*amqp.Channel, error) {
+// newConsumerChannel создает новый канал RabbitMQ и ограничивает консьюмер одним неподтвержденным сообщением.
+func newConsumerChannel(conn *amqp.Connection) (*amqp.Channel, error) {
 	channel, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open rabbitmq consumer channel: %w", err)
@@ -118,11 +144,13 @@ func consumerChannel(conn *amqp.Connection) (*amqp.Channel, error) {
 	return channel, nil
 }
 
-// Run читает сообщения задач аватарок до отмены контекста или ошибки RabbitMQ.
+// Run читает сообщения из обеих очередей до отмены контекста, закрытия канала доставок или ошибки RabbitMQ.
+// При отмене контекста прекращает новые доставки и ожидает завершения активной обработки. Если обработка не
+// завершается за shutdownTimeout, Run отменяет ее контекст и продолжает ждать завершения.
 func (c *Consumer) Run(ctx context.Context) error {
 	processingDeliveryCh, err := c.processingChannel.Consume(
 		c.cfg.AvatarProcessingQueue,
-		"",
+		avatarProcessingConsumerTag,
 		false,
 		false,
 		false,
@@ -135,7 +163,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 
 	deletionDeliveryCh, err := c.deletionChannel.Consume(
 		c.cfg.AvatarDeletionQueue,
-		"",
+		avatarDeletionConsumerTag,
 		false,
 		false,
 		false,
@@ -143,7 +171,11 @@ func (c *Consumer) Run(ctx context.Context) error {
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to consume avatar deletion queue: %w", err)
+		cancelErr := c.processingChannel.Cancel(avatarProcessingConsumerTag, false)
+		return errors.Join(
+			fmt.Errorf("failed to consume avatar deletion queue: %w", err),
+			wrapConsumerCancelError("avatar processing", cancelErr),
+		)
 	}
 
 	c.logger.InfoContext(ctx, "starting rabbitmq consumer",
@@ -151,45 +183,130 @@ func (c *Consumer) Run(ctx context.Context) error {
 		slog.String("avatar_deletion_queue", c.cfg.AvatarDeletionQueue),
 	)
 
-	errCh := make(chan error, 2)
-	go c.consumeProcessing(ctx, processingDeliveryCh, errCh)
-	go c.consumeDeletion(ctx, deletionDeliveryCh, errCh)
+	workCtx, cancelWork := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelWork()
+
+	processingResultCh := make(chan error, 1)
+	deletionResultCh := make(chan error, 1)
+	go func() {
+		processingResultCh <- c.consumeProcessing(workCtx, processingDeliveryCh)
+	}()
+	go func() {
+		deletionResultCh <- c.consumeDeletion(workCtx, deletionDeliveryCh)
+	}()
 
 	select {
 	case <-ctx.Done():
-		return nil
-	case err = <-errCh:
-		return err
+		c.logger.InfoContext(ctx, "stopping rabbitmq consumer gracefully")
+		return c.stopAndWait(processingResultCh, deletionResultCh, cancelWork)
+	case err = <-processingResultCh:
+		cancelWork()
+		return errors.Join(
+			unexpectedConsumerStopError("avatar processing", err),
+			c.stopAndWait(nil, deletionResultCh, cancelWork),
+		)
+	case err = <-deletionResultCh:
+		cancelWork()
+		return errors.Join(
+			unexpectedConsumerStopError("avatar deletion", err),
+			c.stopAndWait(processingResultCh, nil, cancelWork),
+		)
 	}
 }
 
-// consumeProcessing читает очередь задач обработки аватарок до отмены контекста или ошибки подтверждения сообщения.
+// stopAndWait останавливает консьюмеры обеих очередей и ожидает завершения оставшихся горутин.
+// Если тайм-аут истекает, функция отменяет контекст активных обработчиков, но продолжает ожидание.
+func (c *Consumer) stopAndWait(
+	processingResultCh <-chan error,
+	deletionResultCh <-chan error,
+	cancelWork context.CancelFunc,
+) error {
+	timeout := c.shutdownTimeout
+	if timeout <= 0 {
+		timeout = consumerShutdownTimeout
+	}
+	timedOutCh := make(chan struct{})
+	timer := time.AfterFunc(timeout, func() {
+		cancelWork()
+		close(timedOutCh)
+	})
+
+	cancelErr := c.cancelConsumers()
+	processingErr := waitForConsumeLoop("avatar processing", processingResultCh)
+	deletionErr := waitForConsumeLoop("avatar deletion", deletionResultCh)
+	shutdownErr := errors.Join(cancelErr, processingErr, deletionErr)
+	if timer.Stop() {
+		return shutdownErr
+	}
+
+	<-timedOutCh
+	return errors.Join(errConsumerShutdownTimeout, shutdownErr)
+}
+
+// cancelConsumers параллельно останавливает новые доставки из обеих очередей и дожидается ответа RabbitMQ.
+func (c *Consumer) cancelConsumers() error {
+	cancelCh := make(chan error, 2)
+	go func() {
+		cancelCh <- wrapConsumerCancelError(
+			"avatar processing",
+			c.processingChannel.Cancel(avatarProcessingConsumerTag, false),
+		)
+	}()
+	go func() {
+		cancelCh <- wrapConsumerCancelError(
+			"avatar deletion",
+			c.deletionChannel.Cancel(avatarDeletionConsumerTag, false),
+		)
+	}()
+
+	return errors.Join(<-cancelCh, <-cancelCh)
+}
+
+// waitForConsumeLoop ожидает завершения горутины консьюмера и добавляет его имя к возникшей ошибке.
+func waitForConsumeLoop(name string, resultCh <-chan error) error {
+	if resultCh == nil {
+		return nil
+	}
+	if err := <-resultCh; err != nil {
+		return fmt.Errorf("rabbitmq %s consumer failed during shutdown: %w", name, err)
+	}
+	return nil
+}
+
+// unexpectedConsumerStopError описывает неожиданное завершение консьюмера.
+func unexpectedConsumerStopError(name string, err error) error {
+	if err != nil {
+		return fmt.Errorf("rabbitmq %s consumer stopped: %w", name, err)
+	}
+	return fmt.Errorf("rabbitmq %s delivery channel closed", name)
+}
+
+// wrapConsumerCancelError добавляет к ошибке остановки имя консьюмера RabbitMQ.
+func wrapConsumerCancelError(name string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("failed to cancel rabbitmq %s consumer: %w", name, err)
+}
+
+// consumeProcessing обрабатывает доставки задач обработки аватарок до закрытия канала доставок или ошибки
+// Ack, Nack либо Reject.
 func (c *Consumer) consumeProcessing(
 	ctx context.Context,
 	deliveryCh <-chan amqp.Delivery,
-	errCh chan<- error,
-) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case delivery, ok := <-deliveryCh:
-			if !ok {
-				errCh <- errors.New("rabbitmq avatar processing delivery channel closed")
-				return
-			}
-			if err := c.handleProcessingDelivery(ctx, delivery); err != nil {
-				errCh <- err
-				return
-			}
+) error {
+	for delivery := range deliveryCh {
+		if err := c.handleProcessingDelivery(ctx, delivery); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // handleProcessingDelivery парсит задачу обработки, передает ее хендлеру и подтверждает результат в RabbitMQ.
 //
 // Невалидное сообщение отклоняется через Reject без повторной доставки. Ошибка обработчика считается временной
-// ошибкой выполнения и подтверждается через Nack с возвратом сообщения в очередь.
+// ошибкой выполнения, поэтому сообщение отклоняется через Nack с возвратом в очередь.
 func (c *Consumer) handleProcessingDelivery(ctx context.Context, delivery amqp.Delivery) error {
 	ctx, span := startConsumeSpanWithExtractedTraceContext(ctx, delivery, "rabbitmq.consume.avatar_processing")
 	defer span.end()
@@ -250,29 +367,21 @@ func decodeAvatarProcessingMessage(body []byte) (usecase.AvatarProcessingMessage
 	}, nil
 }
 
-// consumeDeletion читает очередь задач удаления файлов аватарок до отмены контекста или ошибки подтверждения сообщения.
-func (c *Consumer) consumeDeletion(ctx context.Context, deliveryCh <-chan amqp.Delivery, errCh chan<- error) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case delivery, ok := <-deliveryCh:
-			if !ok {
-				errCh <- errors.New("rabbitmq avatar deletion delivery channel closed")
-				return
-			}
-			if err := c.handleDeletionDelivery(ctx, delivery); err != nil {
-				errCh <- err
-				return
-			}
+// consumeDeletion обрабатывает доставки задач удаления файлов аватарок до закрытия канала доставок или ошибки
+// Ack, Nack либо Reject.
+func (c *Consumer) consumeDeletion(ctx context.Context, deliveryCh <-chan amqp.Delivery) error {
+	for delivery := range deliveryCh {
+		if err := c.handleDeletionDelivery(ctx, delivery); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // handleDeletionDelivery парсит задачу удаления, передает ее хендлеру и подтверждает результат в RabbitMQ.
 //
 // Невалидное сообщение отклоняется через Reject без повторной доставки. Ошибка обработчика считается временной
-// ошибкой выполнения и подтверждается через Nack с возвратом сообщения в очередь.
+// ошибкой выполнения, поэтому сообщение отклоняется через Nack с возвратом в очередь.
 func (c *Consumer) handleDeletionDelivery(ctx context.Context, delivery amqp.Delivery) error {
 	ctx, span := startConsumeSpanWithExtractedTraceContext(ctx, delivery, "rabbitmq.consume.avatar_deletion")
 	defer span.end()
@@ -333,17 +442,10 @@ func decodeAvatarDeletionMessage(body []byte) (usecase.AvatarDeletionMessage, er
 	}, nil
 }
 
-// Close закрывает каналы чтения и соединение RabbitMQ.
+// Close закрывает соединение RabbitMQ вместе со связанными каналами чтения.
 func (c *Consumer) Close() error {
-	var err error
-	if c.processingChannel != nil {
-		err = errors.Join(err, c.processingChannel.Close())
+	if c.conn == nil {
+		return nil
 	}
-	if c.deletionChannel != nil {
-		err = errors.Join(err, c.deletionChannel.Close())
-	}
-	if c.conn != nil {
-		err = errors.Join(err, c.conn.Close())
-	}
-	return err
+	return c.conn.CloseDeadline(time.Now().Add(consumerCloseTimeout))
 }
