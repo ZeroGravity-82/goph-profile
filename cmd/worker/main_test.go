@@ -13,7 +13,7 @@ import (
 // Test_run_ReturnsAppInitError проверяет, что ошибка инициализации приложения возвращается вызывающему коду.
 func Test_run_ReturnsAppInitError(t *testing.T) {
 	// Arrange
-	cfg := config.ServerConfig{DatabaseURI: "://bad-database-uri"}
+	cfg := config.WorkerConfig{DatabaseURI: "://bad-database-uri"}
 	logger := logging.NopLogger()
 
 	// Act

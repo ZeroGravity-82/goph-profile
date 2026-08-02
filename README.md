@@ -645,9 +645,10 @@ make up
 - Prometheus и Grafana;
 - Jaeger;
 - сервер;
-- воркер.
+- воркер;
+- мигратор базы данных.
 
-Для локальной разработки сервер и воркер удобнее запускать через `go run`. Перед этим отдельно поднимите инфраструктуру:
+Для локальной разработки сервер, воркер и мигратор удобнее запускать через `go run`. Перед этим отдельно поднимите инфраструктуру:
 
 ```bash
 make infra-up
@@ -655,6 +656,12 @@ make infra-up
 
 Создайте локальный конфиг сервера по примеру `config/server.local.example.yaml`. Укажите в нем те же учетные данные,
 что в `.env`, но используйте `localhost` в адресах PostgreSQL, MinIO и RabbitMQ.
+
+Примените миграции базы данных:
+
+```bash
+go run ./cmd/migrate -c config/server.local.yaml
+```
 
 Запустите сервер локально:
 
@@ -676,7 +683,9 @@ go run ./cmd/worker -c config/worker.local.yaml
 docker build -f docker/Dockerfile -t goph-profile:local .
 ```
 
-Dockerfile использует multi-stage build: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками `server` и `worker`. По умолчанию контейнер запускает `/app/server`; воркер запускается тем же образом с переопределением entrypoint на `/app/worker`.
+Dockerfile использует multi-stage build: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками
+`server`, `worker` и `migrate`. По умолчанию контейнер запускает `/app/server`; воркер и мигратор запускаются тем же
+образом с переопределением entrypoint на `/app/worker` и `/app/migrate` соответственно.
 
 ## Тестирование
 
@@ -791,15 +800,17 @@ RabbitMQ, MinIO и хоста.
 ## Структура папок
 
 ```text
+cmd/migrate/                 # точка входа мигратора базы данных
 cmd/server/                  # точка входа HTTP-сервера
 cmd/worker/                  # точка входа воркера
 config/                      # примеры конфигурации без секретов
 certs/                       # TLS-сертификаты для локального запуска и разработки
 docker/                      # Dockerfile и конфигурация локальной инфраструктуры
+internal/app/migrate/        # применение миграций базы данных
 internal/app/server/         # сборка зависимостей сервера
 internal/app/worker/         # сборка зависимостей воркера
 internal/buildinfo/          # версия и дата сборки бинарных файлов
-internal/config/             # конфигурация сервера и воркера
+internal/config/             # конфигурация сервера, воркера и мигратора
 internal/domain/model/       # доменные модели, типы и ошибки
 internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
 internal/imageproc/          # обработка изображений и создание миниатюр

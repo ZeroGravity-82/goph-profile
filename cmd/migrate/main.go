@@ -1,0 +1,73 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	migrateApp "github.com/ZeroGravity-82/goph-profile/internal/app/migrate"
+	"github.com/ZeroGravity-82/goph-profile/internal/config"
+	"github.com/ZeroGravity-82/goph-profile/internal/observability"
+)
+
+const (
+	serviceName              = "goph-profile-migrate"
+	telemetryShutdownTimeout = 5 * time.Second
+)
+
+func main() {
+	ctx := context.Background()
+
+	cfg, err := config.LoadMigrate()
+	if err != nil {
+		if errors.Is(err, config.ErrHelp) {
+			// Пользователь запросил справку по флагам командной строки; это штатное завершение.
+			return
+		}
+
+		// Логгер еще не сконфигурирован.
+		log.Fatalf("config error: %v", err)
+	}
+
+	logger, shutdownLogger, err := observability.NewLogger(ctx, cfg.Logging, serviceName)
+	if err != nil {
+		// Логгер еще не сконфигурирован.
+		log.Fatalf("logger config error: %v", err)
+	}
+
+	exitCode := 0
+	if err := run(cfg, logger); err != nil {
+		logger.ErrorContext(ctx, "migration terminated with error", slog.Any("err", err))
+		exitCode = 1
+	}
+
+	if err := shutdownTelemetryProvider(shutdownLogger); err != nil {
+		logger.ErrorContext(ctx, "failed to shutdown logger provider", slog.Any("err", err))
+	}
+	if exitCode != 0 {
+		os.Exit(exitCode)
+	}
+}
+
+func run(cfg config.MigrateConfig, logger *slog.Logger) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	if err := migrateApp.Run(ctx, cfg, logger); err != nil {
+		return fmt.Errorf("failed to migrate database: %w", err)
+	}
+	return nil
+}
+
+func shutdownTelemetryProvider(shutdown func(context.Context) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), telemetryShutdownTimeout)
+	defer cancel()
+
+	return shutdown(ctx)
+}

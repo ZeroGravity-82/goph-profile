@@ -150,15 +150,8 @@ func httpTLSConfig(tlsCert tls.Certificate) *tls.Config {
 	}
 }
 
-// Run применяет миграции БД и запускает HTTP-сервер.
-//
-// Блокируется до остановки по сигналу завершения или из-за ошибки HTTP-сервера.
+// Run запускает HTTP-сервер и блокируется до остановки по сигналу завершения или из-за ошибки HTTP-сервера.
 func (a *App) Run(ctx context.Context) error {
-	err := a.runMigrations(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
-
 	return a.httpSrv.Run(ctx)
 }
 

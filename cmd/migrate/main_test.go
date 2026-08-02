@@ -10,10 +10,10 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 )
 
-// Test_run_ReturnsAppInitError проверяет, что ошибка инициализации приложения возвращается вызывающему коду.
-func Test_run_ReturnsAppInitError(t *testing.T) {
+// Test_run_ReturnsMigrationError проверяет, что ошибка миграции возвращается вызывающему коду.
+func Test_run_ReturnsMigrationError(t *testing.T) {
 	// Arrange
-	cfg := config.ServerConfig{DatabaseURI: "://bad-database-uri"}
+	cfg := config.MigrateConfig{DatabaseURI: "://bad-database-uri"}
 	logger := logging.NopLogger()
 
 	// Act
@@ -21,6 +21,6 @@ func Test_run_ReturnsAppInitError(t *testing.T) {
 
 	// Assert
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "app init error")
+	assert.Contains(t, err.Error(), "failed to migrate database")
 	assert.Contains(t, err.Error(), "failed to connect to the database")
 }
