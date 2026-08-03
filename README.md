@@ -805,6 +805,7 @@ kubectl rollout restart deployment/goph-profile-server deployment/goph-profile-w
 helm status goph-profile --namespace goph-profile
 kubectl get pods,services,ingresses,hpa --namespace goph-profile
 kubectl get servicemonitor goph-profile-otel-collector --namespace goph-profile
+kubectl get middleware goph-profile-server-rate-limit --namespace goph-profile
 ```
 
 Дождитесь готовности всех Deployment:
@@ -869,6 +870,7 @@ flowchart TB
 
     subgraph appNamespace["namespace goph-profile"]
         ingress[Ingress]
+        rateLimit[Middleware<br/>ограничение частоты запросов]
         serverService[Service server]
         server[Deployment server<br/>HPA: 1–3 реплики]
         worker[Deployment worker<br/>HPA: 1–3 реплики]
@@ -893,6 +895,7 @@ flowchart TB
     end
 
     traefik --> ingress
+    rateLimit -.->|применяется| ingress
     ingress --> serverService
     serverService --> server
 
@@ -926,6 +929,28 @@ Helm-чарт `helm/goph-profile` рассчитан на кластер с ус
 Для маршрутизации внешнего трафика чарт создает стандартный Kubernetes-объект `Ingress`. Traefik завершает внешнее
 TLS-соединение, после чего передает запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
 HTTP-сервером сохраняется для запуска приложения без Kubernetes.
+
+### Ограничение частоты запросов
+
+Traefik Middleware ограничивает частоту запросов от одного IP-адреса до 10 запросов в секунду и допускает
+кратковременный всплеск до 20 запросов. При превышении лимита Traefik возвращает `429 Too Many Requests`, не передавая
+запрос серверу приложения. Параметры ограничения настраиваются в values-файлах:
+
+```yaml
+ingress:
+  rateLimit:
+    enabled: true
+    average: 10
+    burst: 20
+    period: 1s
+```
+
+Значение `average` задает допустимое количество запросов за `period`, а `burst` - максимальное количество запросов,
+которое может поступить одновременно. При `enabled: false` Middleware не создается и не подключается к Ingress.
+
+Ограничитель хранит состояние в памяти каждой реплики Traefik. Если в прод-окружении запущено несколько реплик
+Ingress-контроллера и требуется общий для них лимит, его состояние следует хранить в общем Redis на уровне инфраструктуры
+кластера.
 
 ### Миграции базы данных
 

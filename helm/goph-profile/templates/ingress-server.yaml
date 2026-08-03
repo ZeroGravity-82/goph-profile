@@ -5,6 +5,11 @@ metadata:
   labels:
     {{- include "goph-profile.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
+  {{- if .Values.ingress.rateLimit.enabled }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: >-
+      {{ include "goph-profile.rateLimitMiddlewareReference" . }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:

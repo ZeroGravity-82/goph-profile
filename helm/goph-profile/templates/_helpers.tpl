@@ -53,6 +53,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-ingress-tls" (include "goph-profile.fullname" .) }}
 {{- end }}
 
+{{/* Имя Traefik Middleware с ограничением частоты запросов. */}}
+{{- define "goph-profile.rateLimitMiddlewareName" -}}
+{{- printf "%s-server-rate-limit" (include "goph-profile.fullname" .) }}
+{{- end }}
+
+{{/* Ссылка на Traefik Middleware в формате провайдера Kubernetes CRD. */}}
+{{- define "goph-profile.rateLimitMiddlewareReference" -}}
+{{- printf "%s-%s@kubernetescrd" .Release.Namespace (include "goph-profile.rateLimitMiddlewareName" .) }}
+{{- end }}
+
 {{/* Имя ресурсов OpenTelemetry Collector. */}}
 {{- define "goph-profile.otelCollectorName" -}}
 {{- printf "%s-otel-collector" (include "goph-profile.fullname" .) }}

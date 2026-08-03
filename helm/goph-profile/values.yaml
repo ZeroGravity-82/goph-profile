@@ -35,6 +35,11 @@ server:
 ingress:
   className: traefik
   host: localhost
+  rateLimit:
+    enabled: true
+    average: 10
+    burst: 20
+    period: 1s
 
 networkPolicy:
   enabled: true
