@@ -28,6 +28,7 @@ COPY --from=builder /out/server /app/server
 COPY --from=builder /out/worker /app/worker
 COPY --from=builder /out/migrate /app/migrate
 
-USER nonroot:nonroot
+# Числовые UID/GID пользователя nonroot позволяют Kubernetes проверить требование runAsNonRoot.
+USER 65532:65532
 
 ENTRYPOINT ["/app/server"]
