@@ -4,7 +4,6 @@ image:
   tag: ""
 
 server:
-  replicaCount: 1
   port: 3202
   service:
     type: ClusterIP
@@ -16,13 +15,17 @@ server:
     limits:
       cpu: 500m
       memory: 512Mi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
 
 ingress:
   className: traefik
   host: localhost
 
 worker:
-  replicaCount: 1
   healthPort: 3203
   resources:
     requests:
@@ -31,6 +34,11 @@ worker:
     limits:
       cpu: 500m
       memory: 512Mi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
 
 config:
   fileStorage:

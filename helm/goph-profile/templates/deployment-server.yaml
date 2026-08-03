@@ -6,7 +6,6 @@ metadata:
     {{- include "goph-profile.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
 spec:
-  replicas: {{ .Values.server.replicaCount }}
   selector:
     matchLabels:
       {{- include "goph-profile.selectorLabels" . | nindent 6 }}
