@@ -51,13 +51,13 @@ type userUseCase interface {
 	ResolveUserByEmail(ctx context.Context, email model.Email) (usecase.ResolveUserByEmailOutput, error)
 }
 
-// HealthCheck проверяет доступность внешней зависимости.
-type HealthCheck func(ctx context.Context) error
+// ReadinessCheck проверяет доступность внешней зависимости.
+type ReadinessCheck func(ctx context.Context) error
 
-// HealthChecks содержит именованные проверки внешних зависимостей.
-type HealthChecks map[string]HealthCheck
+// ReadinessChecks содержит именованные проверки готовности внешних зависимостей.
+type ReadinessChecks map[string]ReadinessCheck
 
-func (checks HealthChecks) handlerChecks() map[string]func(context.Context) error {
+func (checks ReadinessChecks) handlerChecks() map[string]func(context.Context) error {
 	result := make(map[string]func(context.Context) error, len(checks))
 	for name, check := range checks {
 		result[name] = check
@@ -69,12 +69,12 @@ func (checks HealthChecks) handlerChecks() map[string]func(context.Context) erro
 //
 // Он запускает роутер, собранный handler.NewRouter, на указанном адресе.
 type HTTPServer struct {
-	addr          string
-	tlsConfig     *tls.Config
-	avatarUseCase avatarUseCase
-	userUseCase   userUseCase
-	healthChecks  HealthChecks
-	logger        *slog.Logger
+	addr            string
+	tlsConfig       *tls.Config
+	avatarUseCase   avatarUseCase
+	userUseCase     userUseCase
+	readinessChecks ReadinessChecks
+	logger          *slog.Logger
 }
 
 // NewHTTPServer создает HTTPServer.
@@ -83,7 +83,7 @@ func NewHTTPServer(
 	tlsConfig *tls.Config,
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
-	healthChecks HealthChecks,
+	readinessChecks ReadinessChecks,
 	logger *slog.Logger,
 ) (*HTTPServer, error) {
 	if addr == "" {
@@ -98,20 +98,20 @@ func NewHTTPServer(
 	if userUseCase == nil {
 		return nil, errors.New("user usecase is not provided")
 	}
-	if len(healthChecks) == 0 {
-		return nil, errors.New("health checks are not provided")
+	if len(readinessChecks) == 0 {
+		return nil, errors.New("readiness checks are not provided")
 	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
 
 	return &HTTPServer{
-		addr:          addr,
-		tlsConfig:     tlsConfig,
-		avatarUseCase: avatarUseCase,
-		userUseCase:   userUseCase,
-		healthChecks:  healthChecks,
-		logger:        logger,
+		addr:            addr,
+		tlsConfig:       tlsConfig,
+		avatarUseCase:   avatarUseCase,
+		userUseCase:     userUseCase,
+		readinessChecks: readinessChecks,
+		logger:          logger,
 	}, nil
 }
 
@@ -121,7 +121,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	router, err := handler.NewRouter(
 		s.avatarUseCase,
 		s.userUseCase,
-		s.healthChecks.handlerChecks(),
+		s.readinessChecks.handlerChecks(),
 		s.logger,
 	)
 	if err != nil {

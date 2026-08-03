@@ -44,30 +44,30 @@ func mustRouter(
 	t *testing.T,
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
-	healthChecks map[string]func(context.Context) error,
+	readinessChecks map[string]func(context.Context) error,
 	logger *slog.Logger,
 ) http.Handler {
 	t.Helper()
 
-	router, err := NewRouter(avatarUseCase, userUseCase, healthChecks, logger)
+	router, err := NewRouter(avatarUseCase, userUseCase, readinessChecks, logger)
 	require.NoError(t, err)
 
 	return router
 }
 
-func okHealthChecks() map[string]func(context.Context) error {
+func okReadinessChecks() map[string]func(context.Context) error {
 	return map[string]func(context.Context) error{
-		"postgres": okHealthCheck,
-		"s3":       okHealthCheck,
-		"rabbitmq": okHealthCheck,
+		"postgres": okReadinessCheck,
+		"s3":       okReadinessCheck,
+		"rabbitmq": okReadinessCheck,
 	}
 }
 
-func okHealthCheck(_ context.Context) error {
+func okReadinessCheck(_ context.Context) error {
 	return nil
 }
 
-func healthCheckError(err error) func(context.Context) error {
+func readinessCheckError(err error) func(context.Context) error {
 	return func(_ context.Context) error {
 		return err
 	}

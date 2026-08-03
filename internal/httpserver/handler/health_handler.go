@@ -12,48 +12,53 @@ import (
 )
 
 const (
-	healthCheckTimeout   = 2 * time.Second
-	healthStatusOK       = "ok"
-	healthStatusError    = "error"
-	healthStatusDegraded = "degraded"
+	readinessCheckTimeout = 2 * time.Second
+	healthStatusOK        = "ok"
+	healthStatusError     = "error"
+	healthStatusDegraded  = "degraded"
 )
 
-// HealthHandler обрабатывает HTTP-запрос проверки состояния сервиса и его внешних зависимостей.
+// HealthHandler обрабатывает HTTP-запросы проверки жизнеспособности и готовности сервиса.
 type HealthHandler struct {
-	checks map[string]func(context.Context) error
-	logger *slog.Logger
+	readinessChecks map[string]func(context.Context) error
+	logger          *slog.Logger
 }
 
 // NewHealthHandler создает HealthHandler.
-func NewHealthHandler(checks map[string]func(context.Context) error, logger *slog.Logger) (*HealthHandler, error) {
-	if checks == nil {
-		return nil, errors.New("health checks are not provided")
+func NewHealthHandler(readinessChecks map[string]func(context.Context) error, logger *slog.Logger) (*HealthHandler, error) {
+	if readinessChecks == nil {
+		return nil, errors.New("readiness checks are not provided")
 	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
 
 	return &HealthHandler{
-		checks: checks,
-		logger: logger.With("component", "httpserver.health_handler"),
+		readinessChecks: readinessChecks,
+		logger:          logger.With("component", "httpserver.health_handler"),
 	}, nil
 }
 
-// getHealth выполняет именованные проверки внешних зависимостей и возвращает общий статус сервиса.
-func (h *HealthHandler) getHealth(w http.ResponseWriter, r *http.Request) {
+// getLive подтверждает, что процесс сервиса запущен и не требует перезапуска.
+func (h *HealthHandler) getLive(w http.ResponseWriter, r *http.Request) {
+	writeJSON(h.logger, w, r, http.StatusOK, dto.LivenessResponse{Status: healthStatusOK})
+}
+
+// getReady выполняет именованные проверки внешних зависимостей и возвращает готовность сервиса принимать трафик.
+func (h *HealthHandler) getReady(w http.ResponseWriter, r *http.Request) {
 	var checkErr error
 	statusCode := http.StatusOK
-	response := dto.HealthResponse{
+	response := dto.ReadinessResponse{
 		Status: healthStatusOK,
-		Checks: make(map[string]string, len(h.checks)),
+		Checks: make(map[string]string, len(h.readinessChecks)),
 	}
 
-	for name, check := range h.checks {
-		ctx, cancel := context.WithTimeout(r.Context(), healthCheckTimeout)
+	for name, check := range h.readinessChecks {
+		ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
 		err := check(ctx)
 		cancel()
 
-		response.Checks[name] = healthCheckStatus(err)
+		response.Checks[name] = readinessCheckStatus(err)
 		if err != nil {
 			checkErr = errors.Join(checkErr, err)
 		}
@@ -62,13 +67,13 @@ func (h *HealthHandler) getHealth(w http.ResponseWriter, r *http.Request) {
 	if checkErr != nil {
 		statusCode = http.StatusServiceUnavailable
 		response.Status = healthStatusDegraded
-		logError(h.logger, r, "health check failed", checkErr)
+		logError(h.logger, r, "readiness check failed", checkErr)
 	}
 
 	writeJSON(h.logger, w, r, statusCode, response)
 }
 
-func healthCheckStatus(err error) string {
+func readinessCheckStatus(err error) string {
 	if err != nil {
 		return healthStatusError
 	}

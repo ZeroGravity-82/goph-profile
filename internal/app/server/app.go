@@ -123,7 +123,7 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 		httpTLSConfig(tlsCert),
 		avatarUseCase,
 		userUseCase,
-		httpserver.HealthChecks{
+		httpserver.ReadinessChecks{
 			"postgres": db.Ping,
 			"s3":       fileStorage.Ping,
 			"rabbitmq": publisher.Ping,
