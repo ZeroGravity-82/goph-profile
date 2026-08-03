@@ -30,6 +30,17 @@ spec:
             - name: http
               containerPort: {{ .Values.server.port }}
               protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            timeoutSeconds: 3
           envFrom:
             - configMapRef:
                 name: {{ include "goph-profile.configMapName" . }}
