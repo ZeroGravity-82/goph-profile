@@ -19,10 +19,22 @@ spec:
         {{- include "goph-profile.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
     spec:
+      serviceAccountName: {{ include "goph-profile.fullname" . }}-worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: worker
           image: {{ include "goph-profile.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           command:
             - /app/worker
           ports:

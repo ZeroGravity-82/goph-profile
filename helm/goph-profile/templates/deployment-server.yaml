@@ -19,10 +19,22 @@ spec:
         {{- include "goph-profile.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: server
     spec:
+      serviceAccountName: {{ include "goph-profile.fullname" . }}-server
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: server
           image: {{ include "goph-profile.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           command:
             - /app/server
           ports:

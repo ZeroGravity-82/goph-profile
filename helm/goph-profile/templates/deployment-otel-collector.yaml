@@ -20,6 +20,12 @@ spec:
         {{- include "goph-profile.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: otel-collector
     spec:
+      serviceAccountName: {{ include "goph-profile.otelCollectorName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -32,6 +38,12 @@ spec:
         - name: otel-collector
           image: {{ printf "%s:%s" .Values.otelCollector.image.repository .Values.otelCollector.image.tag | quote }}
           imagePullPolicy: {{ .Values.otelCollector.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           args:
             - --config=/etc/otel-collector/config.yaml
           ports:
