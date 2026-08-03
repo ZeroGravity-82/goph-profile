@@ -1,3 +1,10 @@
+{{/* Общая конфигурация server и worker. */}}
+{{- $otelEndpoint := .Values.config.otel.endpoint }}
+{{- if .Values.otelCollector.enabled }}
+{{- $otelEndpoint = printf "http://%s:%v" (include "goph-profile.otelCollectorName" .) .Values.otelCollector.ports.otlpGrpc }}
+{{- else }}
+{{- $otelEndpoint = required "config.otel.endpoint is required when otelCollector.enabled is false" $otelEndpoint }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -16,6 +23,5 @@ data:
   GOPH_PROFILE_LOGGING_FORMAT: {{ .Values.config.logging.format | quote }}
   GOPH_PROFILE_LOGGING_LEVEL: {{ .Values.config.logging.level | quote }}
   GOPH_PROFILE_LOGGING_ADD_SOURCE: {{ .Values.config.logging.addSource | quote }}
-  OTEL_RESOURCE_ATTRIBUTES: {{ .Values.config.otel.resourceAttributes | quote }}
-  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otel.endpoint | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ $otelEndpoint | quote }}
   OTEL_EXPORTER_OTLP_INSECURE: {{ .Values.config.otel.insecure | quote }}

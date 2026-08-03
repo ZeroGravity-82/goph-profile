@@ -52,3 +52,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "goph-profile.ingressTLSSecretName" -}}
 {{- printf "%s-ingress-tls" (include "goph-profile.fullname" .) }}
 {{- end }}
+
+{{/* Имя ресурсов OpenTelemetry Collector. */}}
+{{- define "goph-profile.otelCollectorName" -}}
+{{- printf "%s-otel-collector" (include "goph-profile.fullname" .) }}
+{{- end }}
+
+{{/* OTEL-атрибуты ресурса с уникальным идентификатором pod. */}}
+{{- define "goph-profile.otelResourceAttributes" -}}
+{{- if .Values.config.otel.resourceAttributes -}}
+{{- printf "%s,service.instance.id=$(POD_UID)" .Values.config.otel.resourceAttributes }}
+{{- else -}}
+service.instance.id=$(POD_UID)
+{{- end }}
+{{- end }}

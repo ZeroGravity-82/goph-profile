@@ -740,6 +740,38 @@ Helm-чарт `helm/goph-profile` рассчитан на кластер с ус
 TLS-соединение, после чего передаёт запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
 HTTP-сервером сохраняется для запуска приложения без Kubernetes.
 
+Сервер и воркер отправляют метрики по OTLP/gRPC в отдельный OpenTelemetry Collector через порт `4317`. OpenTelemetry
+Collector публикует метрики в формате Prometheus на порту `8889`, а `ServiceMonitor` указывает Prometheus собирать их
+через Kubernetes Service этого OpenTelemetry Collector. Для применения `ServiceMonitor` в кластере должен быть установлен 
+Prometheus Operator.
+
+По умолчанию Helm-чарт разворачивает выделенный OpenTelemetry Collector вместе с приложением. Чтобы использовать внешний
+OpenTelemetry Collector, нужно отключить встроенный и обязательно указать его OTLP endpoint:
+
+```yaml
+otelCollector:
+  enabled: false
+
+config:
+  otel:
+    endpoint: https://otel-collector.observability:4317
+    insecure: false
+```
+
+При отключенном встроенном OpenTelemetry Collector его `ConfigMap`, `Deployment`, `Service` и `ServiceMonitor` не 
+создаются. Настройка сбора метрик с внешнего OpenTelemetry Collector относится к инфраструктуре Kubernetes-кластера.
+
+Каждый pod сервера и воркера получает собственный `service.instance.id` из своего Kubernetes UID. Это позволяет
+различать метрики отдельных реплик после масштабирования. `ServiceMonitor` сохраняет экспортируемые OpenTelemetry Collector
+метки `job` и `instance` при передаче метрик в Prometheus.
+
+Встроенный OpenTelemetry Collector запускается в двух репликах. Kubernetes Service распределяет OTLP-соединения между готовыми
+репликами, планировщик Kubernetes по возможности размещает их на разных узлах, а `PodDisruptionBudget` сохраняет как минимум
+одну доступную реплику при плановом обслуживании узлов.
+
+Prometheus Operator и Prometheus относятся к инфраструктуре Kubernetes-кластера и не входят в Helm-чарт GophProfile.
+Prometheus должен быть настроен на обнаружение `ServiceMonitor` в namespace `goph-profile`.
+
 ## Тестирование
 
 Unit-тесты и интеграционные тесты размещаются рядом с тестируемыми пакетами.

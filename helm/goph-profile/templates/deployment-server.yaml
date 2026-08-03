@@ -13,7 +13,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-app.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret-credentials.yaml") . | sha256sum }}
       labels:
         {{- include "goph-profile.selectorLabels" . | nindent 8 }}
@@ -56,3 +56,9 @@ spec:
               value: ""
             - name: OTEL_SERVICE_NAME
               value: goph-profile-server
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ include "goph-profile.otelResourceAttributes" . | quote }}

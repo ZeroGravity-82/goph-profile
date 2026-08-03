@@ -40,6 +40,33 @@ worker:
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
 
+otelCollector:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    pullPolicy: IfNotPresent
+    tag: "0.143.0"
+  ports:
+    otlpGrpc: 4317
+    metrics: 8889
+    health: 13133
+  config:
+    opensearchEndpoint: http://opensearch:9200
+    jaegerEndpoint: jaeger:4317
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  serviceMonitor:
+    interval: 30s
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
 config:
   fileStorage:
     endpoint: minio:9000
@@ -56,8 +83,10 @@ config:
     level: info
     addSource: false
   otel:
-    endpoint: http://otel-collector:4317
+    # Внешний endpoint обязателен, если встроенный OpenTelemetry Collector отключен.
+    endpoint: ""
     insecure: true
+    # service.instance.id с UID pod добавляется к этим атрибутам автоматически.
     resourceAttributes: deployment.environment=local
 
 # Значения-заглушки нужно переопределить при установке, не коммитя реальные секреты.
