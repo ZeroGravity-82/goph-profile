@@ -16,3 +16,4 @@ vendor/
 config/migrate.local.yaml
 config/server.local.yaml
 config/worker.local.yaml
+helm/goph-profile/values.secret.yaml

@@ -1,0 +1,20 @@
+# Production-окружение использует внешние инфраструктурные зависимости и OpenTelemetry Collector.
+image:
+  repository: registry.example.com/goph-profile
+  pullPolicy: IfNotPresent
+  tag: replace-with-image-tag
+
+ingress:
+  host: goph-profile.example.com
+
+otelCollector:
+  enabled: false
+
+config:
+  fileStorage:
+    endpoint: minio.storage.svc.cluster.local:9000
+    useSSL: true
+  otel:
+    endpoint: https://otel-collector.observability.svc.cluster.local:4317
+    insecure: false
+    resourceAttributes: deployment.environment=production

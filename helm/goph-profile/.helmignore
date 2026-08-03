@@ -6,3 +6,4 @@
 *.swp
 *.tmp
 *.tgz
+values.secret.yaml

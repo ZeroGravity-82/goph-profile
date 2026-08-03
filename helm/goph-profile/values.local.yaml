@@ -1,0 +1,26 @@
+# Локальное окружение: приложение запускается в Rancher Desktop, а внешние зависимости - в Docker Compose.
+# В строках подключения из values.secret.yaml используйте адрес host.docker.internal.
+image:
+  repository: goph-profile
+  pullPolicy: IfNotPresent
+  tag: local
+
+ingress:
+  host: localhost
+
+otelCollector:
+  enabled: true
+  config:
+    opensearchEndpoint: http://host.docker.internal:9200
+    jaegerEndpoint: host.docker.internal:4317
+
+config:
+  fileStorage:
+    endpoint: host.docker.internal:9000
+    useSSL: false
+  logging:
+    format: json
+    level: debug
+    addSource: true
+  otel:
+    resourceAttributes: deployment.environment=local

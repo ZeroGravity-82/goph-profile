@@ -733,6 +733,15 @@ Dockerfile использует multi-stage build: отдельный build stag
 
 ## Развертывание в Kubernetes
 
+### Конфигурация окружений
+
+Базовые значения Helm-чарта находятся в `helm/goph-profile/values.yaml`. Файл `values.local.yaml` настраивает запуск
+приложения в Rancher Desktop с инфраструктурными компонентами из Docker Compose, а `values.production.yaml` содержит
+пример настроек для прод-окружения с внешним OpenTelemetry Collector.
+
+Реальные учётные данные и TLS-ключи не хранятся в Git. Для их передачи скопируйте `values.secret.example.yaml` в
+игнорируемый файл `values.secret.yaml`, заполните его и указывайте после файла окружения, чтобы реальные секреты и TLS переопределили значения-заглушки.
+
 ### Ingress и TLS
 
 Helm-чарт `helm/goph-profile` рассчитан на кластер с установленным Traefik Ingress Controller. В используемом локальном
