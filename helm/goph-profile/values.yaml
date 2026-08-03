@@ -3,6 +3,17 @@ image:
   pullPolicy: IfNotPresent
   tag: ""
 
+migrate:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 server:
   port: 3202
   service:

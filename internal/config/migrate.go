@@ -11,7 +11,7 @@ import (
 //
 // DatabaseURI - строка подключения к базе данных.
 //
-// Logging - настройки логирования сервиса.
+// Logging - настройки логирования мигратора.
 type MigrateConfig struct {
 	DatabaseURI string  `koanf:"database_uri"`
 	Logging     Logging `koanf:"logging"`

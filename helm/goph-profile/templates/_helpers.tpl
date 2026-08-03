@@ -58,6 +58,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-otel-collector" (include "goph-profile.fullname" .) }}
 {{- end }}
 
+{{/* Имя ресурсов мигратора. */}}
+{{- define "goph-profile.migrateName" -}}
+{{- printf "%s-migrate" (include "goph-profile.fullname" .) }}
+{{- end }}
+
 {{/* OTEL-атрибуты ресурса с уникальным идентификатором pod. */}}
 {{- define "goph-profile.otelResourceAttributes" -}}
 {{- if .Values.config.otel.resourceAttributes -}}

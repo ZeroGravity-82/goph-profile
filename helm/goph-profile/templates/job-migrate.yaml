@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "goph-profile.migrateName" . }}
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrate.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrate.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "goph-profile.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      serviceAccountName: {{ include "goph-profile.migrateName" . }}
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: {{ include "goph-profile.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - /app/migrate
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          envFrom:
+            - secretRef:
+                name: {{ include "goph-profile.migrateName" . }}
+          env:
+            - name: GOPH_PROFILE_LOGGING_FORMAT
+              value: {{ .Values.config.logging.format | quote }}
+            - name: GOPH_PROFILE_LOGGING_LEVEL
+              value: {{ .Values.config.logging.level | quote }}
+            - name: GOPH_PROFILE_LOGGING_ADD_SOURCE
+              value: {{ .Values.config.logging.addSource | quote }}

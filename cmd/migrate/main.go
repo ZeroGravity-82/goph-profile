@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	logger, shutdownLogger, err := observability.NewLogger(ctx, cfg.Logging, serviceName)
+	logger, shutdownLogger, err := newLogger(ctx, cfg.Logging)
 	if err != nil {
 		// Логгер еще не сконфигурирован.
 		log.Fatalf("logger config error: %v", err)
@@ -47,12 +47,29 @@ func main() {
 		exitCode = 1
 	}
 
-	if err := shutdownTelemetryProvider(shutdownLogger); err != nil {
-		logger.ErrorContext(ctx, "failed to shutdown logger provider", slog.Any("err", err))
+	if shutdownLogger != nil {
+		if err := shutdownTelemetryProvider(shutdownLogger); err != nil {
+			logger.ErrorContext(ctx, "failed to shutdown logger provider", slog.Any("err", err))
+		}
 	}
 	if exitCode != 0 {
 		os.Exit(exitCode)
 	}
+}
+
+func newLogger(
+	ctx context.Context,
+	cfg config.Logging,
+) (*slog.Logger, func(context.Context) error, error) {
+	if !otelLoggingEnabled() {
+		logger, err := observability.NewStdoutLogger(cfg)
+		return logger, nil, err
+	}
+	return observability.NewLogger(ctx, cfg, serviceName)
+}
+
+func otelLoggingEnabled() bool {
+	return os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != ""
 }
 
 func run(cfg config.MigrateConfig, logger *slog.Logger) error {

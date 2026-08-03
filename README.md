@@ -742,15 +742,25 @@ Helm-чарт `helm/goph-profile` рассчитан на кластер с ус
 TLS-соединение, после чего передаёт запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
 HTTP-сервером сохраняется для запуска приложения без Kubernetes.
 
+### Миграции базы данных
+
+Перед установкой и обновлением Helm-релиза хук `pre-install,pre-upgrade` запускает отдельный Kubernetes `Job` с командой
+`/app/migrate`. Временные `ServiceAccount`, `Secret` со строкой подключения к PostgreSQL и `NetworkPolicy` создаются раньше
+`Job` с помощью весов хуков и удаляются после успешного завершения миграций. При ошибке Helm не устанавливает или не
+обновляет ресурсы приложения, а завершившийся с ошибкой `Job` сохраняется до следующей попытки для просмотра его логов.
+Мигратор всегда пишет структурированные логи в stdout. Если задана переменная `OTEL_EXPORTER_OTLP_ENDPOINT`, он также
+отправляет их в OpenTelemetry Collector. Docker Compose задаёт адрес OpenTelemetry Collector, поэтому при локальной
+разработке логи мигратора попадают в OpenSearch. Helm-хук этот адрес не задаёт и от OpenTelemetry Collector не зависит.
+
 ### Наблюдаемость в Kubernetes
 
 Сервер и воркер отправляют метрики по OTLP/gRPC в отдельный OpenTelemetry Collector через порт `4317`. OpenTelemetry
 Collector публикует метрики в формате Prometheus на порту `8889`, а `ServiceMonitor` указывает Prometheus собирать их
-через Kubernetes Service этого OpenTelemetry Collector. Для применения `ServiceMonitor` в кластере должен быть установлен 
+через Kubernetes Service этого OpenTelemetry Collector. Для применения `ServiceMonitor` в кластере должен быть установлен
 Prometheus Operator.
 
 По умолчанию Helm-чарт разворачивает выделенный OpenTelemetry Collector вместе с приложением. Чтобы использовать внешний
-OpenTelemetry Collector, нужно отключить встроенный и обязательно указать его OTLP endpoint:
+OpenTelemetry Collector, нужно отключить встроенный и обязательно указать его адрес для отправки данных по OTLP:
 
 ```yaml
 otelCollector:
@@ -762,7 +772,7 @@ config:
     insecure: false
 ```
 
-При отключенном встроенном OpenTelemetry Collector его `ConfigMap`, `Deployment`, `Service` и `ServiceMonitor` не 
+При отключенном встроенном OpenTelemetry Collector его `ConfigMap`, `Deployment`, `Service` и `ServiceMonitor` не
 создаются. Настройка сбора метрик с внешнего OpenTelemetry Collector относится к инфраструктуре Kubernetes-кластера.
 
 Каждый под сервера и воркера получает собственный `service.instance.id` из своего Kubernetes UID. Это позволяет
@@ -778,8 +788,8 @@ Prometheus должен быть настроен на обнаружение `S
 
 ### Безопасность
 
-Сервер, воркер и встроенный OpenTelemetry Collector используют отдельные `ServiceAccount` без доступа к Kubernetes API.
-Автоматическое подключение API-токенов отключено. Контейнеры запускаются от имени непривилегированных пользователей с
+Сервер, воркер, мигратор и встроенный OpenTelemetry Collector используют отдельные `ServiceAccount` без доступа к Kubernetes
+API. Автоматическое подключение API-токенов отключено. Контейнеры запускаются от имени непривилегированных пользователей с
 корневой файловой системой только для чтения, стандартным профилем фильтрации системных вызовов seccomp (`RuntimeDefault`),
 запретом повышения привилегий и со сброшенными дополнительными привилегиями Linux.
 
@@ -787,8 +797,9 @@ Prometheus должен быть настроен на обнаружение `S
 только от сервера и воркера, а запросы метрик - только от Prometheus. Обращения к подам воркера со стороны других подов
 запрещены, при этом проверки состояния со стороны узла Kubernetes продолжают работать. Для исходящих соединений сервера и
 воркера разрешены DNS-запросы и TCP-порты PostgreSQL, MinIO, RabbitMQ и OpenTelemetry Collector, а для встроенного
-OpenTelemetry Collector - DNS-запросы и TCP-порты OpenSearch и Jaeger. Namespace инфраструктурных компонентов и порты
-внешних зависимостей настраиваются в секции `networkPolicy` файла `values.yaml`.
+OpenTelemetry Collector - DNS-запросы и TCP-порты OpenSearch и Jaeger. Мигратору доступны только DNS и PostgreSQL.
+Namespace инфраструктурных компонентов и порты внешних зависимостей настраиваются в секции `networkPolicy` файла
+`values.yaml`.
 
 ## Тестирование
 

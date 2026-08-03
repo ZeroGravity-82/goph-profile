@@ -88,6 +88,21 @@ func (h fanoutHandler) WithGroup(name string) slog.Handler {
 	return fanoutHandler{handlers: handlers}
 }
 
+// NewStdoutLogger создаёт slog-логгер для записи в stdout без подключения к OTEL Collector.
+func NewStdoutLogger(cfg config.Logging) (*slog.Logger, error) {
+	level, err := parseLogLevel(cfg.Level)
+	if err != nil {
+		return nil, err
+	}
+
+	stdoutHandler, err := newStdoutLogHandler(os.Stdout, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return slog.New(levelHandler{handler: stdoutHandler, level: level}), nil
+}
+
 // NewLogger создает slog-логгер для записи в stdout и отправки записей в OTEL Collector.
 func NewLogger(
 	ctx context.Context,
