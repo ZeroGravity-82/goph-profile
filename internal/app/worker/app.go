@@ -7,7 +7,9 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/ZeroGravity-82/goph-profile/internal/app/worker/healthserver"
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/queue/rabbitmq"
@@ -18,11 +20,12 @@ import (
 
 // App инициализирует зависимости воркера.
 type App struct {
-	db       *pgxpool.Pool
-	consumer *rabbitmq.Consumer
+	db           *pgxpool.Pool
+	consumer     *rabbitmq.Consumer
+	healthServer *healthserver.Server
 }
 
-// New создает App: подключается к БД, настраивает хранилища, сценарии и RabbitMQ consumer.
+// New создает App: подключается к БД, настраивает хранилища, сценарии и RabbitMQ-консьюмер.
 func New(cfg config.WorkerConfig, logger *slog.Logger) (*App, error) {
 	if logger == nil {
 		logger = logging.NopLogger()
@@ -100,15 +103,35 @@ func buildApp(ctx context.Context, cfg config.WorkerConfig, db *pgxpool.Pool, lo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rabbitmq consumer: %w", err)
 	}
+	healthServer, err := healthserver.New(
+		cfg.HealthServerAddr,
+		healthserver.ReadinessChecks{
+			"postgres": db.Ping,
+			"s3":       fileStorage.Ping,
+			"rabbitmq": consumer.Ping,
+		},
+		logger,
+	)
+	if err != nil {
+		_ = consumer.Close()
+		return nil, fmt.Errorf("failed to create worker health server: %w", err)
+	}
 
-	return &App{db: db, consumer: consumer}, nil
+	return &App{db: db, consumer: consumer, healthServer: healthServer}, nil
 }
 
-// Run запускает чтение задач аватарок из RabbitMQ.
+// Run запускает чтение задач аватарок из RabbitMQ и сервер проверок состояния воркера.
 //
-// Блокируется до остановки по сигналу завершения или из-за ошибки RabbitMQ.
+// Блокируется до остановки по сигналу завершения, ошибки консьюмера или ошибки сервера проверок состояния.
 func (a *App) Run(ctx context.Context) error {
-	return a.consumer.Run(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		return a.consumer.Run(ctx)
+	})
+	eg.Go(func() error {
+		return a.healthServer.Run(ctx)
+	})
+	return eg.Wait()
 }
 
 // Close закрывает ресурсы приложения.

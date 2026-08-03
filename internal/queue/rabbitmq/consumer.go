@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
@@ -22,7 +24,10 @@ const (
 	consumerCloseTimeout        = 5 * time.Second
 )
 
-var errConsumerShutdownTimeout = errors.New("rabbitmq consumer shutdown timeout")
+var (
+	errConsumerNotReady        = errors.New("rabbitmq consumer is not ready")
+	errConsumerShutdownTimeout = errors.New("rabbitmq consumer shutdown timeout")
+)
 
 // AvatarMessageHandler описывает обработчик задач аватарок из RabbitMQ.
 type AvatarMessageHandler interface {
@@ -30,7 +35,8 @@ type AvatarMessageHandler interface {
 	HandleAvatarDeletion(ctx context.Context, message usecase.AvatarDeletionMessage) error
 }
 
-// consumerChannel описывает операции RabbitMQ-канала, необходимые для получения и корректной остановки доставок.
+// consumerChannel описывает операции RabbitMQ-канала, необходимые для получения, проверки состояния и корректной
+// остановки доставок.
 type consumerChannel interface {
 	Consume(
 		queue string,
@@ -42,6 +48,7 @@ type consumerChannel interface {
 		args amqp.Table,
 	) (<-chan amqp.Delivery, error)
 	Cancel(consumer string, noWait bool) error
+	IsClosed() bool
 }
 
 // Consumer читает задачи аватарок из RabbitMQ.
@@ -53,6 +60,7 @@ type Consumer struct {
 	handler           AvatarMessageHandler
 	logger            *slog.Logger
 	shutdownTimeout   time.Duration
+	ready             atomic.Bool
 }
 
 // NewConsumer создает подключение к RabbitMQ, объявляет топологию и открывает каналы чтения.
@@ -177,6 +185,8 @@ func (c *Consumer) Run(ctx context.Context) error {
 			wrapConsumerCancelError("avatar processing", cancelErr),
 		)
 	}
+	c.ready.Store(true)
+	defer c.ready.Store(false)
 
 	c.logger.InfoContext(ctx, "starting rabbitmq consumer",
 		slog.String("avatar_processing_queue", c.cfg.AvatarProcessingQueue),
@@ -197,6 +207,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		c.ready.Store(false)
 		c.logger.InfoContext(ctx, "stopping rabbitmq consumer gracefully")
 		return c.stopAndWait(processingResultCh, deletionResultCh, cancelWork)
 	case err = <-processingResultCh:
@@ -212,6 +223,41 @@ func (c *Consumer) Run(ctx context.Context) error {
 			c.stopAndWait(processingResultCh, nil, cancelWork),
 		)
 	}
+}
+
+// Ping проверяет, что консьюмер запущен, а подключение и оба канала RabbitMQ открыты.
+func (c *Consumer) Ping(ctx context.Context) error {
+	ctx, span := startSpan(ctx, "rabbitmq.consumer.ping", "ping", c.cfg.Exchange, "", trace.SpanKindClient)
+	defer span.end()
+
+	select {
+	case <-ctx.Done():
+		err := fmt.Errorf("failed to ping rabbitmq consumer: %w", ctx.Err())
+		span.recordError(err)
+		return err
+	default:
+	}
+
+	if !c.ready.Load() {
+		span.recordError(errConsumerNotReady)
+		return errConsumerNotReady
+	}
+	if c.conn == nil || c.conn.IsClosed() {
+		err := errors.New("rabbitmq connection is closed")
+		span.recordError(err)
+		return err
+	}
+	if c.processingChannel == nil || c.processingChannel.IsClosed() {
+		err := errors.New("rabbitmq avatar processing channel is closed")
+		span.recordError(err)
+		return err
+	}
+	if c.deletionChannel == nil || c.deletionChannel.IsClosed() {
+		err := errors.New("rabbitmq avatar deletion channel is closed")
+		span.recordError(err)
+		return err
+	}
+	return nil
 }
 
 // stopAndWait останавливает консьюмеры обеих очередей и ожидает завершения оставшихся горутин.

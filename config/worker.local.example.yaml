@@ -1,3 +1,4 @@
+health_address: localhost:3203
 database_uri: postgres://change-me-db-user:change-me-db-password@localhost:5432/change-me-db-name?sslmode=disable
 file_storage:
   endpoint: localhost:9000

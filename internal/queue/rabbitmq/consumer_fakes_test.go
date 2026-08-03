@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -12,6 +13,7 @@ import (
 type shutdownConsumerChannelFake struct {
 	deliveries chan amqp.Delivery
 	cancelOnce sync.Once
+	closed     atomic.Bool
 }
 
 func newShutdownConsumerChannelFake() *shutdownConsumerChannelFake {
@@ -32,9 +34,14 @@ func (c *shutdownConsumerChannelFake) Consume(
 
 func (c *shutdownConsumerChannelFake) Cancel(_ string, _ bool) error {
 	c.cancelOnce.Do(func() {
+		c.closed.Store(true)
 		close(c.deliveries)
 	})
 	return nil
+}
+
+func (c *shutdownConsumerChannelFake) IsClosed() bool {
+	return c.closed.Load()
 }
 
 type shutdownMessageHandlerFake struct {

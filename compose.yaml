@@ -80,7 +80,10 @@ services:
       dockerfile: docker/Dockerfile
     image: goph-profile:local
     entrypoint: ["/app/worker"]
+    ports:
+      - "3203:3203"
     environment:
+      GOPH_PROFILE_HEALTH_ADDRESS: 0.0.0.0:3203
       GOPH_PROFILE_DATABASE_URI: ${GOPH_PROFILE_DATABASE_URI:?}
       GOPH_PROFILE_FILE_STORAGE_ENDPOINT: minio:9000
       GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY: ${GOPH_PROFILE_MINIO_ROOT_USER:?}

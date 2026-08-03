@@ -578,6 +578,18 @@ GET /ready
 
 Ручка `GET /health` сохранена для совместимости и полностью повторяет поведение `GET /ready`.
 
+### Проверки состояния воркера
+
+Воркер запускает отдельный HTTP-сервер проверок состояния. Его адрес задаётся настройкой `health_address`.
+
+Доступные ручки:
+
+- `GET /live` подтверждает, что процесс воркера запущен и не требует перезапуска;
+- `GET /ready` проверяет доступность PostgreSQL, S3 и готовность RabbitMQ-консьюмера обрабатывать сообщения.
+
+Формат ответов и HTTP-статусы совпадают с одноимёнными ручками основного HTTP-сервера. Сервер проверок состояния
+воркера не использует TLS, поскольку предназначен для внутренних Kubernetes-проб, а не для пользовательского трафика.
+
 ## Модель безопасности MVP
 
 Полноценная аутентификация в MVP не входит.
@@ -699,6 +711,13 @@ go run ./cmd/server -c config/server.local.yaml
 
 ```bash
 go run ./cmd/worker -c config/worker.local.yaml
+```
+
+После запуска состояние воркера можно проверить командами:
+
+```bash
+curl http://localhost:3203/live
+curl http://localhost:3203/ready
 ```
 
 Отдельно Docker-образ сервиса можно собрать без запуска compose:
@@ -824,26 +843,27 @@ RabbitMQ, MinIO и хоста.
 ## Структура папок
 
 ```text
-cmd/migrate/                 # точка входа мигратора базы данных
-cmd/server/                  # точка входа HTTP-сервера
-cmd/worker/                  # точка входа воркера
-config/                      # примеры конфигурации без секретов
-certs/                       # TLS-сертификаты для локального запуска и разработки
-docker/                      # Dockerfile и конфигурация локальной инфраструктуры
-internal/app/migrate/        # применение миграций базы данных
-internal/app/server/         # сборка зависимостей сервера
-internal/app/worker/         # сборка зависимостей воркера
-internal/buildinfo/          # версия и дата сборки бинарных файлов
-internal/config/             # конфигурация сервера, воркера и мигратора
-internal/domain/model/       # доменные модели, типы и ошибки
-internal/httpserver/         # HTTP-сервер, роутер, middleware и REST-хендлеры
-internal/imageproc/          # обработка изображений и создание миниатюр
-internal/logging/            # настройка логирования
-internal/observability/      # настройка телеметрии приложения
-internal/queue/rabbitmq/     # публикация и получение сообщений RabbitMQ
-internal/storage/minio/      # S3-совместимое хранилище файлов аватарок
-internal/storage/postgres/   # реализация хранения данных в PostgreSQL
-internal/usecase/            # сценарии использования приложения и минимальные интерфейсы их зависимостей
-migrations/                  # SQL-миграции базы данных
-web/static/                  # SPA-ресурсы и default-avatar.png
+cmd/migrate/                      # точка входа мигратора базы данных
+cmd/server/                       # точка входа HTTP-сервера
+cmd/worker/                       # точка входа воркера
+config/                           # примеры конфигурации без секретов
+certs/                            # TLS-сертификаты для локального запуска и разработки
+docker/                           # Dockerfile и конфигурация локальной инфраструктуры
+internal/app/migrate/             # применение миграций базы данных
+internal/app/server/              # сборка зависимостей сервера
+internal/app/worker/              # сборка зависимостей воркера
+internal/app/worker/healthserver/ # HTTP-проверки жизнеспособности и готовности воркера
+internal/buildinfo/               # версия и дата сборки бинарных файлов
+internal/config/                  # конфигурация сервера, воркера и мигратора
+internal/domain/model/            # доменные модели, типы и ошибки
+internal/httpserver/              # HTTP-сервер, роутер, middleware и REST-хендлеры
+internal/imageproc/               # обработка изображений и создание миниатюр
+internal/logging/                 # настройка логирования
+internal/observability/           # настройка телеметрии приложения
+internal/queue/rabbitmq/          # публикация и получение сообщений RabbitMQ
+internal/storage/minio/           # S3-совместимое хранилище файлов аватарок
+internal/storage/postgres/        # реализация хранения данных в PostgreSQL
+internal/usecase/                 # сценарии использования приложения и минимальные интерфейсы их зависимостей
+migrations/                       # SQL-миграции базы данных
+web/static/                       # SPA-ресурсы и default-avatar.png
 ```
