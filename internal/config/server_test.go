@@ -163,6 +163,66 @@ func TestLoadServer_RejectsInvalidHTTPServerAddr(t *testing.T) {
 	assert.Contains(t, err.Error(), "server address must be in the format host:port")
 }
 
+// TestLoadServer_DisablesTLSForEmptyPaths проверяет отключение TLS при пустых путях к сертификату и ключу.
+func TestLoadServer_DisablesTLSForEmptyPaths(t *testing.T) {
+	// Arrange
+	unsetConfigEnv(t)
+	t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
+	t.Setenv("GOPH_PROFILE_TLS_CERT", "")
+	t.Setenv("GOPH_PROFILE_TLS_KEY", "")
+	setRequiredFileStorageEnv(t)
+	setRequiredQueueEnv(t)
+	setArgs(t, "server")
+
+	// Act
+	cfg, err := LoadServer()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Empty(t, cfg.TLSCertPath)
+	assert.Empty(t, cfg.TLSKeyPath)
+}
+
+// TestLoadServer_RejectsIncompleteTLSConfig проверяет обязательность совместного указания сертификата и ключа.
+func TestLoadServer_RejectsIncompleteTLSConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		certPath   string
+		keyPath    string
+		wantErrMsg string
+	}{
+		{
+			name:       "certificate only",
+			certPath:   "certs/server.crt",
+			wantErrMsg: "TLS private key path is required when TLS certificate path is provided",
+		},
+		{
+			name:       "private key only",
+			keyPath:    "certs/server.key",
+			wantErrMsg: "TLS certificate path is required when TLS private key path is provided",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			unsetConfigEnv(t)
+			t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
+			t.Setenv("GOPH_PROFILE_TLS_CERT", tt.certPath)
+			t.Setenv("GOPH_PROFILE_TLS_KEY", tt.keyPath)
+			setRequiredFileStorageEnv(t)
+			setRequiredQueueEnv(t)
+			setArgs(t, "server")
+
+			// Act
+			_, err := LoadServer()
+
+			// Assert
+			require.EqualError(t, err, tt.wantErrMsg)
+		})
+	}
+}
+
 // TestLoadServer_LoadsDefaults проверяет значения по умолчанию.
 func TestLoadServer_LoadsDefaults(t *testing.T) {
 	// Arrange

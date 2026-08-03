@@ -55,9 +55,13 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 		logger = logging.NopLogger()
 	}
 
-	tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load tls certificate: %w", err)
+	var tlsConfig *tls.Config
+	if cfg.TLSCertPath != "" {
+		tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load tls certificate: %w", err)
+		}
+		tlsConfig = httpTLSConfig(tlsCert)
 	}
 
 	userRepo, err := postgres.NewUserRepository(db)
@@ -120,7 +124,7 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 
 	httpSrv, err := httpserver.NewHTTPServer(
 		cfg.HTTPServerAddr,
-		httpTLSConfig(tlsCert),
+		tlsConfig,
 		avatarUseCase,
 		userUseCase,
 		httpserver.ReadinessChecks{

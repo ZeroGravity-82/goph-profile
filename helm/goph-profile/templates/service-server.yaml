@@ -8,9 +8,9 @@ metadata:
 spec:
   type: {{ .Values.server.service.type }}
   ports:
-    - name: https
+    - name: http
       port: {{ .Values.server.service.port }}
-      targetPort: https
+      targetPort: http
       protocol: TCP
   selector:
     {{- include "goph-profile.selectorLabels" . | nindent 4 }}

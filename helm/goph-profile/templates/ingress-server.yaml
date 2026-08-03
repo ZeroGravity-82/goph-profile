@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "goph-profile.fullname" . }}-server
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ include "goph-profile.ingressTLSSecretName" . }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "goph-profile.fullname" . }}-server
+                port:
+                  number: {{ .Values.server.service.port }}

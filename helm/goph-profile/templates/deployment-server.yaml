@@ -16,7 +16,6 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret-credentials.yaml") . | sha256sum }}
-        checksum/tls: {{ include (print $.Template.BasePath "/secret-server-tls.yaml") . | sha256sum }}
       labels:
         {{- include "goph-profile.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: server
@@ -28,7 +27,7 @@ spec:
           command:
             - /app/server
           ports:
-            - name: https
+            - name: http
               containerPort: {{ .Values.server.port }}
               protocol: TCP
           envFrom:
@@ -40,16 +39,8 @@ spec:
             - name: GOPH_PROFILE_HTTP_ADDRESS
               value: {{ printf "0.0.0.0:%v" .Values.server.port | quote }}
             - name: GOPH_PROFILE_TLS_CERT
-              value: /app/certs/tls.crt
+              value: ""
             - name: GOPH_PROFILE_TLS_KEY
-              value: /app/certs/tls.key
+              value: ""
             - name: OTEL_SERVICE_NAME
               value: goph-profile-server
-          volumeMounts:
-            - name: tls
-              mountPath: /app/certs
-              readOnly: true
-      volumes:
-        - name: tls
-          secret:
-            secretName: {{ include "goph-profile.tlsSecretName" . }}

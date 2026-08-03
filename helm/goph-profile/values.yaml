@@ -8,7 +8,11 @@ server:
   port: 3202
   service:
     type: ClusterIP
-    port: 443
+    port: 80
+
+ingress:
+  className: traefik
+  host: localhost
 
 worker:
   replicaCount: 1
@@ -41,7 +45,7 @@ secret:
   fileStorageSecretKey: change-me
   queueURL: amqp://goph-profile:change-me@rabbitmq:5672/
 
-# Локальный или production values-файл должен передать действующую TLS-пару.
+# Локальный или production values-файл должен передать действующую TLS-пару для Ingress.
 tls:
   certificate: |
     replace-with-tls-certificate

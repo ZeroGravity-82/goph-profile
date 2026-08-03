@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -70,6 +72,91 @@ func TestHTTPServer_Run_ShutsDownOnContextCancel(t *testing.T) {
 	}
 }
 
+// TestHTTPServer_Run_ServesHTTPWithoutTLS проверяет запуск HTTP-сервера без TLS-конфигурации.
+func TestHTTPServer_Run_ServesHTTPWithoutTLS(t *testing.T) {
+	// Arrange
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	server, err := NewHTTPServer(
+		addr,
+		nil,
+		&avatarUseCaseFake{},
+		&userUseCaseFake{},
+		testReadinessChecks(),
+		discardLogger(),
+	)
+	require.NoError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.Run(ctx)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case runErr := <-errCh:
+			require.NoError(t, runErr)
+		case <-time.After(time.Second):
+			t.Fatal("http server did not stop after context cancellation")
+		}
+	}()
+
+	client := &http.Client{Timeout: 100 * time.Millisecond}
+
+	// Act
+	response := waitForHTTPResponse(t, client, "http://"+addr+"/live")
+	defer func() { _ = response.Body.Close() }()
+
+	// Assert
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+}
+
+// TestHTTPServer_Run_ServesHTTPSWithTLS проверяет запуск HTTP-сервера с TLS-конфигурацией.
+func TestHTTPServer_Run_ServesHTTPSWithTLS(t *testing.T) {
+	// Arrange
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	tlsConfig, client := testTLSConfigAndClient(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	server, err := NewHTTPServer(
+		addr,
+		tlsConfig,
+		&avatarUseCaseFake{},
+		&userUseCaseFake{},
+		testReadinessChecks(),
+		discardLogger(),
+	)
+	require.NoError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.Run(ctx)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case runErr := <-errCh:
+			require.NoError(t, runErr)
+		case <-time.After(time.Second):
+			t.Fatal("http server did not stop after context cancellation")
+		}
+	}()
+
+	// Act
+	response := waitForHTTPResponse(t, client, "https://"+addr+"/live")
+	defer func() { _ = response.Body.Close() }()
+
+	// Assert
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+}
+
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
@@ -82,10 +169,33 @@ func testTLSConfig() *tls.Config {
 	}
 }
 
+func testTLSConfigAndClient(t *testing.T) (*tls.Config, *http.Client) {
+	t.Helper()
+
+	fixture := httptest.NewTLSServer(http.NotFoundHandler())
+	tlsConfig := fixture.TLS.Clone()
+	client := fixture.Client()
+	fixture.Close()
+	client.Timeout = 100 * time.Millisecond
+	return tlsConfig, client
+}
+
 func testReadinessChecks() ReadinessChecks {
 	return ReadinessChecks{
 		"test": func(_ context.Context) error {
 			return nil
 		},
 	}
+}
+
+func waitForHTTPResponse(t *testing.T, client *http.Client, url string) *http.Response {
+	t.Helper()
+
+	var response *http.Response
+	require.Eventually(t, func() bool {
+		var err error
+		response, err = client.Get(url)
+		return err == nil
+	}, time.Second, 10*time.Millisecond)
+	return response
 }

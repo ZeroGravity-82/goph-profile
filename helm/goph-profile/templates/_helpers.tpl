@@ -48,7 +48,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-secret" (include "goph-profile.fullname" .) }}
 {{- end }}
 
-{{/* Имя Secret с TLS-сертификатом основного HTTP-сервера. */}}
-{{- define "goph-profile.tlsSecretName" -}}
-{{- printf "%s-server-tls" (include "goph-profile.fullname" .) }}
+{{/* Имя Secret с TLS-сертификатом Ingress. */}}
+{{- define "goph-profile.ingressTLSSecretName" -}}
+{{- printf "%s-ingress-tls" (include "goph-profile.fullname" .) }}
 {{- end }}

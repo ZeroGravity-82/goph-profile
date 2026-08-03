@@ -89,9 +89,6 @@ func NewHTTPServer(
 	if addr == "" {
 		return nil, errors.New("http server address is not provided")
 	}
-	if tlsConfig == nil {
-		return nil, errors.New("TLS config is not provided")
-	}
 	if avatarUseCase == nil {
 		return nil, errors.New("avatar usecase is not provided")
 	}
@@ -137,6 +134,10 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {
 		logger.InfoContext(ctx, "starting http server", slog.String("addr", s.addr))
+		if s.tlsConfig == nil {
+			errCh <- srv.ListenAndServe()
+			return
+		}
 		errCh <- srv.ListenAndServeTLS("", "")
 	}()
 

@@ -647,7 +647,8 @@ tls_cert
 tls_key
 ```
 
-Для локального запуска эти значения будут указывать на `certs/server.crt` и `certs/server.key`.
+Для локального запуска эти значения будут указывать на `certs/server.crt` и `certs/server.key`. Если оба пути пустые,
+сервер принимает обычные HTTP-соединения. Указание только одного из двух путей считается ошибкой конфигурации.
 
 ## Локальный запуск
 
@@ -729,6 +730,15 @@ docker build -f docker/Dockerfile -t goph-profile:local .
 Dockerfile использует multi-stage build: отдельный build stage на Go-образе и минимальный runtime stage с бинарниками
 `server`, `worker` и `migrate`. По умолчанию контейнер запускает `/app/server`; воркер и мигратор запускаются тем же
 образом с переопределением entrypoint на `/app/worker` и `/app/migrate` соответственно.
+
+## Развертывание в Kubernetes
+
+Helm-чарт `helm/goph-profile` рассчитан на кластер с установленным Traefik Ingress Controller. В используемом локальном
+кластере Rancher Desktop Traefik уже установлен, поэтому сам Ingress Controller в состав чарта приложения не входит.
+
+Для маршрутизации внешнего трафика чарт создаёт стандартный Kubernetes-объект `Ingress`. Traefik завершает внешнее
+TLS-соединение, после чего передаёт запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
+HTTP-сервером сохраняется для запуска приложения без Kubernetes.
 
 ## Тестирование
 
