@@ -9,6 +9,13 @@ server:
   service:
     type: ClusterIP
     port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 ingress:
   className: traefik
@@ -17,6 +24,13 @@ ingress:
 worker:
   replicaCount: 1
   healthPort: 3203
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 config:
   fileStorage:

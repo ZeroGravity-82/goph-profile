@@ -41,6 +41,8 @@ spec:
               port: health
             initialDelaySeconds: 5
             timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
           envFrom:
             - configMapRef:
                 name: {{ include "goph-profile.configMapName" . }}
