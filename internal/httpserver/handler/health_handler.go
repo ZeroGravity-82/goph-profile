@@ -24,6 +24,12 @@ type HealthHandler struct {
 	logger          *slog.Logger
 }
 
+// readinessCheckResult содержит имя зависимости и результат проверки её готовности.
+type readinessCheckResult struct {
+	name string
+	err  error
+}
+
 // NewHealthHandler создает HealthHandler.
 func NewHealthHandler(readinessChecks map[string]func(context.Context) error, logger *slog.Logger) (*HealthHandler, error) {
 	if readinessChecks == nil {
@@ -53,14 +59,21 @@ func (h *HealthHandler) getReady(w http.ResponseWriter, r *http.Request) {
 		Checks: make(map[string]string, len(h.readinessChecks)),
 	}
 
+	resultCh := make(chan readinessCheckResult, len(h.readinessChecks))
 	for name, check := range h.readinessChecks {
-		ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
-		err := check(ctx)
-		cancel()
+		go func() {
+			ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
+			defer cancel()
 
-		response.Checks[name] = readinessCheckStatus(err)
-		if err != nil {
-			checkErr = errors.Join(checkErr, err)
+			resultCh <- readinessCheckResult{name: name, err: check(ctx)}
+		}()
+	}
+
+	for range h.readinessChecks {
+		result := <-resultCh
+		response.Checks[result.name] = readinessCheckStatus(result.err)
+		if result.err != nil {
+			checkErr = errors.Join(checkErr, result.err)
 		}
 	}
 

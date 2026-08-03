@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,6 +58,37 @@ func TestHealthHandler_getReady(t *testing.T) {
 			"rabbitmq": healthStatusOK,
 		},
 	})
+}
+
+// TestHealthHandler_getReady_RunsChecksConcurrently проверяет параллельный запуск проверок готовности зависимостей.
+func TestHealthHandler_getReady_RunsChecksConcurrently(t *testing.T) {
+	// Arrange
+	var startedChecks atomic.Int32
+	allChecksStarted := make(chan struct{})
+	waitForAllChecks := func(ctx context.Context) error {
+		if startedChecks.Add(1) == 2 {
+			close(allChecksStarted)
+		}
+		select {
+		case <-allChecksStarted:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	handler := mustHealthHandler(t, map[string]func(context.Context) error{
+		"postgres": waitForAllChecks,
+		"s3":       waitForAllChecks,
+	}, discardLogger())
+	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.getReady(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, int32(2), startedChecks.Load())
 }
 
 func assertReadinessResponse(t *testing.T, response *httptest.ResponseRecorder, want dto.ReadinessResponse) {

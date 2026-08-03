@@ -28,6 +28,12 @@ type ReadinessCheck func(ctx context.Context) error
 // ReadinessChecks содержит именованные проверки готовности зависимостей воркера.
 type ReadinessChecks map[string]ReadinessCheck
 
+// readinessCheckResult содержит имя зависимости и результат проверки её готовности.
+type readinessCheckResult struct {
+	name string
+	err  error
+}
+
 // Server обслуживает проверки жизнеспособности и готовности воркера.
 type Server struct {
 	addr            string
@@ -129,14 +135,21 @@ func (s *Server) getReady(w http.ResponseWriter, r *http.Request) {
 		Checks: make(map[string]string, len(s.readinessChecks)),
 	}
 
+	resultCh := make(chan readinessCheckResult, len(s.readinessChecks))
 	for name, check := range s.readinessChecks {
-		ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
-		err := check(ctx)
-		cancel()
+		go func() {
+			ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
+			defer cancel()
 
-		response.Checks[name] = readinessCheckStatus(err)
-		if err != nil {
-			checkErr = errors.Join(checkErr, err)
+			resultCh <- readinessCheckResult{name: name, err: check(ctx)}
+		}()
+	}
+
+	for range s.readinessChecks {
+		result := <-resultCh
+		response.Checks[result.name] = readinessCheckStatus(result.err)
+		if result.err != nil {
+			checkErr = errors.Join(checkErr, result.err)
 		}
 	}
 

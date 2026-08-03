@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -53,6 +54,37 @@ func TestServer_getReady(t *testing.T) {
 		"status":"ok",
 		"checks":{"postgres":"ok","s3":"ok","rabbitmq":"ok"}
 	}`, response.Body.String())
+}
+
+// TestServer_getReady_RunsChecksConcurrently проверяет параллельный запуск проверок готовности зависимостей.
+func TestServer_getReady_RunsChecksConcurrently(t *testing.T) {
+	// Arrange
+	var startedChecks atomic.Int32
+	allChecksStarted := make(chan struct{})
+	waitForAllChecks := func(ctx context.Context) error {
+		if startedChecks.Add(1) == 2 {
+			close(allChecksStarted)
+		}
+		select {
+		case <-allChecksStarted:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	server := mustServer(t, "127.0.0.1:0", ReadinessChecks{
+		"postgres": waitForAllChecks,
+		"s3":       waitForAllChecks,
+	})
+	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	server.handler().ServeHTTP(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, int32(2), startedChecks.Load())
 }
 
 // TestServer_getReady_ReturnsServiceUnavailable проверяет ответ ручки готовности при недоступной зависимости.
