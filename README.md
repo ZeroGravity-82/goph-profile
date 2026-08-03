@@ -733,12 +733,16 @@ Dockerfile использует multi-stage build: отдельный build stag
 
 ## Развертывание в Kubernetes
 
+### Ingress и TLS
+
 Helm-чарт `helm/goph-profile` рассчитан на кластер с установленным Traefik Ingress Controller. В используемом локальном
 кластере Rancher Desktop Traefik уже установлен, поэтому сам Ingress Controller в состав чарта приложения не входит.
 
 Для маршрутизации внешнего трафика чарт создаёт стандартный Kubernetes-объект `Ingress`. Traefik завершает внешнее
 TLS-соединение, после чего передаёт запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
 HTTP-сервером сохраняется для запуска приложения без Kubernetes.
+
+### Наблюдаемость в Kubernetes
 
 Сервер и воркер отправляют метрики по OTLP/gRPC в отдельный OpenTelemetry Collector через порт `4317`. OpenTelemetry
 Collector публикует метрики в формате Prometheus на порту `8889`, а `ServiceMonitor` указывает Prometheus собирать их
@@ -761,7 +765,7 @@ config:
 При отключенном встроенном OpenTelemetry Collector его `ConfigMap`, `Deployment`, `Service` и `ServiceMonitor` не 
 создаются. Настройка сбора метрик с внешнего OpenTelemetry Collector относится к инфраструктуре Kubernetes-кластера.
 
-Каждый pod сервера и воркера получает собственный `service.instance.id` из своего Kubernetes UID. Это позволяет
+Каждый под сервера и воркера получает собственный `service.instance.id` из своего Kubernetes UID. Это позволяет
 различать метрики отдельных реплик после масштабирования. `ServiceMonitor` сохраняет экспортируемые OpenTelemetry Collector
 метки `job` и `instance` при передаче метрик в Prometheus.
 
@@ -769,13 +773,22 @@ config:
 репликами, планировщик Kubernetes по возможности размещает их на разных узлах, а `PodDisruptionBudget` сохраняет как минимум
 одну доступную реплику при плановом обслуживании узлов.
 
+Prometheus Operator и Prometheus относятся к инфраструктуре Kubernetes-кластера и не входят в Helm-чарт GophProfile.
+Prometheus должен быть настроен на обнаружение `ServiceMonitor` в namespace `goph-profile`.
+
+### Безопасность
+
 Сервер, воркер и встроенный OpenTelemetry Collector используют отдельные `ServiceAccount` без доступа к Kubernetes API.
 Автоматическое подключение API-токенов отключено. Контейнеры запускаются от имени непривилегированных пользователей с
 корневой файловой системой только для чтения, стандартным профилем фильтрации системных вызовов seccomp (`RuntimeDefault`),
 запретом повышения привилегий и со сброшенными дополнительными привилегиями Linux.
 
-Prometheus Operator и Prometheus относятся к инфраструктуре Kubernetes-кластера и не входят в Helm-чарт GophProfile.
-Prometheus должен быть настроен на обнаружение `ServiceMonitor` в namespace `goph-profile`.
+Сетевые политики разрешают обращаться к серверу только Traefik. Встроенный OpenTelemetry Collector принимает OTLP-данные
+только от сервера и воркера, а запросы метрик - только от Prometheus. Обращения к подам воркера со стороны других подов
+запрещены, при этом проверки состояния со стороны узла Kubernetes продолжают работать. Для исходящих соединений сервера и
+воркера разрешены DNS-запросы и TCP-порты PostgreSQL, MinIO, RabbitMQ и OpenTelemetry Collector, а для встроенного
+OpenTelemetry Collector - DNS-запросы и TCP-порты OpenSearch и Jaeger. Namespace инфраструктурных компонентов и порты
+внешних зависимостей настраиваются в секции `networkPolicy` файла `values.yaml`.
 
 ## Тестирование
 

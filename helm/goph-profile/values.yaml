@@ -25,6 +25,28 @@ ingress:
   className: traefik
   host: localhost
 
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespace: kube-system
+    podSelector:
+      app.kubernetes.io/name: traefik
+  prometheus:
+    namespace: monitoring
+    podSelector:
+      app.kubernetes.io/name: prometheus
+  dns:
+    namespace: kube-system
+    podSelector:
+      k8s-app: kube-dns
+  ports:
+    database: 5432
+    fileStorage: 9000
+    queue: 5672
+    externalOTLP: 4317
+    opensearch: 9200
+    jaeger: 4317
+
 worker:
   healthPort: 3203
   resources:
