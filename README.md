@@ -580,14 +580,14 @@ GET /ready
 
 ### Проверки состояния воркера
 
-Воркер запускает отдельный HTTP-сервер проверок состояния. Его адрес задаётся настройкой `health_address`.
+Воркер запускает отдельный HTTP-сервер проверок состояния. Его адрес задается настройкой `health_address`.
 
 Доступные ручки:
 
 - `GET /live` подтверждает, что процесс воркера запущен и не требует перезапуска;
 - `GET /ready` проверяет доступность PostgreSQL, S3 и готовность RabbitMQ-консьюмера обрабатывать сообщения.
 
-Формат ответов и HTTP-статусы совпадают с одноимёнными ручками основного HTTP-сервера. Сервер проверок состояния
+Формат ответов и HTTP-статусы совпадают с одноименными ручками основного HTTP-сервера. Сервер проверок состояния
 воркера не использует TLS, поскольку предназначен для внутренних Kubernetes-проб, а не для пользовательского трафика.
 
 ## Модель безопасности MVP
@@ -739,16 +739,192 @@ Dockerfile использует multi-stage build: отдельный build stag
 приложения в Rancher Desktop с инфраструктурными компонентами из Docker Compose, а `values.production.yaml` содержит
 пример настроек для прод-окружения с внешним OpenTelemetry Collector.
 
-Реальные учётные данные и TLS-ключи не хранятся в Git. Для их передачи скопируйте `values.secret.example.yaml` в
+Реальные учетные данные и TLS-ключи не хранятся в Git. Для их передачи скопируйте `values.secret.example.yaml` в
 игнорируемый файл `values.secret.yaml`, заполните его и указывайте после файла окружения, чтобы реальные секреты и TLS переопределили значения-заглушки.
+
+### Установка и обновление Helm-релиза
+
+Для локального развертывания Kubernetes должен быть включен в Rancher Desktop. В кластере должны быть установлены
+Traefik, Metrics Server, Prometheus Operator и Prometheus. Локально используется гибридное окружение: Helm-чарт
+разворачивает компоненты GophProfile в Kubernetes, а PostgreSQL, MinIO, RabbitMQ, OpenSearch и Jaeger остаются внешними
+зависимостями и запускаются в Docker Compose. Они не входят в чарт приложения, потому что имеют отдельный жизненный цикл
+и в прод-окружении предоставляются как самостоятельные инфраструктурные компоненты.
+
+Запустите локальные зависимости:
+
+```bash
+docker compose up -d postgresql minio rabbitmq opensearch jaeger
+```
+
+Соберите образ приложения в Docker-контексте Rancher Desktop:
+
+```bash
+docker build -f docker/Dockerfile -t goph-profile:local .
+```
+
+Подготовьте локальный файл с учетными данными и TLS-ключами:
+
+```bash
+cp helm/goph-profile/values.secret.example.yaml helm/goph-profile/values.secret.yaml
+```
+
+Замените в `values.secret.yaml` значения-заглушки. Для PostgreSQL и RabbitMQ из Docker Compose используйте адрес
+`host.docker.internal`. Файл `values.secret.yaml` добавлен в `.gitignore` и не должен попадать в Git.
+
+Один раз создайте отдельный namespace приложения:
+
+```bash
+kubectl create namespace goph-profile
+```
+
+Команда `helm upgrade --install` устанавливает отсутствующий релиз или обновляет уже существующий:
+
+```bash
+helm upgrade --install goph-profile helm/goph-profile \
+  --namespace goph-profile \
+  --values helm/goph-profile/values.local.yaml \
+  --values helm/goph-profile/values.secret.yaml \
+  --wait \
+  --timeout 10m
+```
+
+Файл `values.secret.yaml` передается после `values.local.yaml`, поэтому его значения имеют больший приоритет. При
+изменении конфигурации меняются аннотации с ее контрольными суммами, поэтому Kubernetes перезапускает затронутые поды.
+Если изменился только код и локальный образ пересобран с прежним тегом `local`, перезапустите server и worker явно:
+
+```bash
+kubectl rollout restart deployment/goph-profile-server deployment/goph-profile-worker \
+  --namespace goph-profile
+```
+
+### Проверка развертывания
+
+Проверьте состояние Helm-релиза и Kubernetes-ресурсов:
+
+```bash
+helm status goph-profile --namespace goph-profile
+kubectl get pods,services,ingresses,hpa --namespace goph-profile
+kubectl get servicemonitor goph-profile-otel-collector --namespace goph-profile
+```
+
+Дождитесь готовности всех Deployment:
+
+```bash
+kubectl rollout status deployment/goph-profile-server --namespace goph-profile --timeout=3m
+kubectl rollout status deployment/goph-profile-worker --namespace goph-profile --timeout=3m
+kubectl rollout status deployment/goph-profile-otel-collector --namespace goph-profile --timeout=3m
+```
+
+Если Rancher Desktop не публикует адрес Traefik на `localhost`, временно перенаправьте его HTTPS-порт:
+
+```bash
+kubectl port-forward service/traefik 18443:443 --namespace kube-system
+```
+
+В другом терминале проверьте Ingress, TLS и ручки состояния сервера:
+
+```bash
+curl --cacert certs/ca.crt --resolve localhost:18443:127.0.0.1 https://localhost:18443/live
+curl --cacert certs/ca.crt --resolve localhost:18443:127.0.0.1 https://localhost:18443/ready
+```
+
+Состояние воркера можно проверить через перенаправление его health-порта:
+
+```bash
+kubectl port-forward deployment/goph-profile-worker 13203:3203 --namespace goph-profile
+```
+
+В другом терминале выполните:
+
+```bash
+curl http://localhost:13203/live
+curl http://localhost:13203/ready
+```
+
+Команда `kubectl get hpa` должна вывести текущие значения CPU и памяти, а не `<unknown>`. Prometheus должен обнаружить
+две цели `goph-profile-otel-collector` и показывать для них состояние `up`.
+
+Для проверки целей в локальном Prometheus перенаправьте его порт:
+
+```bash
+kubectl port-forward service/monitoring-kube-prometheus-prometheus 19090:9090 --namespace monitoring
+```
+
+В другом терминале выполните:
+
+```bash
+curl --silent --show-error --fail 'http://localhost:19090/api/v1/targets?state=active' | \
+  jq '[
+    .data.activeTargets[]
+    | select(.labels.service == "goph-profile-otel-collector")
+    | {scrapeUrl, health, lastError}
+  ]'
+```
+
+### Архитектура Kubernetes-развертывания
+
+```mermaid
+flowchart TB
+    client[Клиент] -->|HTTPS| traefik[Traefik Ingress Controller]
+
+    subgraph appNamespace["namespace goph-profile"]
+        ingress[Ingress]
+        serverService[Service server]
+        server[Deployment server<br/>HPA: 1–3 реплики]
+        worker[Deployment worker<br/>HPA: 1–3 реплики]
+        migrate[Job migrate<br/>Helm-хук]
+        appConfig[ConfigMap и Secret приложения]
+        collectorService[Service OpenTelemetry Collector<br/>OTLP :4317, Prometheus :8889/metrics]
+        collector[Deployment OpenTelemetry Collector<br/>2 реплики]
+        serviceMonitor[ServiceMonitor]
+    end
+
+    subgraph dependencies["Внешние зависимости"]
+        postgres[(PostgreSQL)]
+        minio[(MinIO)]
+        rabbitmq[(RabbitMQ)]
+        opensearch[(OpenSearch)]
+        jaeger[(Jaeger)]
+    end
+
+    subgraph monitoring["Инфраструктура мониторинга"]
+        prometheusOperator[Prometheus Operator]
+        prometheus[Prometheus]
+    end
+
+    traefik --> ingress
+    ingress --> serverService
+    serverService --> server
+
+    appConfig -.->|конфигурация| server
+    appConfig -.->|конфигурация| worker
+
+    server --> postgres
+    server --> minio
+    server -->|публикация задач| rabbitmq
+    rabbitmq -->|задачи| worker
+    worker --> postgres
+    worker --> minio
+    migrate -->|миграции| postgres
+
+    server -->|OTLP/gRPC| collectorService
+    worker -->|OTLP/gRPC| collectorService
+    collectorService --> collector
+    collector -->|логи| opensearch
+    collector -->|трассы| jaeger
+
+    serviceMonitor -.->|обнаруживается| prometheusOperator
+    prometheusOperator -.->|настраивает сбор| prometheus
+    prometheus -->|GET /metrics| collectorService
+```
 
 ### Ingress и TLS
 
 Helm-чарт `helm/goph-profile` рассчитан на кластер с установленным Traefik Ingress Controller. В используемом локальном
 кластере Rancher Desktop Traefik уже установлен, поэтому сам Ingress Controller в состав чарта приложения не входит.
 
-Для маршрутизации внешнего трафика чарт создаёт стандартный Kubernetes-объект `Ingress`. Traefik завершает внешнее
-TLS-соединение, после чего передаёт запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
+Для маршрутизации внешнего трафика чарт создает стандартный Kubernetes-объект `Ingress`. Traefik завершает внешнее
+TLS-соединение, после чего передает запрос HTTP-серверу приложения по HTTP внутри кластера. Нативная поддержка TLS
 HTTP-сервером сохраняется для запуска приложения без Kubernetes.
 
 ### Миграции базы данных
@@ -758,8 +934,8 @@ HTTP-сервером сохраняется для запуска прилож�
 `Job` с помощью весов хуков и удаляются после успешного завершения миграций. При ошибке Helm не устанавливает или не
 обновляет ресурсы приложения, а завершившийся с ошибкой `Job` сохраняется до следующей попытки для просмотра его логов.
 Мигратор всегда пишет структурированные логи в stdout. Если задана переменная `OTEL_EXPORTER_OTLP_ENDPOINT`, он также
-отправляет их в OpenTelemetry Collector. Docker Compose задаёт адрес OpenTelemetry Collector, поэтому при локальной
-разработке логи мигратора попадают в OpenSearch. Helm-хук этот адрес не задаёт и от OpenTelemetry Collector не зависит.
+отправляет их в OpenTelemetry Collector. Docker Compose задает адрес OpenTelemetry Collector, поэтому при локальной
+разработке логи мигратора попадают в OpenSearch. Helm-хук этот адрес не задает и от OpenTelemetry Collector не зависит.
 
 ### Наблюдаемость в Kubernetes
 
