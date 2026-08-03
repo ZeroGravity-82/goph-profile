@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "goph-profile.fullname" . }}-worker
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "goph-profile.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret-credentials.yaml") . | sha256sum }}
+      labels:
+        {{- include "goph-profile.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: worker
+          image: {{ include "goph-profile.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /app/worker
+          ports:
+            - name: health
+              containerPort: {{ .Values.worker.healthPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "goph-profile.configMapName" . }}
+            - secretRef:
+                name: {{ include "goph-profile.secretName" . }}
+          env:
+            - name: GOPH_PROFILE_HEALTH_ADDRESS
+              value: {{ printf "0.0.0.0:%v" .Values.worker.healthPort | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: goph-profile-worker

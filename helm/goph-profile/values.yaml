@@ -1,0 +1,49 @@
+image:
+  repository: goph-profile
+  pullPolicy: IfNotPresent
+  tag: ""
+
+server:
+  replicaCount: 1
+  port: 3202
+  service:
+    type: ClusterIP
+    port: 443
+
+worker:
+  replicaCount: 1
+  healthPort: 3203
+
+config:
+  fileStorage:
+    endpoint: minio:9000
+    bucket: goph-profile
+    useSSL: false
+  queue:
+    exchange: goph-profile.avatar
+    avatarProcessingQueue: goph-profile.avatar-processing
+    avatarDeletionQueue: goph-profile.avatar-deletion
+    avatarProcessingRoutingKey: avatar.process
+    avatarDeletionRoutingKey: avatar.delete
+  logging:
+    format: json
+    level: info
+    addSource: false
+  otel:
+    endpoint: http://otel-collector:4317
+    insecure: true
+    resourceAttributes: deployment.environment=local
+
+# Значения-заглушки нужно переопределить при установке, не коммитя реальные секреты.
+secret:
+  databaseURI: postgres://goph-profile:change-me@postgresql:5432/gophprofile?sslmode=disable
+  fileStorageAccessKey: change-me
+  fileStorageSecretKey: change-me
+  queueURL: amqp://goph-profile:change-me@rabbitmq:5672/
+
+# Локальный или production values-файл должен передать действующую TLS-пару.
+tls:
+  certificate: |
+    replace-with-tls-certificate
+  privateKey: |
+    replace-with-tls-private-key
