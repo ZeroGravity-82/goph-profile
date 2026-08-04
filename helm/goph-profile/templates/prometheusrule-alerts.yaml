@@ -50,7 +50,8 @@ spec:
               sum by (le) (
                 rate(
                   http_server_request_duration_seconds_bucket{
-                    job="goph-profile-server"
+                    job="goph-profile-server",
+                    otel_scope_name="go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
                   }[{{ .Values.monitoring.prometheusRule.evaluationWindow }}]
                 )
               )
