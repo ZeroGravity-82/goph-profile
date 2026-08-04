@@ -5,7 +5,7 @@ info:
   description: |
     REST API приложения GophProfile для загрузки, обработки, получения и удаления аватарок.
 
-    Полноценная аутентификация в MVP не реализована. В изменяющих состояние запросах
+    Полноценная аутентификация не реализована. В изменяющих состояние запросах
     заголовок `X-User-ID` содержит UUID пользователя и считается доверенным.
 servers:
   - url: https://localhost:3202
@@ -296,7 +296,7 @@ paths:
     get:
       tags: [Health]
       summary: Проверить готовность HTTP-сервера
-      description: Совместимый с прежними клиентами вариант `GET /ready`.
+      description: Обратно-совместимый вариант `GET /ready`.
       deprecated: true
       operationId: getHealth
       responses:
