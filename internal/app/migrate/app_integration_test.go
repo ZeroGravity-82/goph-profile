@@ -8,20 +8,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ZeroGravity-82/goph-profile/internal/config"
 )
 
-// TestRun_Integration применяет встроенные миграции к реальной PostgreSQL.
-func TestRun_Integration(t *testing.T) {
+// TestMigrator_Run_Integration применяет встроенные миграции к реальной PostgreSQL.
+func TestMigrator_Run_Integration(t *testing.T) {
 	// Arrange
 	databaseURI := os.Getenv("TEST_DATABASE_URI")
 	if databaseURI == "" {
 		t.Skip("TEST_DATABASE_URI is not set")
 	}
+	migrator, err := New(databaseURI, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, migrator.Close()) })
 
 	// Act
-	err := Run(context.Background(), config.MigrateConfig{DatabaseURI: databaseURI}, nil)
+	err = migrator.Run(context.Background())
 
 	// Assert
 	require.NoError(t, err)

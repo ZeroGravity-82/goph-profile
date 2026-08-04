@@ -76,10 +76,17 @@ func run(cfg config.MigrateConfig, logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if err := migrateApp.Run(ctx, cfg, logger); err != nil {
-		return fmt.Errorf("failed to migrate database: %w", err)
+	migrator, err := migrateApp.New(cfg.DatabaseURI, logger)
+	if err != nil {
+		return fmt.Errorf("migrator init error: %w", err)
 	}
-	return nil
+	defer func() {
+		if err := migrator.Close(); err != nil {
+			logger.ErrorContext(ctx, "failed to close migrator", slog.Any("err", err))
+		}
+	}()
+
+	return migrator.Run(ctx)
 }
 
 func shutdownTelemetryProvider(shutdown func(context.Context) error) error {

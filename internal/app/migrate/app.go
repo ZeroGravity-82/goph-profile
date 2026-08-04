@@ -10,7 +10,6 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
 
-	"github.com/ZeroGravity-82/goph-profile/internal/config"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	migrationfiles "github.com/ZeroGravity-82/goph-profile/migrations"
 )
@@ -22,28 +21,27 @@ const (
 	migrationUnlockRetryAttempts     = 30
 )
 
-// Run подключается к PostgreSQL и накатывает встроенные goose-миграции.
-//
-// Для защиты от конкурентного запуска используется PostgreSQL advisory lock через session locker пакета goose:
-// несколько параллельных процессов будут ждать одну и ту же блокировку, поэтому миграции в конкретный момент времени
-// накатит только один из процессов.
-//
-// Реализация session locker в goose: https://github.com/pressly/goose/blob/main/lock/postgres.go
-// Документация PostgreSQL по advisory lock:
-// https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS
-func Run(ctx context.Context, cfg config.MigrateConfig, logger *slog.Logger) error {
+// Migrator управляет подключением к PostgreSQL и применением миграций.
+type Migrator struct {
+	db       *pgxpool.Pool
+	provider *goose.Provider
+	logger   *slog.Logger
+}
+
+// New создает Migrator: подключается к PostgreSQL и настраивает goose.
+func New(databaseURI string, logger *slog.Logger) (*Migrator, error) {
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
 
-	db, err := pgxpool.New(ctx, cfg.DatabaseURI)
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, databaseURI)
 	if err != nil {
-		return fmt.Errorf("failed to connect to the database: %w", err)
+		return nil, fmt.Errorf("failed to connect to the database: %w", err)
 	}
-	defer db.Close()
-
 	if err = db.Ping(ctx); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	sessionLocker, err := lock.NewPostgresSessionLocker(
@@ -52,13 +50,12 @@ func Run(ctx context.Context, cfg config.MigrateConfig, logger *slog.Logger) err
 		lock.WithUnlockTimeout(migrationUnlockRetryPeriodSecond, migrationUnlockRetryAttempts),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create postgres session locker: %w", err)
+		db.Close()
+		return nil, fmt.Errorf("failed to create postgres session locker: %w", err)
 	}
 
 	// Goose работает с *sql.DB, поэтому создаем совместимую обертку поверх pgxpool.
 	migrationDB := stdlib.OpenDBFromPool(db)
-	defer func() { _ = migrationDB.Close() }()
-
 	provider, err := goose.NewProvider(
 		goose.DialectPostgres,
 		migrationDB,
@@ -66,22 +63,49 @@ func Run(ctx context.Context, cfg config.MigrateConfig, logger *slog.Logger) err
 		goose.WithSessionLocker(sessionLocker),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create goose provider: %w", err)
+		_ = migrationDB.Close()
+		db.Close()
+		return nil, fmt.Errorf("failed to create goose provider: %w", err)
 	}
 
-	results, err := provider.Up(ctx)
+	return &Migrator{db: db, provider: provider, logger: logger}, nil
+}
+
+// Run накатывает встроенные goose-миграции.
+//
+// Для защиты от конкурентного запуска используется PostgreSQL advisory lock через session locker пакета goose:
+// несколько параллельных процессов будут ждать одну и ту же блокировку, поэтому миграции в конкретный момент времени
+// накатит только один из процессов.
+//
+// Реализация session locker в goose: https://github.com/pressly/goose/blob/main/lock/postgres.go
+// Документация PostgreSQL по advisory lock:
+// https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS
+func (m *Migrator) Run(ctx context.Context) error {
+	results, err := m.provider.Up(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	for _, res := range results {
-		logger.InfoContext(ctx, "applied migration",
+		m.logger.InfoContext(ctx, "applied migration",
 			slog.Int64("version", res.Source.Version),
 			slog.String("source", res.Source.Path),
 			slog.Duration("duration", res.Duration),
 		)
 	}
-	logger.InfoContext(ctx, "postgres migrations complete", slog.Int("count", len(results)))
+	m.logger.InfoContext(ctx, "postgres migrations complete", slog.Int("count", len(results)))
 
 	return nil
+}
+
+// Close закрывает ресурсы мигратора.
+func (m *Migrator) Close() error {
+	var closeErr error
+	if m.provider != nil {
+		closeErr = m.provider.Close()
+	}
+	if m.db != nil {
+		m.db.Close()
+	}
+	return closeErr
 }
