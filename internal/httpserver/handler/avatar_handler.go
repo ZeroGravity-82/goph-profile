@@ -25,6 +25,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/observability"
 	"github.com/ZeroGravity-82/goph-profile/internal/repository"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
+	"github.com/ZeroGravity-82/goph-profile/web"
 )
 
 const formFileField = "file"
@@ -788,16 +789,16 @@ func (h *AvatarHandler) getCurrentAvatarByEmail(w http.ResponseWriter, r *http.R
 	}
 
 	if output.UseDefaultAvatar {
-		writeDefaultAvatarRedirect(w)
+		writeDefaultAvatar(h.logger, w, r)
 		return
 	}
 	writeAvatarContent(h.logger, w, r, output.MIMEType, output.Content)
 }
 
-// writeDefaultAvatarRedirect передает Nginx запрос на PNG-заглушку через заголовок X-Accel-Redirect.
-func writeDefaultAvatarRedirect(w http.ResponseWriter) {
+// writeDefaultAvatar возвращает встроенную PNG-заглушку и разрешает Nginx заменить её статическим файлом.
+func writeDefaultAvatar(logger *slog.Logger, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(xAccelRedirectHeader, defaultAvatarPath)
-	w.WriteHeader(http.StatusOK)
+	writeAvatarContent(logger, w, r, model.MIMEPNG, web.DefaultAvatarPNG)
 }
 
 // getCurrentAvatarByUserID парсит user_id из пути и возвращает текущую аватарку или PNG-заглушку.
@@ -818,7 +819,7 @@ func (h *AvatarHandler) getCurrentAvatarByUserID(w http.ResponseWriter, r *http.
 	}
 
 	if output.UseDefaultAvatar {
-		writeDefaultAvatarRedirect(w)
+		writeDefaultAvatar(h.logger, w, r)
 		return
 	}
 	writeAvatarContent(h.logger, w, r, output.MIMEType, output.Content)
