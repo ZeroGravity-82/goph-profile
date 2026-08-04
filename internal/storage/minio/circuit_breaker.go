@@ -34,7 +34,7 @@ func newMinIOCircuitBreaker(failureThreshold uint32, timeout time.Duration) *min
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
 				return counts.ConsecutiveFailures >= failureThreshold
 			},
-			IsSuccessful: isMinIORequestSuccessful,
+			IsSuccessful: isMinIOAvailable,
 			IsExcluded: func(err error) bool {
 				return errors.Is(err, context.Canceled)
 			},
@@ -53,8 +53,8 @@ func (b *minioCircuitBreaker) Execute(operation func() error) error {
 	return err
 }
 
-// isMinIORequestSuccessful определяет ошибки, которые не указывают на недоступность MinIO.
-func isMinIORequestSuccessful(err error) bool {
+// isMinIOAvailable определяет, указывает ли результат запроса на доступность MinIO.
+func isMinIOAvailable(err error) bool {
 	if err == nil {
 		return true
 	}

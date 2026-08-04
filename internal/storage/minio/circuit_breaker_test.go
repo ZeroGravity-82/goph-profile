@@ -59,14 +59,18 @@ func TestMinIOCircuitBreaker_Execute_ClosesAfterSuccessfulProbe(t *testing.T) {
 	assert.Equal(t, gobreaker.StateClosed, breaker.breaker.State())
 }
 
-// Test_isMinIORequestSuccessful проверяет классификацию ответов MinIO для circuit breaker.
-func Test_isMinIORequestSuccessful(t *testing.T) {
+// Test_isMinIOAvailable проверяет классификацию ответов MinIO по доступности хранилища.
+func Test_isMinIOAvailable(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
 		want bool
 	}{
-		{name: "success", want: true},
+		{
+			name: "success",
+			err:  nil,
+			want: true,
+		},
 		{
 			name: "client error",
 			err:  minioV7.ErrorResponse{Code: "NoSuchKey", StatusCode: http.StatusNotFound},
@@ -75,14 +79,19 @@ func Test_isMinIORequestSuccessful(t *testing.T) {
 		{
 			name: "server error",
 			err:  minioV7.ErrorResponse{Code: "InternalError", StatusCode: http.StatusServiceUnavailable},
+			want: false,
 		},
-		{name: "connection error", err: errors.New("connection refused")},
+		{
+			name: "connection error",
+			err:  errors.New("connection refused"),
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Act
-			got := isMinIORequestSuccessful(tt.err)
+			got := isMinIOAvailable(tt.err)
 
 			// Assert
 			assert.Equal(t, tt.want, got)
