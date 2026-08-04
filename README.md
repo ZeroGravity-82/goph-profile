@@ -736,60 +736,58 @@ Dockerfile использует multi-stage build: отдельный build stag
 ### Конфигурация окружений
 
 Базовые значения Helm-чарта находятся в `helm/goph-profile/values.yaml`. Файл `values.local.yaml` настраивает запуск
-приложения в Rancher Desktop с инфраструктурными компонентами из Docker Compose, а `values.production.yaml` содержит
-пример настроек для прод-окружения с внешним OpenTelemetry Collector.
+приложения в Rancher Desktop с зависимостями внутри кластера, а `values.production.yaml` содержит пример настроек для
+прод-окружения с внешними инфраструктурными сервисами и OpenTelemetry Collector.
 
-Реальные учетные данные и TLS-ключи не хранятся в Git. Для их передачи скопируйте `values.secret.example.yaml` в
-игнорируемый файл `values.secret.yaml`, заполните его и указывайте после файла окружения, чтобы реальные секреты и TLS переопределили значения-заглушки.
+В `values.local.yaml` намеренно зафиксированы только тестовые учетные данные локального кластера. В проде реальные
+учетные данные и TLS-ключи не хранятся в Git: скопируйте `values.secret.example.yaml` в игнорируемый файл
+`values.secret.yaml`, заполните его и передавайте после файла окружения, чтобы секреты переопределили значения-заглушки.
 
 ### Установка и обновление Helm-релиза
 
-Для локального развертывания Kubernetes должен быть включен в Rancher Desktop. В кластере должны быть установлены
-Traefik, Metrics Server, Prometheus Operator и Prometheus. Локально используется гибридное окружение: Helm-чарт
-разворачивает компоненты GophProfile в Kubernetes, а PostgreSQL, MinIO, RabbitMQ, OpenSearch и Jaeger остаются внешними
-зависимостями и запускаются в Docker Compose. Они не входят в чарт приложения, потому что имеют отдельный жизненный цикл
-и в прод-окружении предоставляются как самостоятельные инфраструктурные компоненты.
-
-Запустите локальные зависимости:
+Для локального развертывания включите Kubernetes в Rancher Desktop и установите Helm 3. Traefik и Metrics Server
+предоставляет Rancher Desktop. Для одновременного запуска приложения, OpenSearch и стека мониторинга рекомендуется
+выделить виртуальной машине не менее 6 ГБ памяти и по возможности 4 CPU. Локальные сервисы Docker Compose можно
+остановить, чтобы они не расходовали ресурсы параллельно:
 
 ```bash
-docker compose up -d postgresql minio rabbitmq opensearch jaeger
+docker compose down
 ```
 
-Соберите образ приложения в Docker-контексте Rancher Desktop:
+Воспроизводимое окружение состоит из трех независимо управляемых частей:
+
+- `deploy/kubernetes/local/dependencies.yaml` разворачивает PostgreSQL, MinIO, RabbitMQ, OpenSearch и Jaeger;
+- официальный чарт `prometheus-community/kube-prometheus-stack` отдельным Helm-релизом устанавливает Prometheus
+  Operator, Prometheus, Grafana и `kube-state-metrics`;
+- `helm/goph-profile` разворачивает сервер, воркер, миграционный Job и OpenTelemetry Collector приложения.
+
+Инфраструктурные компоненты не включены в чарт GophProfile: у них отдельный жизненный цикл, а в проде вместо
+локальных Deployment обычно используются внешние или управляемые сервисы. Репозиторий хранит только локальный манифест
+зависимостей и values-файл официального чарта мониторинга, чтобы можно было воспроизвести окружение.
+
+Поднимите весь стенд одной командой:
 
 ```bash
-docker build -f docker/Dockerfile -t goph-profile:local .
+./scripts/kubernetes-local.sh up
 ```
 
-Подготовьте локальный файл с учетными данными и TLS-ключами:
+Скрипт собирает `goph-profile:local` в Docker-контексте Rancher Desktop, создает namespace, дожидается готовности
+зависимостей, устанавливает `kube-prometheus-stack` и затем Helm-релиз приложения. Если локальный образ
+уже собран, сборку можно пропустить:
 
 ```bash
-cp helm/goph-profile/values.secret.example.yaml helm/goph-profile/values.secret.yaml
+SKIP_BUILD=1 ./scripts/kubernetes-local.sh up
 ```
 
-Замените в `values.secret.yaml` значения-заглушки. Для PostgreSQL и RabbitMQ из Docker Compose используйте адрес
-`host.docker.internal`. Файл `values.secret.yaml` добавлен в `.gitignore` и не должен попадать в Git.
-
-Один раз создайте отдельный namespace приложения:
+Посмотреть состояние окружения или остановить его можно командами:
 
 ```bash
-kubectl create namespace goph-profile
+./scripts/kubernetes-local.sh status
+./scripts/kubernetes-local.sh down
 ```
 
-Команда `helm upgrade --install` устанавливает отсутствующий релиз или обновляет уже существующий:
+Команда down удаляет Helm-релизы и останавливает локальные зависимости, но сохраняет их постоянные хранилища. Поэтому следующий up запускает зависимости с прежними данными.
 
-```bash
-helm upgrade --install goph-profile helm/goph-profile \
-  --namespace goph-profile \
-  --values helm/goph-profile/values.local.yaml \
-  --values helm/goph-profile/values.secret.yaml \
-  --wait \
-  --timeout 10m
-```
-
-Файл `values.secret.yaml` передается после `values.local.yaml`, поэтому его значения имеют больший приоритет. При
-изменении конфигурации меняются аннотации с ее контрольными суммами, поэтому Kubernetes перезапускает затронутые поды.
 Если изменился только код и локальный образ пересобран с прежним тегом `local`, перезапустите server и worker явно:
 
 ```bash
@@ -804,7 +802,9 @@ kubectl rollout restart deployment/goph-profile-server deployment/goph-profile-w
 ```bash
 helm status goph-profile --namespace goph-profile
 kubectl get pods,services,ingresses,hpa --namespace goph-profile
+kubectl get configmap goph-profile-kubernetes-dashboard --namespace goph-profile
 kubectl get servicemonitor goph-profile-otel-collector --namespace goph-profile
+kubectl get prometheusrule goph-profile-alerts --namespace goph-profile
 kubectl get middleware goph-profile-server-rate-limit --namespace goph-profile
 ```
 
@@ -848,7 +848,7 @@ curl http://localhost:13203/ready
 Для проверки целей в локальном Prometheus перенаправьте его порт:
 
 ```bash
-kubectl port-forward service/monitoring-kube-prometheus-prometheus 19090:9090 --namespace monitoring
+kubectl port-forward service/prometheus-operated 19090:9090 --namespace monitoring
 ```
 
 В другом терминале выполните:
@@ -861,6 +861,38 @@ curl --silent --show-error --fail 'http://localhost:19090/api/v1/targets?state=a
     | {scrapeUrl, health, lastError}
   ]'
 ```
+
+Проверьте, что Prometheus загрузил правила GophProfile:
+
+```bash
+curl --silent --show-error --fail 'http://localhost:19090/api/v1/rules?type=alert' | \
+  jq '[
+    .data.groups[].rules[]
+    | select(.name | startswith("GophProfile"))
+    | {name, state, health}
+  ]'
+```
+
+Helm-чарт создает `ConfigMap` `goph-profile-kubernetes-dashboard` с дашбордом `GophProfile Kubernetes` и меткой
+`grafana_dashboard: "1"`. В локальном окружении вспомогательный контейнер Grafana из `kube-prometheus-stack`
+обнаруживает этот `ConfigMap` во всех namespace и автоматически загружает дашборд.
+
+При использовании другой Grafana импортируйте файл
+`helm/goph-profile/dashboards/goph-profile-kubernetes.json` через интерфейс Grafana и выберите источник данных Prometheus.
+В переменных дашборда укажите namespace и префикс ресурсов Helm-релиза; для приведенной выше команды установки используются
+значения `goph-profile` и `goph-profile`.
+
+Проверьте на дашборде:
+
+- желаемое и доступное число реплик Deployment;
+- количество готовых подов и их текущее состояние;
+- текущие и желаемые реплики HPA;
+- рестарты контейнеров;
+- использование CPU и памяти подами GophProfile.
+
+Если панели реплик, готовности и HPA пусты, проверьте сбор метрик `kube-state-metrics`. Для панелей CPU и памяти Prometheus
+должен собирать метрики kubelet/cAdvisor. Встроенный Cluster Dashboard Rancher Desktop можно использовать для дополнительной
+проверки ресурсов, но он не заменяет проектный дашборд Grafana.
 
 ### Архитектура Kubernetes-развертывания
 
@@ -879,19 +911,24 @@ flowchart TB
         collectorService[Service OpenTelemetry Collector<br/>OTLP :4317, Prometheus :8889/metrics]
         collector[Deployment OpenTelemetry Collector<br/>2 реплики]
         serviceMonitor[ServiceMonitor]
-    end
+        prometheusRule[PrometheusRule<br/>алерты доступности]
+        dashboardConfig[ConfigMap<br/>дашборд Grafana]
 
-    subgraph dependencies["Внешние зависимости"]
+        subgraph localDependencies["локальные инфраструктурные компоненты"]
         postgres[(PostgreSQL)]
         minio[(MinIO)]
         rabbitmq[(RabbitMQ)]
         opensearch[(OpenSearch)]
         jaeger[(Jaeger)]
+        end
     end
 
-    subgraph monitoring["Инфраструктура мониторинга"]
+    subgraph monitoring["namespace monitoring: отдельный Helm-релиз"]
         prometheusOperator[Prometheus Operator]
         prometheus[Prometheus]
+        grafana[Grafana]
+        kubeStateMetrics[kube-state-metrics]
+        cadvisor[kubelet / cAdvisor]
     end
 
     traefik --> ingress
@@ -917,8 +954,13 @@ flowchart TB
     collector -->|трассы| jaeger
 
     serviceMonitor -.->|обнаруживается| prometheusOperator
+    prometheusRule -.->|обнаруживается| prometheusOperator
     prometheusOperator -.->|настраивает сбор| prometheus
     prometheus -->|GET /metrics| collectorService
+    prometheus -->|собирает состояние объектов| kubeStateMetrics
+    prometheus -->|собирает ресурсы контейнеров| cadvisor
+    dashboardConfig -.->|обнаруживается вспомогательным контейнером| grafana
+    grafana -->|PromQL| prometheus
 ```
 
 ### Ingress и TLS
@@ -976,7 +1018,8 @@ Ingress-контроллера и требуется общий для них л
 обновляет ресурсы приложения, а завершившийся с ошибкой `Job` сохраняется до следующей попытки для просмотра его логов.
 Мигратор всегда пишет структурированные логи в stdout. Если задана переменная `OTEL_EXPORTER_OTLP_ENDPOINT`, он также
 отправляет их в OpenTelemetry Collector. Docker Compose задает адрес OpenTelemetry Collector, поэтому при локальной
-разработке логи мигратора попадают в OpenSearch. Helm-хук этот адрес не задает и от OpenTelemetry Collector не зависит.
+разработке через Compose логи мигратора попадают в OpenSearch. Kubernetes Job этот адрес не задает: его логи доступны
+через `kubectl logs`, а выполнение миграций не зависит от готовности OpenTelemetry Collector.
 
 ### Наблюдаемость в Kubernetes
 
@@ -1009,8 +1052,49 @@ config:
 репликами, планировщик Kubernetes по возможности размещает их на разных узлах, а `PodDisruptionBudget` сохраняет как минимум
 одну доступную реплику при плановом обслуживании узлов.
 
-Prometheus Operator и Prometheus относятся к инфраструктуре Kubernetes-кластера и не входят в Helm-чарт GophProfile.
-Prometheus должен быть настроен на обнаружение `ServiceMonitor` в namespace `goph-profile`.
+Prometheus должен быть настроен на обнаружение `ServiceMonitor` и `PrometheusRule` в namespace `goph-profile`.
+Дополнительные метки этих ресурсов задаются через `otelCollector.serviceMonitor.labels` и
+`monitoring.prometheusRule.labels`: они должны соответствовать селекторам установленного Prometheus. Локальный
+`values.local.yaml` добавляет метку `release: monitoring`, а локальный Prometheus настроен на обнаружение ресурсов во
+всех namespace независимо от этой дополнительной метки.
+
+#### Алерты и дашборды Kubernetes
+
+Helm-чарт создает `PrometheusRule` с алертами на основе уже экспортируемых метрик GophProfile:
+
+- `GophProfileHighHTTPErrorRate` - доля ответов сервера с кодом `5xx` превышает 5%;
+- `GophProfileHighHTTPResponseTime` - 95-й процентиль времени ответа сервера превышает две секунды;
+- `GophProfileHighWorkerFailureRate` - доля завершившихся ошибкой задач воркера превышает 10%;
+- `GophProfileOTelCollectorUnavailable` - Prometheus не может собрать метрики ни с одной реплики встроенного
+  OpenTelemetry Collector.
+
+Правило OpenTelemetry Collector создается только вместе со встроенным Collector. Остальные алерты используют метрики
+HTTP-сервера и воркера, поступающие через OpenTelemetry Collector. Интервал вычисления, окно анализа, время ожидания и
+пороговые значения настраиваются в `values.yaml`:
+
+```yaml
+monitoring:
+  grafanaDashboard:
+    enabled: true
+  prometheusRule:
+    enabled: true
+    labels:
+      release: monitoring
+    interval: 30s
+    evaluationWindow: 5m
+    for: 2m
+    httpErrorRateThreshold: 0.05
+    httpDurationP95ThresholdSeconds: 2
+    workerFailureRateThreshold: 0.1
+```
+
+Дашборд `GophProfile Kubernetes` хранится в каталоге `helm/goph-profile/dashboards` и упаковывается Helm-чартом в помеченный
+`ConfigMap`. Он показывает состояние только компонентов GophProfile, а не всего кластера. Дашборд можно отключить через
+`monitoring.grafanaDashboard.enabled`, если платформа использует другой способ доставки дашбордов.
+
+Prometheus Operator, Prometheus, Grafana, `kube-state-metrics` и сбор метрик kubelet/cAdvisor относятся к инфраструктуре
+кластера и не входят в Helm-чарт GophProfile. Чарт предоставляет `ServiceMonitor`, `PrometheusRule` и дашборд, но не
+устанавливает и не настраивает сам стек мониторинга.
 
 ### Безопасность
 
@@ -1111,10 +1195,10 @@ RabbitMQ, MinIO и хоста.
 
 Локальные UI для анализа телеметрии:
 
-- Grafana: <http://localhost:3000> — дашборды метрик, просмотр логов через OpenSearch datasource и трасс через Jaeger datasource;
-- Prometheus: <http://localhost:9090> — PromQL-запросы и проверка собранных метрик;
-- Jaeger: <http://localhost:16686> — поиск и анализ трасс;
-- OpenSearch Dashboards: <http://localhost:5601> — просмотр и поиск логов.
+- Grafana: <http://localhost:3000> - дашборды метрик, просмотр логов через OpenSearch datasource и трасс через Jaeger datasource;
+- Prometheus: <http://localhost:9090> - PromQL-запросы и проверка собранных метрик;
+- Jaeger: <http://localhost:16686> - поиск и анализ трасс;
+- OpenSearch Dashboards: <http://localhost:5601> - просмотр и поиск логов.
 
 ### Как проверить наблюдаемость
 

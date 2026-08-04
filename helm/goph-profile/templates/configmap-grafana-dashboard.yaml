@@ -1,0 +1,12 @@
+{{- if .Values.monitoring.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "goph-profile.fullname" . }}-kubernetes-dashboard
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  goph-profile-kubernetes.json: |-
+{{ .Files.Get "dashboards/goph-profile-kubernetes.json" | nindent 4 }}
+{{- end }}

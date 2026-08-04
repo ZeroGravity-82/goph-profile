@@ -41,6 +41,19 @@ ingress:
     burst: 20
     period: 1s
 
+monitoring:
+  grafanaDashboard:
+    enabled: true
+  prometheusRule:
+    enabled: true
+    labels: {}
+    interval: 30s
+    evaluationWindow: 5m
+    for: 2m
+    httpErrorRateThreshold: 0.05
+    httpDurationP95ThresholdSeconds: 2
+    workerFailureRateThreshold: 0.1
+
 networkPolicy:
   enabled: true
   ingressController:
@@ -100,6 +113,7 @@ otelCollector:
       cpu: 250m
       memory: 256Mi
   serviceMonitor:
+    labels: {}
     interval: 30s
   podDisruptionBudget:
     enabled: true
