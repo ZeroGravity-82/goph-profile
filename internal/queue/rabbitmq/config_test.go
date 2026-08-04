@@ -148,8 +148,8 @@ func TestConsumer_Ping(t *testing.T) {
 	// Arrange
 	consumer := &Consumer{
 		conn:              &amqp.Connection{},
-		processingChannel: newShutdownConsumerChannelFake(),
-		deletionChannel:   newShutdownConsumerChannelFake(),
+		processingChannel: newShutdownDeliverySubscriberFake(),
+		deletionChannel:   newShutdownDeliverySubscriberFake(),
 	}
 	consumer.ready.Store(true)
 

@@ -10,17 +10,17 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
-type shutdownConsumerChannelFake struct {
+type shutdownDeliverySubscriberFake struct {
 	deliveries chan amqp.Delivery
 	cancelOnce sync.Once
 	closed     atomic.Bool
 }
 
-func newShutdownConsumerChannelFake() *shutdownConsumerChannelFake {
-	return &shutdownConsumerChannelFake{deliveries: make(chan amqp.Delivery, 1)}
+func newShutdownDeliverySubscriberFake() *shutdownDeliverySubscriberFake {
+	return &shutdownDeliverySubscriberFake{deliveries: make(chan amqp.Delivery, 1)}
 }
 
-func (c *shutdownConsumerChannelFake) Consume(
+func (c *shutdownDeliverySubscriberFake) Consume(
 	_ string,
 	_ string,
 	_ bool,
@@ -32,7 +32,7 @@ func (c *shutdownConsumerChannelFake) Consume(
 	return c.deliveries, nil
 }
 
-func (c *shutdownConsumerChannelFake) Cancel(_ string, _ bool) error {
+func (c *shutdownDeliverySubscriberFake) Cancel(_ string, _ bool) error {
 	c.cancelOnce.Do(func() {
 		c.closed.Store(true)
 		close(c.deliveries)
@@ -40,7 +40,7 @@ func (c *shutdownConsumerChannelFake) Cancel(_ string, _ bool) error {
 	return nil
 }
 
-func (c *shutdownConsumerChannelFake) IsClosed() bool {
+func (c *shutdownDeliverySubscriberFake) IsClosed() bool {
 	return c.closed.Load()
 }
 

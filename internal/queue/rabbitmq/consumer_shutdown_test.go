@@ -16,8 +16,8 @@ import (
 // до подтверждения активного сообщения.
 func TestConsumer_Run_WaitsForAckAfterContextCancel(t *testing.T) {
 	// Arrange
-	processingChannel := newShutdownConsumerChannelFake()
-	deletionChannel := newShutdownConsumerChannelFake()
+	processingChannel := newShutdownDeliverySubscriberFake()
+	deletionChannel := newShutdownDeliverySubscriberFake()
 	handler := newShutdownMessageHandlerFake()
 	ackStarted := make(chan struct{})
 	ackRelease := make(chan struct{})
@@ -51,8 +51,8 @@ func TestConsumer_Run_WaitsForAckAfterContextCancel(t *testing.T) {
 // Run дожидается Nack отмененного сообщения.
 func TestConsumer_Run_WaitsForNackAfterContextCancelTimeout(t *testing.T) {
 	// Arrange
-	processingChannel := newShutdownConsumerChannelFake()
-	deletionChannel := newShutdownConsumerChannelFake()
+	processingChannel := newShutdownDeliverySubscriberFake()
+	deletionChannel := newShutdownDeliverySubscriberFake()
 	handler := newShutdownMessageHandlerFake()
 	nackStarted := make(chan struct{})
 	nackRelease := make(chan struct{})
@@ -81,8 +81,8 @@ func TestConsumer_Run_WaitsForNackAfterContextCancelTimeout(t *testing.T) {
 }
 
 func newShutdownConsumer(
-	processingChannel consumerChannel,
-	deletionChannel consumerChannel,
+	processingChannel deliverySubscriber,
+	deletionChannel deliverySubscriber,
 	handler AvatarMessageHandler,
 	shutdownTimeout time.Duration,
 ) *Consumer {

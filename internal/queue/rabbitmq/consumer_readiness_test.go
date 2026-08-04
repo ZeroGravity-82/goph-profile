@@ -15,8 +15,8 @@ import (
 func TestConsumer_Run_MarksNotReadyOnContextCancel(t *testing.T) {
 	// Arrange
 	ctx, cancel := context.WithCancel(context.Background())
-	processingChannel := newShutdownConsumerChannelFake()
-	deletionChannel := newShutdownConsumerChannelFake()
+	processingChannel := newShutdownDeliverySubscriberFake()
+	deletionChannel := newShutdownDeliverySubscriberFake()
 	consumer := &Consumer{
 		conn:              &amqp.Connection{},
 		processingChannel: processingChannel,

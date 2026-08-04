@@ -35,9 +35,9 @@ type AvatarMessageHandler interface {
 	HandleAvatarDeletion(ctx context.Context, message usecase.AvatarDeletionMessage) error
 }
 
-// consumerChannel описывает операции RabbitMQ-канала, необходимые для получения, проверки состояния и корректной
-// остановки доставок.
-type consumerChannel interface {
+// deliverySubscriber описывает операции подписки на доставки RabbitMQ, необходимые для получения, проверки состояния
+// и корректной остановки доставок.
+type deliverySubscriber interface {
 	Consume(
 		queue string,
 		consumer string,
@@ -54,8 +54,8 @@ type consumerChannel interface {
 // Consumer читает задачи аватарок из RabbitMQ.
 type Consumer struct {
 	conn              *amqp.Connection
-	processingChannel consumerChannel
-	deletionChannel   consumerChannel
+	processingChannel deliverySubscriber
+	deletionChannel   deliverySubscriber
 	cfg               Config
 	handler           AvatarMessageHandler
 	logger            *slog.Logger
