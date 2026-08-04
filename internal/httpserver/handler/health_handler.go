@@ -1,37 +1,29 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 const (
-	readinessCheckTimeout = 2 * time.Second
-	healthStatusOK        = "ok"
-	healthStatusError     = "error"
-	healthStatusDegraded  = "degraded"
+	healthStatusOK       = "ok"
+	healthStatusError    = "error"
+	healthStatusDegraded = "degraded"
 )
 
 // HealthHandler обрабатывает HTTP-запросы проверки жизнеспособности и готовности сервиса.
 type HealthHandler struct {
-	readinessChecks map[string]func(context.Context) error
+	readinessChecks readiness.Checks
 	logger          *slog.Logger
 }
 
-// readinessCheckResult содержит имя зависимости и результат проверки её готовности.
-type readinessCheckResult struct {
-	name string
-	err  error
-}
-
 // NewHealthHandler создает HealthHandler.
-func NewHealthHandler(readinessChecks map[string]func(context.Context) error, logger *slog.Logger) (*HealthHandler, error) {
+func NewHealthHandler(readinessChecks readiness.Checks, logger *slog.Logger) (*HealthHandler, error) {
 	if readinessChecks == nil {
 		return nil, errors.New("readiness checks are not provided")
 	}
@@ -52,31 +44,18 @@ func (h *HealthHandler) getLive(w http.ResponseWriter, r *http.Request) {
 
 // getReady выполняет именованные проверки внешних зависимостей и возвращает готовность сервиса принимать трафик.
 func (h *HealthHandler) getReady(w http.ResponseWriter, r *http.Request) {
-	var checkErr error
 	statusCode := http.StatusOK
 	response := dto.ReadinessResponse{
 		Status: healthStatusOK,
 		Checks: make(map[string]string, len(h.readinessChecks)),
 	}
 
-	resultCh := make(chan readinessCheckResult, len(h.readinessChecks))
-	for name, check := range h.readinessChecks {
-		go func() {
-			ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
-			defer cancel()
-
-			resultCh <- readinessCheckResult{name: name, err: check(ctx)}
-		}()
+	results := readiness.Run(r.Context(), h.readinessChecks, readiness.DefaultTimeout)
+	for name, err := range results {
+		response.Checks[name] = readinessCheckStatus(err)
 	}
 
-	for range h.readinessChecks {
-		result := <-resultCh
-		response.Checks[result.name] = readinessCheckStatus(result.err)
-		if result.err != nil {
-			checkErr = errors.Join(checkErr, result.err)
-		}
-	}
-
+	checkErr := results.Err()
 	if checkErr != nil {
 		statusCode = http.StatusServiceUnavailable
 		response.Status = healthStatusDegraded

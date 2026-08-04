@@ -12,6 +12,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/handler"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -51,20 +52,6 @@ type userUseCase interface {
 	ResolveUserByEmail(ctx context.Context, email model.Email) (usecase.ResolveUserByEmailOutput, error)
 }
 
-// ReadinessCheck проверяет доступность внешней зависимости.
-type ReadinessCheck func(ctx context.Context) error
-
-// ReadinessChecks содержит именованные проверки готовности внешних зависимостей.
-type ReadinessChecks map[string]ReadinessCheck
-
-func (checks ReadinessChecks) handlerChecks() map[string]func(context.Context) error {
-	result := make(map[string]func(context.Context) error, len(checks))
-	for name, check := range checks {
-		result[name] = check
-	}
-	return result
-}
-
 // HTTPServer запускает основной REST API.
 //
 // Он запускает роутер, собранный handler.NewRouter, на указанном адресе.
@@ -73,7 +60,7 @@ type HTTPServer struct {
 	tlsConfig       *tls.Config
 	avatarUseCase   avatarUseCase
 	userUseCase     userUseCase
-	readinessChecks ReadinessChecks
+	readinessChecks readiness.Checks
 	logger          *slog.Logger
 }
 
@@ -83,7 +70,7 @@ func NewHTTPServer(
 	tlsConfig *tls.Config,
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
-	readinessChecks ReadinessChecks,
+	readinessChecks readiness.Checks,
 	logger *slog.Logger,
 ) (*HTTPServer, error) {
 	if addr == "" {
@@ -118,7 +105,7 @@ func (s *HTTPServer) Run(ctx context.Context) error {
 	router, err := handler.NewRouter(
 		s.avatarUseCase,
 		s.userUseCase,
-		s.readinessChecks.handlerChecks(),
+		s.readinessChecks,
 		s.logger,
 	)
 	if err != nil {

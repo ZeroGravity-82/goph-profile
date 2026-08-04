@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/domain/model"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
 )
 
@@ -61,7 +61,7 @@ func TestNewRouter_HealthRoute(t *testing.T) {
 // TestNewRouter_ReadyRoute_ReturnsServiceUnavailable проверяет ответ роутера при недоступной зависимости.
 func TestNewRouter_ReadyRoute_ReturnsServiceUnavailable(t *testing.T) {
 	// Arrange
-	readinessChecks := map[string]func(context.Context) error{
+	readinessChecks := readiness.Checks{
 		"rabbitmq": readinessCheckError(errors.New("rabbitmq error")),
 	}
 	router := mustRouter(t, &avatarUseCaseFake{}, &userUseCaseFake{}, readinessChecks, discardLogger())

@@ -13,6 +13,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/config"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/queue/rabbitmq"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 	minioStorage "github.com/ZeroGravity-82/goph-profile/internal/storage/minio"
 	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
@@ -105,7 +106,7 @@ func buildApp(ctx context.Context, cfg config.WorkerConfig, db *pgxpool.Pool, lo
 	}
 	healthServer, err := healthserver.New(
 		cfg.HealthServerAddr,
-		healthserver.ReadinessChecks{
+		readiness.Checks{
 			"postgres": db.Ping,
 			"s3":       fileStorage.Ping,
 			"rabbitmq": consumer.Ping,

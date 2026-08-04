@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/observability"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 const apiPathPrefix = "/api/v1"
@@ -36,7 +36,7 @@ const apiPathPrefix = "/api/v1"
 func NewRouter(
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
-	readinessChecks map[string]func(context.Context) error,
+	readinessChecks readiness.Checks,
 	logger *slog.Logger,
 ) (http.Handler, error) {
 	if logger == nil {

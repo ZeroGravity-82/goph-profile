@@ -13,6 +13,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/queue/rabbitmq"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 	minioStorage "github.com/ZeroGravity-82/goph-profile/internal/storage/minio"
 	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
@@ -127,7 +128,7 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 		tlsConfig,
 		avatarUseCase,
 		userUseCase,
-		httpserver.ReadinessChecks{
+		readiness.Checks{
 			"postgres": db.Ping,
 			"s3":       fileStorage.Ping,
 			"rabbitmq": publisher.Ping,

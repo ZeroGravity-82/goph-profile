@@ -11,33 +11,21 @@ import (
 	"time"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 const (
-	readHeaderTimeout     = 5 * time.Second
-	readinessCheckTimeout = 2 * time.Second
-	shutdownTimeout       = 5 * time.Second
-	statusOK              = "ok"
-	statusError           = "error"
-	statusDegraded        = "degraded"
+	readHeaderTimeout = 5 * time.Second
+	shutdownTimeout   = 5 * time.Second
+	statusOK          = "ok"
+	statusError       = "error"
+	statusDegraded    = "degraded"
 )
-
-// ReadinessCheck проверяет готовность зависимости воркера.
-type ReadinessCheck func(ctx context.Context) error
-
-// ReadinessChecks содержит именованные проверки готовности зависимостей воркера.
-type ReadinessChecks map[string]ReadinessCheck
-
-// readinessCheckResult содержит имя зависимости и результат проверки её готовности.
-type readinessCheckResult struct {
-	name string
-	err  error
-}
 
 // Server обслуживает проверки жизнеспособности и готовности воркера.
 type Server struct {
 	addr            string
-	readinessChecks ReadinessChecks
+	readinessChecks readiness.Checks
 	logger          *slog.Logger
 }
 
@@ -53,7 +41,7 @@ type readinessResponse struct {
 }
 
 // New создает сервер проверок состояния воркера.
-func New(addr string, readinessChecks ReadinessChecks, logger *slog.Logger) (*Server, error) {
+func New(addr string, readinessChecks readiness.Checks, logger *slog.Logger) (*Server, error) {
 	if addr == "" {
 		return nil, errors.New("health server address is not provided")
 	}
@@ -128,31 +116,18 @@ func (s *Server) writeJSON(w http.ResponseWriter, r *http.Request, statusCode in
 
 // getReady выполняет проверки зависимостей и возвращает готовность воркера обрабатывать сообщения.
 func (s *Server) getReady(w http.ResponseWriter, r *http.Request) {
-	var checkErr error
 	statusCode := http.StatusOK
 	response := readinessResponse{
 		Status: statusOK,
 		Checks: make(map[string]string, len(s.readinessChecks)),
 	}
 
-	resultCh := make(chan readinessCheckResult, len(s.readinessChecks))
-	for name, check := range s.readinessChecks {
-		go func() {
-			ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
-			defer cancel()
-
-			resultCh <- readinessCheckResult{name: name, err: check(ctx)}
-		}()
+	results := readiness.Run(r.Context(), s.readinessChecks, readiness.DefaultTimeout)
+	for name, err := range results {
+		response.Checks[name] = readinessCheckStatus(err)
 	}
 
-	for range s.readinessChecks {
-		result := <-resultCh
-		response.Checks[result.name] = readinessCheckStatus(result.err)
-		if result.err != nil {
-			checkErr = errors.Join(checkErr, result.err)
-		}
-	}
-
+	checkErr := results.Err()
 	if checkErr != nil {
 		statusCode = http.StatusServiceUnavailable
 		response.Status = statusDegraded

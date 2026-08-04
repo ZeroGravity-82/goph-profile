@@ -6,19 +6,20 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 // TestServer_getLive проверяет успешный ответ ручки жизнеспособности без проверки внешних зависимостей.
 func TestServer_getLive(t *testing.T) {
 	// Arrange
 	checkCalled := false
-	server := mustServer(t, "127.0.0.1:0", ReadinessChecks{
+	server := mustServer(t, "127.0.0.1:0", readiness.Checks{
 		"dependency": func(_ context.Context) error {
 			checkCalled = true
 			return errors.New("dependency error")
@@ -56,41 +57,10 @@ func TestServer_getReady(t *testing.T) {
 	}`, response.Body.String())
 }
 
-// TestServer_getReady_RunsChecksConcurrently проверяет параллельный запуск проверок готовности зависимостей.
-func TestServer_getReady_RunsChecksConcurrently(t *testing.T) {
-	// Arrange
-	var startedChecks atomic.Int32
-	allChecksStarted := make(chan struct{})
-	waitForAllChecks := func(ctx context.Context) error {
-		if startedChecks.Add(1) == 2 {
-			close(allChecksStarted)
-		}
-		select {
-		case <-allChecksStarted:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	server := mustServer(t, "127.0.0.1:0", ReadinessChecks{
-		"postgres": waitForAllChecks,
-		"s3":       waitForAllChecks,
-	})
-	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
-	response := httptest.NewRecorder()
-
-	// Act
-	server.handler().ServeHTTP(response, request)
-
-	// Assert
-	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, int32(2), startedChecks.Load())
-}
-
 // TestServer_getReady_ReturnsServiceUnavailable проверяет ответ ручки готовности при недоступной зависимости.
 func TestServer_getReady_ReturnsServiceUnavailable(t *testing.T) {
 	// Arrange
-	server := mustServer(t, "127.0.0.1:0", ReadinessChecks{
+	server := mustServer(t, "127.0.0.1:0", readiness.Checks{
 		"postgres": func(_ context.Context) error { return nil },
 		"s3":       func(_ context.Context) error { return errors.New("s3 error") },
 		"rabbitmq": func(_ context.Context) error { return nil },
@@ -147,7 +117,7 @@ func TestServer_Run_ShutsDownOnContextCancel(t *testing.T) {
 	}
 }
 
-func mustServer(t *testing.T, addr string, checks ReadinessChecks) *Server {
+func mustServer(t *testing.T, addr string, checks readiness.Checks) *Server {
 	t.Helper()
 
 	server, err := New(addr, checks, nil)
@@ -155,8 +125,8 @@ func mustServer(t *testing.T, addr string, checks ReadinessChecks) *Server {
 	return server
 }
 
-func okReadinessChecks() ReadinessChecks {
-	return ReadinessChecks{
+func okReadinessChecks() readiness.Checks {
+	return readiness.Checks{
 		"postgres": func(_ context.Context) error { return nil },
 		"s3":       func(_ context.Context) error { return nil },
 		"rabbitmq": func(_ context.Context) error { return nil },

@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 // TestHTTPServer_Run_ReturnsListenError проверяет ошибку запуска HTTP-сервера.
@@ -180,8 +182,8 @@ func testTLSConfigAndClient(t *testing.T) (*tls.Config, *http.Client) {
 	return tlsConfig, client
 }
 
-func testReadinessChecks() ReadinessChecks {
-	return ReadinessChecks{
+func testReadinessChecks() readiness.Checks {
+	return readiness.Checks{
 		"test": func(_ context.Context) error {
 			return nil
 		},
