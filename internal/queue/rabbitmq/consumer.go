@@ -271,21 +271,18 @@ func (c *Consumer) stopAndWait(
 	if timeout <= 0 {
 		timeout = consumerShutdownTimeout
 	}
-	timedOutCh := make(chan struct{})
-	timer := time.AfterFunc(timeout, func() {
-		cancelWork()
-		close(timedOutCh)
-	})
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), timeout)
+	defer cancelShutdown()
+	stopWorkCancellation := context.AfterFunc(shutdownCtx, cancelWork)
 
 	cancelErr := c.cancelConsumers()
 	processingErr := waitForConsumeLoop("avatar processing", processingResultCh)
 	deletionErr := waitForConsumeLoop("avatar deletion", deletionResultCh)
 	shutdownErr := errors.Join(cancelErr, processingErr, deletionErr)
-	if timer.Stop() {
+	if stopWorkCancellation() {
 		return shutdownErr
 	}
 
-	<-timedOutCh
 	return errors.Join(errConsumerShutdownTimeout, shutdownErr)
 }
 
