@@ -13,6 +13,7 @@ import (
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/queue/rabbitmq"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 	minioStorage "github.com/ZeroGravity-82/goph-profile/internal/storage/minio"
 	"github.com/ZeroGravity-82/goph-profile/internal/storage/postgres"
 	"github.com/ZeroGravity-82/goph-profile/internal/usecase"
@@ -55,9 +56,13 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 		logger = logging.NopLogger()
 	}
 
-	tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load tls certificate: %w", err)
+	var tlsConfig *tls.Config
+	if cfg.TLSCertPath != "" {
+		tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load tls certificate: %w", err)
+		}
+		tlsConfig = httpTLSConfig(tlsCert)
 	}
 
 	userRepo, err := postgres.NewUserRepository(db)
@@ -120,10 +125,10 @@ func buildApp(ctx context.Context, cfg config.ServerConfig, db *pgxpool.Pool, lo
 
 	httpSrv, err := httpserver.NewHTTPServer(
 		cfg.HTTPServerAddr,
-		httpTLSConfig(tlsCert),
+		tlsConfig,
 		avatarUseCase,
 		userUseCase,
-		httpserver.HealthChecks{
+		readiness.Checks{
 			"postgres": db.Ping,
 			"s3":       fileStorage.Ping,
 			"rabbitmq": publisher.Ping,
@@ -150,15 +155,8 @@ func httpTLSConfig(tlsCert tls.Certificate) *tls.Config {
 	}
 }
 
-// Run применяет миграции БД и запускает HTTP-сервер.
-//
-// Блокируется до остановки по сигналу завершения или из-за ошибки HTTP-сервера.
+// Run запускает HTTP-сервер и блокируется до остановки по сигналу завершения или из-за ошибки HTTP-сервера.
 func (a *App) Run(ctx context.Context) error {
-	err := a.runMigrations(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
-
 	return a.httpSrv.Run(ctx)
 }
 

@@ -12,21 +12,45 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
-// TestHealthHandler_getHealth проверяет успешную проверку состояния сервиса.
-func TestHealthHandler_getHealth(t *testing.T) {
+// TestHealthHandler_getLive проверяет успешный ответ ручки жизнеспособности без проверки внешних зависимостей.
+func TestHealthHandler_getLive(t *testing.T) {
 	// Arrange
-	handler := mustHealthHandler(t, okHealthChecks(), discardLogger())
-	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	checkCalled := false
+	handler := mustHealthHandler(t, readiness.Checks{
+		"dependency": func(_ context.Context) error {
+			checkCalled = true
+			return errors.New("dependency error")
+		},
+	}, discardLogger())
+	request := httptest.NewRequest(http.MethodGet, "/live", nil)
 	response := httptest.NewRecorder()
 
 	// Act
-	handler.getHealth(response, request)
+	handler.getLive(response, request)
 
 	// Assert
 	require.Equal(t, http.StatusOK, response.Code)
-	assertHealthResponse(t, response, dto.HealthResponse{
+	assert.Equal(t, "application/json", response.Header().Get("Content-Type"))
+	assert.JSONEq(t, `{"status":"ok"}`, response.Body.String())
+	assert.False(t, checkCalled)
+}
+
+// TestHealthHandler_getReady проверяет успешный ответ ручки готовности при доступности всех внешних зависимостей.
+func TestHealthHandler_getReady(t *testing.T) {
+	// Arrange
+	handler := mustHealthHandler(t, okReadinessChecks(), discardLogger())
+	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	response := httptest.NewRecorder()
+
+	// Act
+	handler.getReady(response, request)
+
+	// Assert
+	require.Equal(t, http.StatusOK, response.Code)
+	assertReadinessResponse(t, response, dto.ReadinessResponse{
 		Status: healthStatusOK,
 		Checks: map[string]string{
 			"postgres": healthStatusOK,
@@ -36,33 +60,33 @@ func TestHealthHandler_getHealth(t *testing.T) {
 	})
 }
 
-func assertHealthResponse(t *testing.T, response *httptest.ResponseRecorder, want dto.HealthResponse) {
+func assertReadinessResponse(t *testing.T, response *httptest.ResponseRecorder, want dto.ReadinessResponse) {
 	t.Helper()
 
 	assert.Equal(t, "application/json", response.Header().Get("Content-Type"))
 
-	var body dto.HealthResponse
+	var body dto.ReadinessResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 	assert.Equal(t, want, body)
 }
 
-// TestHealthHandler_getHealth_ReturnsServiceUnavailable проверяет ошибку при недоступной зависимости.
-func TestHealthHandler_getHealth_ReturnsServiceUnavailable(t *testing.T) {
+// TestHealthHandler_getReady_ReturnsServiceUnavailable проверяет неготовность сервиса при недоступной зависимости.
+func TestHealthHandler_getReady_ReturnsServiceUnavailable(t *testing.T) {
 	// Arrange
-	handler := mustHealthHandler(t, map[string]func(context.Context) error{
-		"postgres": okHealthCheck,
-		"s3":       healthCheckError(errors.New("s3 error")),
-		"rabbitmq": okHealthCheck,
+	handler := mustHealthHandler(t, readiness.Checks{
+		"postgres": okReadinessCheck,
+		"s3":       readinessCheckError(errors.New("s3 error")),
+		"rabbitmq": okReadinessCheck,
 	}, discardLogger())
-	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	response := httptest.NewRecorder()
 
 	// Act
-	handler.getHealth(response, request)
+	handler.getReady(response, request)
 
 	// Assert
 	require.Equal(t, http.StatusServiceUnavailable, response.Code)
-	assertHealthResponse(t, response, dto.HealthResponse{
+	assertReadinessResponse(t, response, dto.ReadinessResponse{
 		Status: healthStatusDegraded,
 		Checks: map[string]string{
 			"postgres": healthStatusOK,

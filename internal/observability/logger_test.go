@@ -196,6 +196,34 @@ func Test_newStdoutLogHandler_RejectsBadFormat(t *testing.T) {
 	assert.Nil(t, handler)
 }
 
+// TestNewStdoutLogger_RejectsBadLevel проверяет ошибку настройки уровня stdout-логгера.
+func TestNewStdoutLogger_RejectsBadLevel(t *testing.T) {
+	// Arrange
+	cfg := config.Logging{Level: "trace", Format: "json"}
+
+	// Act
+	logger, err := NewStdoutLogger(cfg)
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, `unsupported log level: "trace"`, err.Error())
+	assert.Nil(t, logger)
+}
+
+// TestNewStdoutLogger_RejectsBadFormat проверяет ошибку настройки формата stdout-логгера.
+func TestNewStdoutLogger_RejectsBadFormat(t *testing.T) {
+	// Arrange
+	cfg := config.Logging{Level: "info", Format: "yaml"}
+
+	// Act
+	logger, err := NewStdoutLogger(cfg)
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, `unsupported log format: "yaml"`, err.Error())
+	assert.Nil(t, logger)
+}
+
 // TestNewLogger_RejectsBadLevel проверяет ошибку настройки уровня логирования.
 func TestNewLogger_RejectsBadLevel(t *testing.T) {
 	// Arrange

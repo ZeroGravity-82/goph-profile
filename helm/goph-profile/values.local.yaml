@@ -1,0 +1,54 @@
+# Локальное Kubernetes-окружение. Учетные данные ниже предназначены только для Rancher Desktop.
+image:
+  repository: goph-profile
+  pullPolicy: IfNotPresent
+  tag: local
+
+ingress:
+  host: localhost
+
+# Небольшие запросы ресурсов позволяют последовательно обновлять поды в локальном кластере из одного узла.
+server:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+worker:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+monitoring:
+  prometheusRule:
+    labels:
+      release: monitoring
+
+otelCollector:
+  enabled: true
+  serviceMonitor:
+    labels:
+      release: monitoring
+  config:
+    opensearchEndpoint: http://opensearch:9200
+    jaegerEndpoint: jaeger:4317
+
+config:
+  fileStorage:
+    endpoint: minio:9000
+    useSSL: false
+  logging:
+    format: json
+    level: debug
+    addSource: true
+  otel:
+    resourceAttributes: deployment.environment=local
+
+# Эти значения совпадают с Secret из deploy/kubernetes/local/dependencies.yaml.
+# Для прода используйте отдельный игнорируемый values-файл с реальными секретами.
+secret:
+  databaseURI: postgres://goph-profile:goph-profile-local@postgresql:5432/gophprofile?sslmode=disable
+  fileStorageAccessKey: goph-profile
+  fileStorageSecretKey: goph-profile-local-secret
+  queueURL: amqp://goph-profile:goph-profile-local@rabbitmq:5672/

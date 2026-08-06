@@ -1,0 +1,15 @@
+{{- if and .Values.otelCollector.enabled .Values.otelCollector.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "goph-profile.otelCollectorName" . }}
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+spec:
+  minAvailable: {{ .Values.otelCollector.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "goph-profile.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: otel-collector
+{{- end }}

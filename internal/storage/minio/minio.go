@@ -7,16 +7,21 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	minioV7 "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+const minioOperationTimeout = 30 * time.Second
+
 // MinIOStorage хранит файлы аватарок в S3-совместимом объектном хранилище.
 type MinIOStorage struct {
-	client *minioV7.Client
-	bucket string
+	client           *minioV7.Client
+	bucket           string
+	breaker          *minioCircuitBreaker
+	operationTimeout time.Duration
 }
 
 // NewMinIOStorage создает MinIOStorage, проверяет наличие bucket и создает его при необходимости.
@@ -59,7 +64,12 @@ func NewMinIOStorage(
 		}
 	}
 
-	return &MinIOStorage{client: client, bucket: bucket}, nil
+	return &MinIOStorage{
+		client:           client,
+		bucket:           bucket,
+		breaker:          newMinIOCircuitBreaker(minioCircuitBreakerFailureThreshold, minioCircuitBreakerTimeout),
+		operationTimeout: minioOperationTimeout,
+	}, nil
 }
 
 // ObjectKeyOriginal возвращает стабильный ключ исходного файла аватарки в объектном хранилище.
@@ -87,15 +97,21 @@ func (s *MinIOStorage) Put(ctx context.Context, objectKey string, content []byte
 		return err
 	}
 
-	reader := bytes.NewReader(content)
-	_, err := s.client.PutObject(
-		ctx,
-		s.bucket,
-		objectKey,
-		reader,
-		int64(len(content)),
-		minioV7.PutObjectOptions{},
-	)
+	operationCtx, cancel := context.WithTimeout(ctx, s.operationTimeout)
+	defer cancel()
+
+	err := s.breaker.Execute(func() error {
+		reader := bytes.NewReader(content)
+		_, err := s.client.PutObject(
+			operationCtx,
+			s.bucket,
+			objectKey,
+			reader,
+			int64(len(content)),
+			minioV7.PutObjectOptions{},
+		)
+		return err
+	})
 	if err != nil {
 		err = fmt.Errorf("failed to put minio object: %w", err)
 		recordSpanError(span, err)
@@ -140,19 +156,24 @@ func (s *MinIOStorage) Get(ctx context.Context, objectKey string) ([]byte, error
 		return nil, err
 	}
 
-	object, err := s.client.GetObject(ctx, s.bucket, objectKey, minioV7.GetObjectOptions{})
+	operationCtx, cancel := context.WithTimeout(ctx, s.operationTimeout)
+	defer cancel()
+
+	var content []byte
+	err := s.breaker.Execute(func() error {
+		object, err := s.client.GetObject(operationCtx, s.bucket, objectKey, minioV7.GetObjectOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = object.Close()
+		}()
+
+		content, err = io.ReadAll(object)
+		return err
+	})
 	if err != nil {
 		err = fmt.Errorf("failed to get minio object: %w", err)
-		recordSpanError(span, err)
-		return nil, err
-	}
-	defer func() {
-		_ = object.Close()
-	}()
-
-	content, err := io.ReadAll(object)
-	if err != nil {
-		err = fmt.Errorf("failed to read minio object: %w", err)
 		recordSpanError(span, err)
 		return nil, err
 	}
@@ -169,7 +190,12 @@ func (s *MinIOStorage) Delete(ctx context.Context, objectKey string) error {
 		return err
 	}
 
-	if err := s.client.RemoveObject(ctx, s.bucket, objectKey, minioV7.RemoveObjectOptions{}); err != nil {
+	operationCtx, cancel := context.WithTimeout(ctx, s.operationTimeout)
+	defer cancel()
+
+	if err := s.breaker.Execute(func() error {
+		return s.client.RemoveObject(operationCtx, s.bucket, objectKey, minioV7.RemoveObjectOptions{})
+	}); err != nil {
 		err = fmt.Errorf("failed to delete minio object: %w", err)
 		recordSpanError(span, err)
 		return err

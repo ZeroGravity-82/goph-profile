@@ -22,4 +22,5 @@ func Test_run_ReturnsAppInitError(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "app init error")
+	assert.Contains(t, err.Error(), "failed to connect to the database")
 }

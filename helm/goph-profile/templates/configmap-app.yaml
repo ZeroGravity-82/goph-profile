@@ -1,0 +1,27 @@
+{{/* Общая конфигурация server и worker. */}}
+{{- $otelEndpoint := .Values.config.otel.endpoint }}
+{{- if .Values.otelCollector.enabled }}
+{{- $otelEndpoint = printf "http://%s:%v" (include "goph-profile.otelCollectorName" .) .Values.otelCollector.ports.otlpGrpc }}
+{{- else }}
+{{- $otelEndpoint = required "config.otel.endpoint is required when otelCollector.enabled is false" $otelEndpoint }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "goph-profile.configMapName" . }}
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+data:
+  GOPH_PROFILE_FILE_STORAGE_ENDPOINT: {{ .Values.config.fileStorage.endpoint | quote }}
+  GOPH_PROFILE_FILE_STORAGE_BUCKET: {{ .Values.config.fileStorage.bucket | quote }}
+  GOPH_PROFILE_FILE_STORAGE_USE_SSL: {{ .Values.config.fileStorage.useSSL | quote }}
+  GOPH_PROFILE_QUEUE_EXCHANGE: {{ .Values.config.queue.exchange | quote }}
+  GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE: {{ .Values.config.queue.avatarProcessingQueue | quote }}
+  GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE: {{ .Values.config.queue.avatarDeletionQueue | quote }}
+  GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY: {{ .Values.config.queue.avatarProcessingRoutingKey | quote }}
+  GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY: {{ .Values.config.queue.avatarDeletionRoutingKey | quote }}
+  GOPH_PROFILE_LOGGING_FORMAT: {{ .Values.config.logging.format | quote }}
+  GOPH_PROFILE_LOGGING_LEVEL: {{ .Values.config.logging.level | quote }}
+  GOPH_PROFILE_LOGGING_ADD_SOURCE: {{ .Values.config.logging.addSource | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ $otelEndpoint | quote }}
+  OTEL_EXPORTER_OTLP_INSECURE: {{ .Values.config.otel.insecure | quote }}

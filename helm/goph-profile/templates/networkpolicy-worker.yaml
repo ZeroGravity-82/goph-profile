@@ -1,0 +1,52 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "goph-profile.fullname" . }}-worker
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "goph-profile.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.dns.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dns.podSelector | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: {{ .Values.networkPolicy.ports.database }}
+          protocol: TCP
+        - port: {{ .Values.networkPolicy.ports.fileStorage }}
+          protocol: TCP
+        - port: {{ .Values.networkPolicy.ports.queue }}
+          protocol: TCP
+    {{- if .Values.otelCollector.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "goph-profile.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: otel-collector
+      ports:
+        - port: {{ .Values.otelCollector.ports.otlpGrpc }}
+          protocol: TCP
+    {{- else }}
+    - ports:
+        - port: {{ .Values.networkPolicy.ports.externalOTLP }}
+          protocol: TCP
+    {{- end }}
+{{- end }}

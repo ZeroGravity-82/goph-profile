@@ -13,6 +13,7 @@ vendor/
 # Sensitive data
 .env
 .env.test
-config/client.local.yaml
+config/migrate.local.yaml
 config/server.local.yaml
 config/worker.local.yaml
+helm/goph-profile/values.secret.yaml

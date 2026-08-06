@@ -1,0 +1,127 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "goph-profile.fullname" . }}-alerts
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: goph-profile.application
+      interval: {{ .Values.monitoring.prometheusRule.interval | quote }}
+      rules:
+        - alert: GophProfileHighHTTPErrorRate
+          expr: |
+            (
+              sum(
+                rate(
+                  http_server_requests_total{
+                    job="goph-profile-server",
+                    http_response_status_code=~"5.."
+                  }[{{ .Values.monitoring.prometheusRule.evaluationWindow }}]
+                )
+              )
+              /
+              sum(
+                rate(
+                  http_server_requests_total{
+                    job="goph-profile-server"
+                  }[{{ .Values.monitoring.prometheusRule.evaluationWindow }}]
+                )
+              )
+            ) > {{ .Values.monitoring.prometheusRule.httpErrorRateThreshold }}
+          for: {{ .Values.monitoring.prometheusRule.for | quote }}
+          labels:
+            severity: warning
+            component: server
+          annotations:
+            summary: Высокая доля ошибок HTTP-сервера GophProfile
+            description: >-
+              Доля ответов с кодом 5xx превышает
+              {{ mulf .Values.monitoring.prometheusRule.httpErrorRateThreshold 100 }}%
+              в течение {{ .Values.monitoring.prometheusRule.for }}.
+        - alert: GophProfileHighHTTPResponseTime
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(
+                  http_server_request_duration_seconds_bucket{
+                    job="goph-profile-server",
+                    otel_scope_name="go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+                  }[{{ .Values.monitoring.prometheusRule.evaluationWindow }}]
+                )
+              )
+            ) > {{ .Values.monitoring.prometheusRule.httpDurationP95ThresholdSeconds }}
+          for: {{ .Values.monitoring.prometheusRule.for | quote }}
+          labels:
+            severity: warning
+            component: server
+          annotations:
+            summary: Высокое время ответа HTTP-сервера GophProfile
+            description: >-
+              95-й процентиль времени ответа превышает
+              {{ .Values.monitoring.prometheusRule.httpDurationP95ThresholdSeconds }} секунды
+              в течение {{ .Values.monitoring.prometheusRule.for }}.
+        - alert: GophProfileHighWorkerFailureRate
+          expr: |
+            (
+              sum(
+                rate(
+                  avatar_worker_jobs_total{
+                    job="goph-profile-worker",
+                    status=~"error|failed"
+                  }[{{ .Values.monitoring.prometheusRule.evaluationWindow }}]
+                )
+              )
+              /
+              sum(
+                rate(
+                  avatar_worker_jobs_total{
+                    job="goph-profile-worker"
+                  }[{{ .Values.monitoring.prometheusRule.evaluationWindow }}]
+                )
+              )
+            ) > {{ .Values.monitoring.prometheusRule.workerFailureRateThreshold }}
+          for: {{ .Values.monitoring.prometheusRule.for | quote }}
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: Высокая доля ошибок воркера GophProfile
+            description: >-
+              Доля завершившихся ошибкой задач превышает
+              {{ mulf .Values.monitoring.prometheusRule.workerFailureRateThreshold 100 }}%
+              в течение {{ .Values.monitoring.prometheusRule.for }}.
+        {{- if .Values.otelCollector.enabled }}
+        - alert: GophProfileOTelCollectorUnavailable
+          expr: |
+            (
+              max(
+                up{
+                  namespace={{ .Release.Namespace | quote }},
+                  service={{ include "goph-profile.otelCollectorName" . | quote }}
+                }
+              ) < 1
+            )
+            or
+            absent(
+              up{
+                namespace={{ .Release.Namespace | quote }},
+                service={{ include "goph-profile.otelCollectorName" . | quote }}
+              }
+            )
+          for: {{ .Values.monitoring.prometheusRule.for | quote }}
+          labels:
+            severity: critical
+            component: otel-collector
+          annotations:
+            summary: OpenTelemetry Collector GophProfile недоступен
+            description: >-
+              Prometheus не может собирать метрики ни с одной реплики OpenTelemetry Collector
+              в течение {{ .Values.monitoring.prometheusRule.for }}.
+        {{- end }}
+{{- end }}

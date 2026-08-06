@@ -1,0 +1,80 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "goph-profile.otelCollectorName" . }}
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: {{ printf "0.0.0.0:%v" .Values.otelCollector.ports.otlpGrpc }}
+
+    processors:
+      batch:
+        timeout: 10s
+        send_batch_size: 1024
+
+      resource/add-job:
+        attributes:
+          - key: job
+            from_attribute: service.name
+            action: upsert
+
+    exporters:
+      prometheus:
+        endpoint: {{ printf "0.0.0.0:%v" .Values.otelCollector.ports.metrics }}
+
+      opensearch/logs:
+        http:
+          endpoint: {{ .Values.otelCollector.config.opensearchEndpoint }}
+        logs_index: "otel-logs-%{service.name}"
+        logs_index_fallback: "default"
+        logs_index_time_format: "yyyy.MM.dd"
+        retry_on_failure:
+          enabled: true
+          initial_interval: 5s
+          max_interval: 30s
+          max_elapsed_time: 10m
+        sending_queue:
+          enabled: true
+          num_consumers: 1
+          queue_size: 10
+
+      otlp/jaeger:
+        endpoint: {{ .Values.otelCollector.config.jaegerEndpoint }}
+        tls:
+          insecure: true
+
+    extensions:
+      health_check:
+        endpoint: {{ printf "0.0.0.0:%v" .Values.otelCollector.ports.health }}
+
+    service:
+      extensions: [health_check]
+      pipelines:
+        logs:
+          receivers: [otlp]
+          processors:
+            - resource/add-job
+            - batch
+          exporters: [opensearch/logs]
+
+        metrics:
+          receivers: [otlp]
+          processors:
+            - resource/add-job
+            - batch
+          exporters: [prometheus]
+
+        traces:
+          receivers: [otlp]
+          processors:
+            - resource/add-job
+            - batch
+          exporters: [otlp/jaeger]
+{{- end }}

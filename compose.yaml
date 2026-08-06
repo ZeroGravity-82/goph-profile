@@ -1,4 +1,25 @@
 services:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: goph-profile:local
+    entrypoint: ["/app/migrate"]
+    environment:
+      GOPH_PROFILE_DATABASE_URI: ${GOPH_PROFILE_DATABASE_URI:?}
+      GOPH_PROFILE_LOGGING_FORMAT: json
+      GOPH_PROFILE_LOGGING_LEVEL: debug
+      GOPH_PROFILE_LOGGING_ADD_SOURCE: "true"
+      OTEL_SERVICE_NAME: goph-profile-migrate
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: true
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
   nginx:
     image: nginx:1.29-alpine
     ports:
@@ -43,6 +64,8 @@ services:
     volumes:
       - ./certs:/app/certs:ro
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgresql:
         condition: service_healthy
       minio:
@@ -57,7 +80,10 @@ services:
       dockerfile: docker/Dockerfile
     image: goph-profile:local
     entrypoint: ["/app/worker"]
+    ports:
+      - "3203:3203"
     environment:
+      GOPH_PROFILE_HEALTH_ADDRESS: 0.0.0.0:3203
       GOPH_PROFILE_DATABASE_URI: ${GOPH_PROFILE_DATABASE_URI:?}
       GOPH_PROFILE_FILE_STORAGE_ENDPOINT: minio:9000
       GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY: ${GOPH_PROFILE_MINIO_ROOT_USER:?}
@@ -78,6 +104,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_INSECURE: true
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgresql:
         condition: service_healthy
       minio:

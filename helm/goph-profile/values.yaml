@@ -1,0 +1,156 @@
+image:
+  repository: goph-profile
+  pullPolicy: IfNotPresent
+  tag: ""
+
+migrate:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+server:
+  port: 3202
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+ingress:
+  className: traefik
+  host: localhost
+  rateLimit:
+    enabled: true
+    average: 10
+    burst: 20
+    period: 1s
+
+monitoring:
+  grafanaDashboard:
+    enabled: true
+  prometheusRule:
+    enabled: true
+    labels: {}
+    interval: 30s
+    evaluationWindow: 5m
+    for: 2m
+    httpErrorRateThreshold: 0.05
+    httpDurationP95ThresholdSeconds: 2
+    workerFailureRateThreshold: 0.1
+
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespace: kube-system
+    podSelector:
+      app.kubernetes.io/name: traefik
+  prometheus:
+    namespace: monitoring
+    podSelector:
+      app.kubernetes.io/name: prometheus
+  dns:
+    namespace: kube-system
+    podSelector:
+      k8s-app: kube-dns
+  ports:
+    database: 5432
+    fileStorage: 9000
+    queue: 5672
+    externalOTLP: 4317
+    opensearch: 9200
+    jaeger: 4317
+
+worker:
+  healthPort: 3203
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+otelCollector:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    pullPolicy: IfNotPresent
+    tag: "0.143.0"
+  ports:
+    otlpGrpc: 4317
+    metrics: 8889
+    health: 13133
+  config:
+    opensearchEndpoint: http://opensearch:9200
+    jaegerEndpoint: jaeger:4317
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  serviceMonitor:
+    labels: {}
+    interval: 30s
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+config:
+  fileStorage:
+    endpoint: minio:9000
+    bucket: goph-profile
+    useSSL: false
+  queue:
+    exchange: goph-profile.avatar
+    avatarProcessingQueue: goph-profile.avatar-processing
+    avatarDeletionQueue: goph-profile.avatar-deletion
+    avatarProcessingRoutingKey: avatar.process
+    avatarDeletionRoutingKey: avatar.delete
+  logging:
+    format: json
+    level: info
+    addSource: false
+  otel:
+    # Внешний endpoint обязателен, если встроенный OpenTelemetry Collector отключен.
+    endpoint: ""
+    insecure: true
+    # service.instance.id с UID pod добавляется к этим атрибутам автоматически.
+    resourceAttributes: deployment.environment=local
+
+# Значения-заглушки нужно переопределить при установке, не коммитя реальные секреты.
+secret:
+  databaseURI: postgres://goph-profile:change-me@postgresql:5432/gophprofile?sslmode=disable
+  fileStorageAccessKey: change-me
+  fileStorageSecretKey: change-me
+  queueURL: amqp://goph-profile:change-me@rabbitmq:5672/
+
+# Локальный или production values-файл должен передать действующую TLS-пару для Ingress.
+tls:
+  certificate: |
+    replace-with-tls-certificate
+  privateKey: |
+    replace-with-tls-private-key

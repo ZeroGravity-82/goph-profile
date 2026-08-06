@@ -1,0 +1,79 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "goph-profile.otelCollectorName" . }}
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+spec:
+  replicas: {{ .Values.otelCollector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "goph-profile.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: otel-collector
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-otel-collector.yaml") . | sha256sum }}
+      labels:
+        {{- include "goph-profile.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: otel-collector
+    spec:
+      serviceAccountName: {{ include "goph-profile.otelCollectorName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "goph-profile.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: otel-collector
+      containers:
+        - name: otel-collector
+          image: {{ printf "%s:%s" .Values.otelCollector.image.repository .Values.otelCollector.image.tag | quote }}
+          imagePullPolicy: {{ .Values.otelCollector.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          args:
+            - --config=/etc/otel-collector/config.yaml
+          ports:
+            - name: otlp-grpc
+              containerPort: {{ .Values.otelCollector.ports.otlpGrpc }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.otelCollector.ports.metrics }}
+              protocol: TCP
+            - name: health
+              containerPort: {{ .Values.otelCollector.ports.health }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 5
+          resources:
+            {{- toYaml .Values.otelCollector.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otel-collector
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "goph-profile.otelCollectorName" . }}
+{{- end }}

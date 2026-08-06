@@ -81,9 +81,9 @@ type Queue struct {
 //
 // HTTPServerAddr - адрес HTTP-сервера в формате host:port.
 //
-// TLSCertPath - путь к TLS-сертификату HTTP-сервера.
+// TLSCertPath - путь к TLS-сертификату HTTP-сервера. Пустое значение вместе с TLSKeyPath отключает TLS.
 //
-// TLSKeyPath - путь к приватному TLS-ключу HTTP-сервера.
+// TLSKeyPath - путь к приватному TLS-ключу HTTP-сервера. Пустое значение вместе с TLSCertPath отключает TLS.
 //
 // DatabaseURI - строка подключения к базе данных.
 //
@@ -122,8 +122,8 @@ func parseServerFlags(args []string) (*pflag.FlagSet, string, error) {
 	flags := pflag.NewFlagSet("goph-profile-server", pflag.ContinueOnError)
 	flags.StringP("config", "c", "", "path to config file")
 	flags.String("http-address", "", `HTTP server address (default "`+defaultHTTPServerAddr+`")`)
-	flags.String("tls-cert", "", "TLS certificate path for HTTP server")
-	flags.String("tls-key", "", "TLS private key path for HTTP server")
+	flags.String("tls-cert", "", "TLS certificate path for HTTP server; leave both TLS paths empty to disable TLS")
+	flags.String("tls-key", "", "TLS private key path for HTTP server; leave both TLS paths empty to disable TLS")
 	addCommonFlags(flags)
 
 	if err := flags.Parse(args); err != nil {
@@ -148,11 +148,11 @@ func validateServerConfig(cfg ServerConfig) error {
 	if err := validateServerAddr(cfg.HTTPServerAddr); err != nil {
 		return err
 	}
-	if cfg.TLSCertPath == "" {
-		return errors.New("TLS certificate path is required")
+	if cfg.TLSCertPath == "" && cfg.TLSKeyPath != "" {
+		return errors.New("TLS certificate path is required when TLS private key path is provided")
 	}
-	if cfg.TLSKeyPath == "" {
-		return errors.New("TLS private key path is required")
+	if cfg.TLSCertPath != "" && cfg.TLSKeyPath == "" {
+		return errors.New("TLS private key path is required when TLS certificate path is provided")
 	}
 	return validateCommonConfig(cfg.DatabaseURI, cfg.FileStorage, cfg.Queue)
 }

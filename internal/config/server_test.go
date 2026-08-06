@@ -2,8 +2,6 @@ package config
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -163,6 +161,66 @@ func TestLoadServer_RejectsInvalidHTTPServerAddr(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "server address must be in the format host:port")
+}
+
+// TestLoadServer_DisablesTLSForEmptyPaths проверяет отключение TLS при пустых путях к сертификату и ключу.
+func TestLoadServer_DisablesTLSForEmptyPaths(t *testing.T) {
+	// Arrange
+	unsetConfigEnv(t)
+	t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
+	t.Setenv("GOPH_PROFILE_TLS_CERT", "")
+	t.Setenv("GOPH_PROFILE_TLS_KEY", "")
+	setRequiredFileStorageEnv(t)
+	setRequiredQueueEnv(t)
+	setArgs(t, "server")
+
+	// Act
+	cfg, err := LoadServer()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Empty(t, cfg.TLSCertPath)
+	assert.Empty(t, cfg.TLSKeyPath)
+}
+
+// TestLoadServer_RejectsIncompleteTLSConfig проверяет обязательность совместного указания сертификата и ключа.
+func TestLoadServer_RejectsIncompleteTLSConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		certPath   string
+		keyPath    string
+		wantErrMsg string
+	}{
+		{
+			name:       "certificate only",
+			certPath:   "certs/server.crt",
+			wantErrMsg: "TLS private key path is required when TLS certificate path is provided",
+		},
+		{
+			name:       "private key only",
+			keyPath:    "certs/server.key",
+			wantErrMsg: "TLS certificate path is required when TLS private key path is provided",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			unsetConfigEnv(t)
+			t.Setenv("GOPH_PROFILE_DATABASE_URI", "postgres://user:pass@localhost/db")
+			t.Setenv("GOPH_PROFILE_TLS_CERT", tt.certPath)
+			t.Setenv("GOPH_PROFILE_TLS_KEY", tt.keyPath)
+			setRequiredFileStorageEnv(t)
+			setRequiredQueueEnv(t)
+			setArgs(t, "server")
+
+			// Act
+			_, err := LoadServer()
+
+			// Assert
+			require.EqualError(t, err, tt.wantErrMsg)
+		})
+	}
 }
 
 // TestLoadServer_LoadsDefaults проверяет значения по умолчанию.
@@ -345,74 +403,4 @@ queue:
 	// Assert
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "database URI is required")
-}
-
-func setRequiredFileStorageEnv(t *testing.T) {
-	t.Helper()
-
-	t.Setenv("GOPH_PROFILE_FILE_STORAGE_ENDPOINT", "localhost:9000")
-	t.Setenv("GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY", "access")
-	t.Setenv("GOPH_PROFILE_FILE_STORAGE_SECRET_KEY", "secret")
-	t.Setenv("GOPH_PROFILE_FILE_STORAGE_BUCKET", "goph-profile")
-}
-
-func setRequiredQueueEnv(t *testing.T) {
-	t.Helper()
-
-	t.Setenv("GOPH_PROFILE_QUEUE_URL", "amqp://user:pass@localhost:5672/")
-	t.Setenv("GOPH_PROFILE_QUEUE_EXCHANGE", "goph-profile.avatar")
-	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE", "goph-profile.avatar-processing")
-	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE", "goph-profile.avatar-deletion")
-	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY", "avatar.process")
-	t.Setenv("GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY", "avatar.delete")
-}
-
-func unsetConfigEnv(t *testing.T) {
-	t.Helper()
-
-	for _, key := range []string{
-		"GOPH_PROFILE_HTTP_ADDRESS",
-		"GOPH_PROFILE_TLS_CERT",
-		"GOPH_PROFILE_TLS_KEY",
-		"GOPH_PROFILE_DATABASE_URI",
-		"GOPH_PROFILE_FILE_STORAGE_ENDPOINT",
-		"GOPH_PROFILE_FILE_STORAGE_ACCESS_KEY",
-		"GOPH_PROFILE_FILE_STORAGE_SECRET_KEY",
-		"GOPH_PROFILE_FILE_STORAGE_BUCKET",
-		"GOPH_PROFILE_FILE_STORAGE_USE_SSL",
-		"GOPH_PROFILE_QUEUE_URL",
-		"GOPH_PROFILE_QUEUE_EXCHANGE",
-		"GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_QUEUE",
-		"GOPH_PROFILE_QUEUE_AVATAR_DELETION_QUEUE",
-		"GOPH_PROFILE_QUEUE_AVATAR_PROCESSING_ROUTING_KEY",
-		"GOPH_PROFILE_QUEUE_AVATAR_DELETION_ROUTING_KEY",
-		"GOPH_PROFILE_LOGGING_FORMAT",
-		"GOPH_PROFILE_LOGGING_LEVEL",
-		"GOPH_PROFILE_LOGGING_ADD_SOURCE",
-	} {
-		unsetEnv(t, key)
-	}
-}
-
-func unsetEnv(t *testing.T, key string) {
-	t.Helper()
-
-	oldValue, existed := os.LookupEnv(key)
-	require.NoError(t, os.Unsetenv(key))
-	t.Cleanup(func() {
-		if existed {
-			require.NoError(t, os.Setenv(key, oldValue))
-			return
-		}
-		require.NoError(t, os.Unsetenv(key))
-	})
-}
-
-func writeTempConfig(t *testing.T, content string) string {
-	t.Helper()
-
-	path := filepath.Join(t.TempDir(), "config.yaml")
-	err := os.WriteFile(path, []byte(content), 0o600)
-	require.NoError(t, err)
-	return path
 }

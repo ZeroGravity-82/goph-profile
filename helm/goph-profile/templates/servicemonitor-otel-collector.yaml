@@ -1,0 +1,22 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "goph-profile.otelCollectorName" . }}
+  labels:
+    {{- include "goph-profile.labels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+    {{- with .Values.otelCollector.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "goph-profile.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: otel-collector
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.otelCollector.serviceMonitor.interval }}
+      honorLabels: true
+{{- end }}

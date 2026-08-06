@@ -32,8 +32,10 @@ set +a
 tmp_dir="$(mktemp -d /tmp/goph-profile-e2e.XXXXXX)"
 server_log="$tmp_dir/server.log"
 worker_log="$tmp_dir/worker.log"
+migrate_log="$tmp_dir/migrate.log"
 server_bin="$tmp_dir/server"
 worker_bin="$tmp_dir/worker"
+migrate_bin="$tmp_dir/migrate"
 processes=()
 
 dump_logs() {
@@ -43,6 +45,9 @@ dump_logs() {
 	echo
 	echo "worker log:"
 	tail -n 120 "$worker_log" 2>/dev/null || true
+	echo
+	echo "migrate log:"
+	tail -n 120 "$migrate_log" 2>/dev/null || true
 }
 
 cleanup() {
@@ -223,6 +228,13 @@ cd "$repo_root"
 
 go build -o "$server_bin" ./cmd/server
 go build -o "$worker_bin" ./cmd/worker
+go build -o "$migrate_bin" ./cmd/migrate
+
+if ! "$migrate_bin" >"$migrate_log" 2>&1; then
+	echo "migration failed" >&2
+	cat "$migrate_log" >&2
+	exit 1
+fi
 
 "$server_bin" >"$server_log" 2>&1 &
 server_pid=$!

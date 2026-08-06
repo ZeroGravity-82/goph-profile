@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 func mustAvatarHandler(t *testing.T, avatarUseCase avatarUseCase, logger *slog.Logger) *AvatarHandler {
@@ -29,7 +31,7 @@ func mustUserHandler(t *testing.T, userUseCase userUseCase, logger *slog.Logger)
 
 func mustHealthHandler(
 	t *testing.T,
-	checks map[string]func(context.Context) error,
+	checks readiness.Checks,
 	logger *slog.Logger,
 ) *HealthHandler {
 	t.Helper()
@@ -44,30 +46,30 @@ func mustRouter(
 	t *testing.T,
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
-	healthChecks map[string]func(context.Context) error,
+	readinessChecks readiness.Checks,
 	logger *slog.Logger,
 ) http.Handler {
 	t.Helper()
 
-	router, err := NewRouter(avatarUseCase, userUseCase, healthChecks, logger)
+	router, err := NewRouter(avatarUseCase, userUseCase, readinessChecks, logger)
 	require.NoError(t, err)
 
 	return router
 }
 
-func okHealthChecks() map[string]func(context.Context) error {
-	return map[string]func(context.Context) error{
-		"postgres": okHealthCheck,
-		"s3":       okHealthCheck,
-		"rabbitmq": okHealthCheck,
+func okReadinessChecks() readiness.Checks {
+	return readiness.Checks{
+		"postgres": okReadinessCheck,
+		"s3":       okReadinessCheck,
+		"rabbitmq": okReadinessCheck,
 	}
 }
 
-func okHealthCheck(_ context.Context) error {
+func okReadinessCheck(_ context.Context) error {
 	return nil
 }
 
-func healthCheckError(err error) func(context.Context) error {
+func readinessCheckError(err error) func(context.Context) error {
 	return func(_ context.Context) error {
 		return err
 	}

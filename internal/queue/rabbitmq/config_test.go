@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -140,6 +141,45 @@ func TestPublisher_PingCanceledContext(t *testing.T) {
 
 	// Assert
 	require.EqualError(t, err, "failed to ping rabbitmq: context canceled")
+}
+
+// TestConsumer_Ping проверяет готовность запущенного консьюмера с открытыми подключением и каналами.
+func TestConsumer_Ping(t *testing.T) {
+	// Arrange
+	consumer := &Consumer{
+		conn:              &amqp.Connection{},
+		processingChannel: newShutdownDeliverySubscriberFake(),
+		deletionChannel:   newShutdownDeliverySubscriberFake(),
+	}
+	consumer.ready.Store(true)
+
+	// Act
+	err := consumer.Ping(context.Background())
+
+	// Assert
+	require.NoError(t, err)
+}
+
+// TestConsumer_PingBeforeRun проверяет неготовность консьюмера до запуска чтения сообщений.
+func TestConsumer_PingBeforeRun(t *testing.T) {
+	// Act
+	err := (&Consumer{}).Ping(context.Background())
+
+	// Assert
+	require.ErrorIs(t, err, errConsumerNotReady)
+}
+
+// TestConsumer_PingCanceledContext проверяет отмену контекста до проверки готовности консьюмера.
+func TestConsumer_PingCanceledContext(t *testing.T) {
+	// Arrange
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Act
+	err := (&Consumer{}).Ping(ctx)
+
+	// Assert
+	require.EqualError(t, err, "failed to ping rabbitmq consumer: context canceled")
 }
 
 func validRabbitMQConfig() Config {

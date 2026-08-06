@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
 	"github.com/ZeroGravity-82/goph-profile/internal/observability"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 const apiPathPrefix = "/api/v1"
@@ -30,11 +30,13 @@ const apiPathPrefix = "/api/v1"
 //	DELETE /api/v1/avatars/{avatar_id}
 //	GET    /api/v1/users/{user_id}/avatar
 //	GET    /api/v1/users/{user_id}/avatars
+//	GET    /live
+//	GET    /ready
 //	GET    /health
 func NewRouter(
 	avatarUseCase avatarUseCase,
 	userUseCase userUseCase,
-	healthChecks map[string]func(context.Context) error,
+	readinessChecks readiness.Checks,
 	logger *slog.Logger,
 ) (http.Handler, error) {
 	if logger == nil {
@@ -62,7 +64,7 @@ func NewRouter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user handler: %w", err)
 	}
-	healthHandler, err := NewHealthHandler(healthChecks, logger)
+	healthHandler, err := NewHealthHandler(readinessChecks, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create health handler: %w", err)
 	}
@@ -79,7 +81,9 @@ func NewRouter(
 		r.With(middleware.AllowContentType("application/json")).Patch("/avatar", avatarHandler.selectCurrentAvatar)
 		r.Delete("/avatar", avatarHandler.deleteCurrentAvatar)
 	})
-	r.Get("/health", healthHandler.getHealth)
+	r.Get("/live", healthHandler.getLive)
+	r.Get("/ready", healthHandler.getReady)
+	r.Get("/health", healthHandler.getReady)
 
 	// otelhttp создает server span трассировки для каждого входящего HTTP-запроса.
 	// withHTTPRouteTracing уточняет имя span и http.route после того, как chi выбрал маршрут.

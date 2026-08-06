@@ -1,74 +1,71 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/ZeroGravity-82/goph-profile/internal/httpserver/dto"
 	"github.com/ZeroGravity-82/goph-profile/internal/logging"
+	"github.com/ZeroGravity-82/goph-profile/internal/readiness"
 )
 
 const (
-	healthCheckTimeout   = 2 * time.Second
 	healthStatusOK       = "ok"
 	healthStatusError    = "error"
 	healthStatusDegraded = "degraded"
 )
 
-// HealthHandler обрабатывает HTTP-запрос проверки состояния сервиса и его внешних зависимостей.
+// HealthHandler обрабатывает HTTP-запросы проверки жизнеспособности и готовности сервиса.
 type HealthHandler struct {
-	checks map[string]func(context.Context) error
-	logger *slog.Logger
+	readinessChecks readiness.Checks
+	logger          *slog.Logger
 }
 
 // NewHealthHandler создает HealthHandler.
-func NewHealthHandler(checks map[string]func(context.Context) error, logger *slog.Logger) (*HealthHandler, error) {
-	if checks == nil {
-		return nil, errors.New("health checks are not provided")
+func NewHealthHandler(readinessChecks readiness.Checks, logger *slog.Logger) (*HealthHandler, error) {
+	if readinessChecks == nil {
+		return nil, errors.New("readiness checks are not provided")
 	}
 	if logger == nil {
 		logger = logging.NopLogger()
 	}
 
 	return &HealthHandler{
-		checks: checks,
-		logger: logger.With("component", "httpserver.health_handler"),
+		readinessChecks: readinessChecks,
+		logger:          logger.With("component", "httpserver.health_handler"),
 	}, nil
 }
 
-// getHealth выполняет именованные проверки внешних зависимостей и возвращает общий статус сервиса.
-func (h *HealthHandler) getHealth(w http.ResponseWriter, r *http.Request) {
-	var checkErr error
+// getLive подтверждает, что процесс сервиса запущен и не требует перезапуска.
+func (h *HealthHandler) getLive(w http.ResponseWriter, r *http.Request) {
+	writeJSON(h.logger, w, r, http.StatusOK, dto.LivenessResponse{Status: healthStatusOK})
+}
+
+// getReady выполняет именованные проверки внешних зависимостей и возвращает готовность сервиса принимать трафик.
+func (h *HealthHandler) getReady(w http.ResponseWriter, r *http.Request) {
 	statusCode := http.StatusOK
-	response := dto.HealthResponse{
+	response := dto.ReadinessResponse{
 		Status: healthStatusOK,
-		Checks: make(map[string]string, len(h.checks)),
+		Checks: make(map[string]string, len(h.readinessChecks)),
 	}
 
-	for name, check := range h.checks {
-		ctx, cancel := context.WithTimeout(r.Context(), healthCheckTimeout)
-		err := check(ctx)
-		cancel()
-
-		response.Checks[name] = healthCheckStatus(err)
-		if err != nil {
-			checkErr = errors.Join(checkErr, err)
-		}
+	results := readiness.Run(r.Context(), h.readinessChecks, readiness.DefaultTimeout)
+	for name, err := range results {
+		response.Checks[name] = readinessCheckStatus(err)
 	}
 
+	checkErr := results.Err()
 	if checkErr != nil {
 		statusCode = http.StatusServiceUnavailable
 		response.Status = healthStatusDegraded
-		logError(h.logger, r, "health check failed", checkErr)
+		logError(h.logger, r, "readiness check failed", checkErr)
 	}
 
 	writeJSON(h.logger, w, r, statusCode, response)
 }
 
-func healthCheckStatus(err error) string {
+func readinessCheckStatus(err error) string {
 	if err != nil {
 		return healthStatusError
 	}
