@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
@@ -23,7 +23,6 @@ const (
 
 // Migrator управляет подключением к PostgreSQL и применением миграций.
 type Migrator struct {
-	db       *pgxpool.Pool
 	provider *goose.Provider
 	logger   *slog.Logger
 }
@@ -34,13 +33,15 @@ func New(databaseURI string, logger *slog.Logger) (*Migrator, error) {
 		logger = logging.NopLogger()
 	}
 
-	ctx := context.Background()
-	db, err := pgxpool.New(ctx, databaseURI)
+	connConfig, err := pgx.ParseConfig(databaseURI)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to the database: %w", err)
+		return nil, fmt.Errorf("failed to parse database URI: %w", err)
 	}
-	if err = db.Ping(ctx); err != nil {
-		db.Close()
+
+	// Goose работает с *sql.DB, поэтому создаем его через адаптер pgx/stdlib.
+	migrationDB := stdlib.OpenDB(*connConfig)
+	if err = migrationDB.PingContext(context.Background()); err != nil {
+		_ = migrationDB.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -50,12 +51,10 @@ func New(databaseURI string, logger *slog.Logger) (*Migrator, error) {
 		lock.WithUnlockTimeout(migrationUnlockRetryPeriodSecond, migrationUnlockRetryAttempts),
 	)
 	if err != nil {
-		db.Close()
+		_ = migrationDB.Close()
 		return nil, fmt.Errorf("failed to create postgres session locker: %w", err)
 	}
 
-	// Goose работает с *sql.DB, поэтому создаем совместимую обертку поверх pgxpool.
-	migrationDB := stdlib.OpenDBFromPool(db)
 	provider, err := goose.NewProvider(
 		goose.DialectPostgres,
 		migrationDB,
@@ -64,11 +63,10 @@ func New(databaseURI string, logger *slog.Logger) (*Migrator, error) {
 	)
 	if err != nil {
 		_ = migrationDB.Close()
-		db.Close()
 		return nil, fmt.Errorf("failed to create goose provider: %w", err)
 	}
 
-	return &Migrator{db: db, provider: provider, logger: logger}, nil
+	return &Migrator{provider: provider, logger: logger}, nil
 }
 
 // Run накатывает встроенные goose-миграции.
@@ -100,12 +98,8 @@ func (m *Migrator) Run(ctx context.Context) error {
 
 // Close закрывает ресурсы мигратора.
 func (m *Migrator) Close() error {
-	var closeErr error
-	if m.provider != nil {
-		closeErr = m.provider.Close()
+	if m.provider == nil {
+		return nil
 	}
-	if m.db != nil {
-		m.db.Close()
-	}
-	return closeErr
+	return m.provider.Close()
 }

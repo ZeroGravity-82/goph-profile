@@ -24,7 +24,7 @@ func Test_run_ReturnsMigratorInitError(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "migrator init error")
-	assert.Contains(t, err.Error(), "failed to connect to the database")
+	assert.Contains(t, err.Error(), "failed to parse database URI")
 }
 
 // Test_newLogger_EndpointSet_ReturnsOTELShutdown проверяет включение отправки логов через OpenTelemetry при заданном
