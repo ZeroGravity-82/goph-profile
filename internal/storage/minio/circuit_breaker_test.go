@@ -1,6 +1,7 @@
 package minio
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -84,6 +85,11 @@ func Test_isMinIOAvailable(t *testing.T) {
 		{
 			name: "connection error",
 			err:  errors.New("connection refused"),
+			want: false,
+		},
+		{
+			name: "deadline exceeded",
+			err:  context.DeadlineExceeded,
 			want: false,
 		},
 	}

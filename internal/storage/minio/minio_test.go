@@ -2,9 +2,15 @@ package minio
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	minioV7 "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -125,6 +131,18 @@ func TestMinIOStorage_PutRequiresObjectKey(t *testing.T) {
 	require.EqualError(t, err, "object key is not provided")
 }
 
+// TestMinIOStorage_Put_ReturnsDeadlineExceededWhenRequestStalls проверяет ограничение времени записи объекта в MinIO.
+func TestMinIOStorage_Put_ReturnsDeadlineExceededWhenRequestStalls(t *testing.T) {
+	// Arrange
+	storage := newStalledMinIOStorage(t)
+
+	// Act
+	err := storage.Put(context.Background(), "avatar", []byte("content"))
+
+	// Assert
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
 // TestMinIOStorage_GetRequiresObjectKey проверяет локальную валидацию ключа объекта перед чтением.
 func TestMinIOStorage_GetRequiresObjectKey(t *testing.T) {
 	// Arrange
@@ -138,6 +156,19 @@ func TestMinIOStorage_GetRequiresObjectKey(t *testing.T) {
 	assert.Nil(t, content)
 }
 
+// TestMinIOStorage_Get_ReturnsDeadlineExceededWhenReadingStalls проверяет ограничение времени чтения объекта из MinIO.
+func TestMinIOStorage_Get_ReturnsDeadlineExceededWhenReadingStalls(t *testing.T) {
+	// Arrange
+	storage := newStalledMinIOStorage(t)
+
+	// Act
+	content, err := storage.Get(context.Background(), "avatar")
+
+	// Assert
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Nil(t, content)
+}
+
 // TestMinIOStorage_DeleteRequiresObjectKey проверяет локальную валидацию ключа объекта перед удалением.
 func TestMinIOStorage_DeleteRequiresObjectKey(t *testing.T) {
 	// Arrange
@@ -148,4 +179,53 @@ func TestMinIOStorage_DeleteRequiresObjectKey(t *testing.T) {
 
 	// Assert
 	require.EqualError(t, err, "object key is not provided")
+}
+
+// TestMinIOStorage_Delete_ReturnsDeadlineExceededWhenRequestStalls проверяет ограничение времени удаления объекта из
+// MinIO.
+func TestMinIOStorage_Delete_ReturnsDeadlineExceededWhenRequestStalls(t *testing.T) {
+	// Arrange
+	storage := newStalledMinIOStorage(t)
+
+	// Act
+	err := storage.Delete(context.Background(), "avatar")
+
+	// Assert
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func newStalledMinIOStorage(t *testing.T) *MinIOStorage {
+	t.Helper()
+
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Length", "1")
+			w.Header().Set("ETag", `"test-etag"`)
+			w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+			w.WriteHeader(http.StatusOK)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(func() {
+		close(release)
+		server.Close()
+	})
+	client, err := minioV7.New(strings.TrimPrefix(server.URL, "http://"), &minioV7.Options{
+		Creds:  credentials.NewStaticV4("access-key", "secret-key", ""),
+		Region: "us-east-1",
+	})
+	require.NoError(t, err)
+	return &MinIOStorage{
+		client:           client,
+		bucket:           "avatars",
+		breaker:          newMinIOCircuitBreaker(minioCircuitBreakerFailureThreshold, time.Minute),
+		operationTimeout: 20 * time.Millisecond,
+	}
 }
